@@ -295,21 +295,27 @@ registerVisualizationLayerDefinition({
   selectionFunc: glyphSelector('editing'),
   zIndex: 545,
   screenParameters: { strokeWidth: 1.5, lineDash: [5, 4] },
-  colors: { fillColor: '#1E88A833', strokeColor: '#1E88A8' },
-  colorsDarkMode: { fillColor: '#81e6d933', strokeColor: '#81e6d9' },
+  colors: {
+    fillColor: '#1E88A833',
+    strokeColor: '#1E88A8',
+    targetBoxColor: '#1E88A866',
+  },
+  colorsDarkMode: {
+    fillColor: '#81e6d933',
+    strokeColor: '#81e6d9',
+    targetBoxColor: '#81e6d966',
+  },
   draw: (
     canvasController: CanvasController,
     _positionedGlyph: PositionedGlyph,
     parameters: Record<string, number | number[] | string>,
     model: SceneModel
   ) => {
-    if (!model.componentGhostPath) {
+    if (!model.componentGhostPath && !model.componentTargetBox) {
       return
     }
 
     const context = canvasController.context
-    context.fillStyle = parameters.fillColor as string
-    context.strokeStyle = parameters.strokeColor as string
     context.lineWidth = screenLength(
       canvasController,
       parameters.strokeWidth as number
@@ -317,8 +323,24 @@ registerVisualizationLayerDefinition({
     context.setLineDash(
       screenArray(canvasController, parameters.lineDash as number[])
     )
-    context.fill(model.componentGhostPath, 'evenodd')
-    context.stroke(model.componentGhostPath)
+
+    if (model.componentTargetBox) {
+      const box = model.componentTargetBox
+      context.strokeStyle = parameters.targetBoxColor as string
+      context.strokeRect(
+        box.xMin,
+        box.yMin,
+        box.xMax - box.xMin,
+        box.yMax - box.yMin
+      )
+    }
+
+    if (model.componentGhostPath) {
+      context.fillStyle = parameters.fillColor as string
+      context.strokeStyle = parameters.strokeColor as string
+      context.fill(model.componentGhostPath, 'evenodd')
+      context.stroke(model.componentGhostPath)
+    }
     context.setLineDash([])
   },
 })

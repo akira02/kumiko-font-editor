@@ -37,6 +37,13 @@ export interface SceneModel {
   shapePreviewPath?: Path2D
   // Translucent preview of a component about to be inserted (glyph-local).
   componentGhostPath?: Path2D
+  // Destination region of the component being searched (glyph-local).
+  componentTargetBox?: {
+    xMin: number
+    yMin: number
+    xMax: number
+    yMax: number
+  }
   knifeLine?: {
     x1: number
     y1: number

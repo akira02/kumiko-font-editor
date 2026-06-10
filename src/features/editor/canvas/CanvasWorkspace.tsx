@@ -73,6 +73,7 @@ export function CanvasWorkspace() {
 
   const fontData = useStore((state) => state.fontData)
   const componentGhostPaths = useStore((state) => state.componentGhostPaths)
+  const componentTargetRect = useStore((state) => state.componentTargetRect)
   const selectedGlyphId = useStore((state) => state.selectedGlyphId)
   const editorGlyphIds = useStore((state) => state.editorGlyphIds)
   const editorText = useStore((state) => state.editorText)
@@ -439,8 +440,10 @@ export function CanvasWorkspace() {
     sceneController.sceneModel.componentGhostPath = componentGhostPaths?.length
       ? buildPath2DFromPaths(componentGhostPaths)
       : undefined
+    sceneController.sceneModel.componentTargetBox =
+      componentTargetRect ?? undefined
     controller.requestUpdate()
-  }, [componentGhostPaths])
+  }, [componentGhostPaths, componentTargetRect])
 
   useEffect(() => {
     const sceneController = sceneControllerRef.current

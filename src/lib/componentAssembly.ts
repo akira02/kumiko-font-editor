@@ -100,6 +100,55 @@ export const extractPartPaths = (paths: PathData[], partBox: Rect) =>
     return intersectionArea(bounds, partBox) / area >= PART_OVERLAP_THRESHOLD
   })
 
+const GROUP_OVERLAP_THRESHOLD = 0.4
+
+// Partition paths among semantic part boxes (e.g. the 火/垔 regions of 煙):
+// each path goes to the box covering most of it; unclaimed paths are
+// returned separately for geometric fallback grouping.
+export const groupPathsByPartBoxes = (
+  paths: PathData[],
+  partRects: Rect[]
+): { groups: PathData[][]; remaining: PathData[] } => {
+  const groups: PathData[][] = partRects.map(() => [])
+  const remaining: PathData[] = []
+
+  for (const path of paths) {
+    const bounds = getPathsBounds([path])
+    if (!bounds) {
+      remaining.push(path)
+      continue
+    }
+
+    const area = rectArea(bounds)
+    let bestIndex = -1
+    let bestRatio = 0
+    for (let index = 0; index < partRects.length; index += 1) {
+      const rect = partRects[index]!
+      const ratio =
+        area > 0
+          ? intersectionArea(bounds, rect) / area
+          : (bounds.xMin + bounds.xMax) / 2 >= rect.xMin &&
+              (bounds.xMin + bounds.xMax) / 2 <= rect.xMax &&
+              (bounds.yMin + bounds.yMax) / 2 >= rect.yMin &&
+              (bounds.yMin + bounds.yMax) / 2 <= rect.yMax
+            ? 1
+            : 0
+      if (ratio > bestRatio) {
+        bestRatio = ratio
+        bestIndex = index
+      }
+    }
+
+    if (bestIndex >= 0 && bestRatio >= GROUP_OVERLAP_THRESHOLD) {
+      groups[bestIndex]!.push(path)
+    } else {
+      remaining.push(path)
+    }
+  }
+
+  return { groups, remaining }
+}
+
 export interface AlignTransform {
   scaleX: number
   scaleY: number

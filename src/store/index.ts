@@ -62,6 +62,7 @@ const initialState = {
   editorActiveGlyphIndex: 0,
   previewGlyphMetrics: null,
   componentGhostPaths: null,
+  componentTargetRect: null,
   idsDictionary: IDS_DICTIONARY,
   currentSearchQuery: '',
   filteredGlyphList: [],

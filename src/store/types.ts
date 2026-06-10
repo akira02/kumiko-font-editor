@@ -268,6 +268,13 @@ export interface GlobalState {
   previewGlyphMetrics: { glyphId: string; metrics: GlyphMetrics } | null
   // Ghost outline previewed in the editor before inserting a component copy.
   componentGhostPaths: PathData[] | null
+  // Destination region of the searched component, in glyph font units.
+  componentTargetRect: {
+    xMin: number
+    yMin: number
+    xMax: number
+    yMax: number
+  } | null
   idsDictionary: Record<string, string[]>
   currentSearchQuery: string
   filteredGlyphList: GlyphData[]
@@ -421,5 +428,8 @@ export interface GlobalState {
   updateFontSettings: (fontDataUpdate: Partial<FontData>) => void
   setPreviewGlyphMetrics: (glyphId: string, metrics: GlyphMetrics) => void
   setComponentGhostPaths: (paths: PathData[] | null) => void
+  setComponentTargetRect: (
+    rect: { xMin: number; yMin: number; xMax: number; yMax: number } | null
+  ) => void
   clearPreviewGlyphMetrics: (glyphId?: string) => void
 }
