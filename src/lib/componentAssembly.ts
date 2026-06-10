@@ -156,22 +156,22 @@ export interface AlignTransform {
   offsetY: number
 }
 
-export const computeAlignTransform = (
+// Translation only: the part keeps its drawn size and stroke weights
+// (donor ranking already prefers parts that fit the target proportions),
+// centered on the target region.
+export const computeCenterPlacement = (
   source: Rect,
   target: Rect
-): AlignTransform => {
-  const sourceWidth = source.xMax - source.xMin
-  const sourceHeight = source.yMax - source.yMin
-  const scaleX = sourceWidth > 0 ? (target.xMax - target.xMin) / sourceWidth : 1
-  const scaleY =
-    sourceHeight > 0 ? (target.yMax - target.yMin) / sourceHeight : 1
-  return {
-    scaleX,
-    scaleY,
-    offsetX: target.xMin - source.xMin * scaleX,
-    offsetY: target.yMin - source.yMin * scaleY,
-  }
-}
+): AlignTransform => ({
+  scaleX: 1,
+  scaleY: 1,
+  offsetX: Math.round(
+    (target.xMin + target.xMax) / 2 - (source.xMin + source.xMax) / 2
+  ),
+  offsetY: Math.round(
+    (target.yMin + target.yMax) / 2 - (source.yMin + source.yMax) / 2
+  ),
+})
 
 let transformIdCounter = 0
 const nextId = (prefix: string) =>
