@@ -278,6 +278,9 @@ export function GlyphReadonlyReference({
   const setComponentGhostPaths = useStore(
     (state) => state.setComponentGhostPaths
   )
+  const setComponentTargetRect = useStore(
+    (state) => state.setComponentTargetRect
+  )
   const fontData = useStore((state) => state.fontData)
   const [hoveredPartId, setHoveredPartId] = useState<string | null>(null)
   const [forceRedraw, setForceRedraw] = useState(0)
@@ -457,13 +460,24 @@ export function GlyphReadonlyReference({
         ? (previewParts.find((candidate) => candidate.id === partId) ?? null)
         : null
       setComponentGhostPaths(part ? buildInsertablePaths(part) : null)
+      // The destination box only shows together with the ghost preview.
+      setComponentTargetRect(part ? (targetRect ?? null) : null)
     },
-    [buildInsertablePaths, previewParts, setComponentGhostPaths]
+    [
+      buildInsertablePaths,
+      previewParts,
+      setComponentGhostPaths,
+      setComponentTargetRect,
+      targetRect,
+    ]
   )
 
   useEffect(() => {
-    return () => setComponentGhostPaths(null)
-  }, [setComponentGhostPaths])
+    return () => {
+      setComponentGhostPaths(null)
+      setComponentTargetRect(null)
+    }
+  }, [setComponentGhostPaths, setComponentTargetRect])
 
   const handlePointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
     const point = toFontPoint(event.clientX, event.clientY)
@@ -493,7 +507,7 @@ export function GlyphReadonlyReference({
     for (const path of buildInsertablePaths(part)) {
       createPath(selectedGlyphId, path)
     }
-    setComponentGhostPaths(null)
+    showGhostForPart(null)
   }
 
   return (

@@ -1,4 +1,5 @@
 import { Box, Button, HStack, Spinner, Text, VStack } from '@chakra-ui/react'
+import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { GlyphwikiPartBox } from 'src/lib/glyphwikiComposition'
 
@@ -62,6 +63,18 @@ export function ComponentSearchSection({
 }: ComponentSearchSectionProps) {
   const { t } = useTranslation()
 
+  // Components with a known position come first; the rest are visually
+  // de-emphasized since they can't be auto-placed.
+  const orderedComponents = useMemo(() => {
+    if (!partBoxesByComponent?.size) {
+      return components
+    }
+    return [
+      ...components.filter((component) => partBoxesByComponent.has(component)),
+      ...components.filter((component) => !partBoxesByComponent.has(component)),
+    ]
+  }, [components, partBoxesByComponent])
+
   return (
     <VStack align="stretch" spacing={2}>
       <Text fontSize="sm" color="field.muted" fontFamily="mono">
@@ -75,8 +88,8 @@ export function ComponentSearchSection({
               {t('editor.analyzing')}
             </Text>
           </HStack>
-        ) : components.length > 0 ? (
-          components.map((component) => {
+        ) : orderedComponents.length > 0 ? (
+          orderedComponents.map((component) => {
             const boxes = partBoxesByComponent?.get(component)
             const isSelected = component === selectedComponent
             return (
@@ -85,6 +98,7 @@ export function ComponentSearchSection({
                 size="sm"
                 variant={isSelected ? 'solid' : 'outline'}
                 fontFamily="glyph"
+                opacity={boxes?.length || isSelected ? 1 : 0.55}
                 onClick={() => onSelectComponent(component)}
                 leftIcon={
                   boxes?.length ? (

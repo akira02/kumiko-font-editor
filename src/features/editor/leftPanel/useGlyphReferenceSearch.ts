@@ -6,7 +6,7 @@ import {
   isCjkCharacter,
 } from 'src/lib/glyphRelations'
 import {
-  getGlyphwikiComposition,
+  getGlyphwikiCompositionDeep,
   type GlyphwikiPartBox,
 } from 'src/lib/glyphwikiComposition'
 import {
@@ -104,7 +104,7 @@ export function useGlyphReferenceSearch({
     void (async () => {
       try {
         const [targetParts, variantMap] = await Promise.all([
-          getGlyphwikiComposition(selectedCharacter),
+          getGlyphwikiCompositionDeep(selectedCharacter),
           getGlyphwikiVariantMap().catch(() => new Map<string, string>()),
         ])
         // Datasets may name the same radical differently (⺣ vs 灬);
@@ -133,7 +133,7 @@ export function useGlyphReferenceSearch({
             if (!character) {
               continue
             }
-            const donorParts = await getGlyphwikiComposition(character)
+            const donorParts = await getGlyphwikiCompositionDeep(character)
             const donorBox = donorParts?.find(
               (part) => canon(part.char) === activeCanonical
             )?.box
