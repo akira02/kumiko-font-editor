@@ -4,6 +4,7 @@ import {
   extractPartPaths,
   getFontVerticalBox,
   getPathsBounds,
+  groupPathsByPartBoxes,
   mapGlyphwikiBoxToFontUnits,
   scorePartFit,
   transformPaths,
@@ -100,6 +101,36 @@ describe('extractPartPaths', () => {
       yMax: 880,
     })
     expect(selected).toHaveLength(1)
+  })
+})
+
+describe('groupPathsByPartBoxes', () => {
+  it('groups every stroke of a radical into one part', () => {
+    // 火-like donor: body plus two dots, all within the left part box.
+    const body = makeRectPath(100, 0, 350, 700)
+    const dotLeft = makeRectPath(80, 500, 150, 600)
+    const dotRight = makeRectPath(300, 500, 380, 600)
+    const rightPart = makeRectPath(500, 0, 900, 700)
+    const leftBox = { xMin: 0, yMin: -120, xMax: 450, yMax: 880 }
+    const rightBox = { xMin: 450, yMin: -120, xMax: 1000, yMax: 880 }
+
+    const { groups, remaining } = groupPathsByPartBoxes(
+      [body, dotLeft, dotRight, rightPart],
+      [leftBox, rightBox]
+    )
+    expect(groups[0]).toEqual([body, dotLeft, dotRight])
+    expect(groups[1]).toEqual([rightPart])
+    expect(remaining).toEqual([])
+  })
+
+  it('leaves unclaimed paths for fallback grouping', () => {
+    const stray = makeRectPath(400, 0, 600, 800)
+    const { groups, remaining } = groupPathsByPartBoxes(
+      [stray],
+      [{ xMin: 0, yMin: 0, xMax: 420, yMax: 800 }]
+    )
+    expect(groups[0]).toEqual([])
+    expect(remaining).toEqual([stray])
   })
 })
 

@@ -1,9 +1,10 @@
 import { Divider, HStack, Stack, Text, VStack } from '@chakra-ui/react'
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import {
   getFontVerticalBox,
   mapGlyphwikiBoxToFontUnits,
 } from 'src/lib/componentAssembly'
+import type { GlyphwikiPartBox } from 'src/lib/glyphwikiComposition'
 import { useStore, type GlyphData } from 'src/store'
 import { ComponentSearchSection } from 'src/features/editor/leftPanel/ComponentSearchSection'
 import { GlyphPreviewCard } from 'src/features/editor/leftPanel/GlyphPreviewCard'
@@ -27,6 +28,9 @@ export function LeftPanelContent({
   onBack,
 }: LeftPanelContentProps) {
   const fontData = useStore((state) => state.fontData)
+  const setComponentTargetRect = useStore(
+    (state) => state.setComponentTargetRect
+  )
   const {
     isCjkGlyph,
     loading,
@@ -35,6 +39,7 @@ export function LeftPanelContent({
     searchState,
     selectedComponent,
     targetPartBox,
+    targetParts,
     setPreviewGlyphId,
     setSelectedComponent,
   } = useGlyphReferenceSearch({
@@ -42,6 +47,14 @@ export function LeftPanelContent({
     glyphMap,
     selectedGlyph,
   })
+
+  const partBoxesByComponent = useMemo(() => {
+    const boxes = new Map<string, GlyphwikiPartBox[]>()
+    for (const part of targetParts ?? []) {
+      boxes.set(part.char, [...(boxes.get(part.char) ?? []), part.box])
+    }
+    return boxes
+  }, [targetParts])
 
   // Where the active component should land inside the edited glyph,
   // in font units; null when GlyphWiki has no layout for this character.
@@ -58,6 +71,13 @@ export function LeftPanelContent({
     )
   }, [fontData, selectedGlyph, targetPartBox])
 
+  // Mirror the destination region into the editor canvas so it's obvious
+  // which position is being searched.
+  useEffect(() => {
+    setComponentTargetRect(targetRect)
+    return () => setComponentTargetRect(null)
+  }, [setComponentTargetRect, targetRect])
+
   return (
     <>
       <VStack align="stretch" spacing={3} mb={4}>
@@ -72,6 +92,7 @@ export function LeftPanelContent({
             components={searchState.components}
             loading={loading}
             selectedComponent={selectedComponent ?? searchState.activeComponent}
+            partBoxesByComponent={partBoxesByComponent}
             onSelectComponent={setSelectedComponent}
           />
         ) : null}

@@ -225,4 +225,11 @@ export const buildUiActions = (set: ImmerSet) => ({
     set((state) => {
       state.componentGhostPaths = paths
     }),
+
+  setComponentTargetRect: (
+    rect: { xMin: number; yMin: number; xMax: number; yMax: number } | null
+  ) =>
+    set((state) => {
+      state.componentTargetRect = rect
+    }),
 })

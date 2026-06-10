@@ -8,6 +8,7 @@ import {
 import {
   getGlyphwikiComposition,
   type GlyphwikiPartBox,
+  type GlyphwikiPartPlacement,
 } from 'src/lib/glyphwikiComposition'
 import { scorePartFit } from 'src/lib/componentAssembly'
 import type { GlyphData } from 'src/store'
@@ -82,6 +83,7 @@ export function useGlyphReferenceSearch({
       : null
   const [partFitState, setPartFitState] = useState<{
     key: string
+    targetParts: GlyphwikiPartPlacement[] | null
     targetPartBox: GlyphwikiPartBox | null
     scoreByGlyphId: Map<string, number>
   } | null>(null)
@@ -121,7 +123,12 @@ export function useGlyphReferenceSearch({
           }
         }
         if (!cancelled) {
-          setPartFitState({ key: partFitKey, targetPartBox, scoreByGlyphId })
+          setPartFitState({
+            key: partFitKey,
+            targetParts: targetParts ?? null,
+            targetPartBox,
+            scoreByGlyphId,
+          })
         }
       } catch {
         if (!cancelled) {
@@ -232,6 +239,7 @@ export function useGlyphReferenceSearch({
     selectedCharacter,
     selectedComponent: activeComponent,
     targetPartBox: partFit?.targetPartBox ?? null,
+    targetParts: partFit?.targetParts ?? null,
     setPreviewGlyphId: setManualPreviewGlyphId,
     setSelectedComponent: handleSelectComponent,
   }

@@ -3,10 +3,18 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { VarPackedPath } from 'src/font/VarPackedPath'
 import {
   computeAlignTransform,
+  getFontVerticalBox,
   getPathsBounds,
+  groupPathsByPartBoxes,
+  mapGlyphwikiBoxToFontUnits,
   transformPaths,
   type Rect,
 } from 'src/lib/componentAssembly'
+import { getGlyphCharacter } from 'src/lib/glyphRelations'
+import {
+  getGlyphwikiComposition,
+  type GlyphwikiPartPlacement,
+} from 'src/lib/glyphwikiComposition'
 import {
   useStore,
   type GlyphData,
@@ -87,21 +95,21 @@ const createTestContext = () => {
   return canvas.getContext('2d')
 }
 
-const buildRootPathParts = (glyph: GlyphData): PreviewPart[] => {
-  if (glyph.paths.length === 0) {
+const buildRootPathParts = (sourcePaths: PathData[]): PreviewPart[] => {
+  if (sourcePaths.length === 0) {
     return []
   }
 
   const testContext = createTestContext()
   if (!testContext) {
-    return glyph.paths.map((path) => ({
+    return sourcePaths.map((path) => ({
       id: `path:${path.id}`,
       path2d: new Path2D(buildVarPackedPathForPaths([path]).toSVGPath()),
       pathsToInsert: [clonePath(path)],
     }))
   }
 
-  const singles = glyph.paths.map((path) => ({
+  const singles = sourcePaths.map((path) => ({
     path,
     bounds: getPathBounds(path),
     path2d: new Path2D(buildVarPackedPathForPaths([path]).toSVGPath()),
@@ -270,16 +278,76 @@ export function GlyphReadonlyReference({
   const setComponentGhostPaths = useStore(
     (state) => state.setComponentGhostPaths
   )
+  const fontData = useStore((state) => state.fontData)
   const [hoveredPartId, setHoveredPartId] = useState<string | null>(null)
   const [forceRedraw, setForceRedraw] = useState(0)
   const width = useMemo(() => getPreviewWidth(glyph), [glyph])
-  const previewParts = useMemo(
-    () => [
+
+  // Group the donor's paths by its own GlyphWiki part boxes so an entire
+  // radical (e.g. all three strokes of 火) hovers and inserts as one unit.
+  const donorCharacter = getGlyphCharacter(glyph)
+  const [donorParts, setDonorParts] = useState<{
+    character: string
+    placements: GlyphwikiPartPlacement[]
+  } | null>(null)
+
+  useEffect(() => {
+    if (!donorCharacter) {
+      return
+    }
+    let cancelled = false
+    void getGlyphwikiComposition(donorCharacter)
+      .then((placements) => {
+        if (!cancelled && placements) {
+          setDonorParts({ character: donorCharacter, placements })
+        }
+      })
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [donorCharacter])
+
+  const previewParts = useMemo(() => {
+    const placements =
+      donorParts && donorParts.character === donorCharacter && fontData
+        ? donorParts.placements
+        : null
+
+    let semanticParts: PreviewPart[] = []
+    let leftoverPaths = glyph.paths
+    if (placements && fontData) {
+      const verticalBox = getFontVerticalBox(fontData)
+      const advanceWidth = glyph.metrics.width || fontData.unitsPerEm || 1000
+      const partRects = placements.map((placement) =>
+        mapGlyphwikiBoxToFontUnits(placement.box, advanceWidth, verticalBox)
+      )
+      const { groups, remaining } = groupPathsByPartBoxes(
+        glyph.paths,
+        partRects
+      )
+      semanticParts = groups.flatMap((groupPaths, index) =>
+        groupPaths.length > 0
+          ? [
+              {
+                id: `part:${placements[index]!.char}:${index}`,
+                path2d: new Path2D(
+                  buildVarPackedPathForPaths(groupPaths).toSVGPath()
+                ),
+                pathsToInsert: groupPaths.map(clonePath),
+              },
+            ]
+          : []
+      )
+      leftoverPaths = remaining
+    }
+
+    return [
       ...buildComponentParts(glyphMap, glyph.componentRefs),
-      ...buildRootPathParts(glyph),
-    ],
-    [glyph, glyphMap]
-  )
+      ...semanticParts,
+      ...buildRootPathParts(leftoverPaths),
+    ]
+  }, [donorCharacter, donorParts, fontData, glyph, glyphMap])
 
   const drawPreview = useCallback(
     (hoveredId: string | null) => {
