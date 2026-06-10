@@ -45,8 +45,13 @@ interface SearchErrorMessage {
 type WorkerResponseMessage = SearchSuccessMessage | SearchErrorMessage
 
 const IDS_OPERATOR_MIN = 0x2ff0
-const IDS_OPERATOR_MAX = 0x2ffb
-const IDS_SOURCE_PATH = '/ids/ids_lv2.txt'
+// Unicode 15.1 extended the IDC block through U+2FFF.
+const IDS_OPERATOR_MAX = 0x2fff
+const IDS_OPERATOR_SUBTRACTION = 0x31ef
+const IDS_SOURCE_PATH = '/ids/ids_babelstone.txt'
+// How many decomposition levels feed the reverse index: with one-level
+// source data (煙→火垔), depth 2 lets a search for 土 still find 煙.
+const DECOMPOSITION_EXPANSION_DEPTH = 2
 const HANSEEKER_DATA_PATH = '/hanseeker/data_nosupp.txt'
 const HANSEEKER_VARIANT_PATH = '/hanseeker/data_vt.txt'
 
@@ -69,8 +74,8 @@ const shouldIgnoreCharacter = (character: string) => {
     character === '\r' ||
     character === '\n' ||
     (typeof codePoint === 'number' &&
-      codePoint >= IDS_OPERATOR_MIN &&
-      codePoint <= IDS_OPERATOR_MAX)
+      ((codePoint >= IDS_OPERATOR_MIN && codePoint <= IDS_OPERATOR_MAX) ||
+        codePoint === IDS_OPERATOR_SUBTRACTION))
   )
 }
 
@@ -283,6 +288,8 @@ const buildDataset = async () => {
     addVariantsToIndexes(target, variants, decompositionMap, reverseIndex)
   }
 
+  expandDecompositions(decompositionMap, reverseIndex)
+
   return {
     decompositionMap,
     reverseIndex: new Map(
@@ -291,6 +298,46 @@ const buildDataset = async () => {
         [...characters],
       ])
     ),
+  }
+}
+
+const expandDecompositions = (
+  decompositionMap: Map<string, string[]>,
+  reverseIndex: Map<string, Set<string>>
+) => {
+  const directComponents = new Map(decompositionMap)
+
+  for (const [target, components] of directComponents) {
+    const expanded = new Set(components)
+    let frontier = components
+
+    for (let depth = 1; depth < DECOMPOSITION_EXPANSION_DEPTH; depth += 1) {
+      const nextFrontier: string[] = []
+      for (const component of frontier) {
+        for (const nested of directComponents.get(component) ?? []) {
+          if (nested !== target && !expanded.has(nested)) {
+            expanded.add(nested)
+            nextFrontier.push(nested)
+          }
+        }
+      }
+      if (nextFrontier.length === 0) {
+        break
+      }
+      frontier = nextFrontier
+    }
+
+    if (expanded.size === components.length) {
+      continue
+    }
+
+    decompositionMap.set(target, [...expanded])
+    for (const component of expanded) {
+      if (!reverseIndex.has(component)) {
+        reverseIndex.set(component, new Set())
+      }
+      reverseIndex.get(component)?.add(target)
+    }
   }
 }
 
