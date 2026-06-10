@@ -35,6 +35,8 @@ export interface SceneModel {
   pathInsertHandles?: { points: Array<{ x: number; y: number }> }
   penPreviewPath?: Path2D
   shapePreviewPath?: Path2D
+  // Translucent preview of a component about to be inserted (glyph-local).
+  componentGhostPath?: Path2D
   knifeLine?: {
     x1: number
     y1: number

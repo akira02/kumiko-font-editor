@@ -61,6 +61,7 @@ const initialState = {
   editorTextCursorIndex: 0,
   editorActiveGlyphIndex: 0,
   previewGlyphMetrics: null,
+  componentGhostPaths: null,
   idsDictionary: IDS_DICTIONARY,
   currentSearchQuery: '',
   filteredGlyphList: [],

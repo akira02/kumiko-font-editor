@@ -3,7 +3,7 @@
  * overview panel, viewport, and preview glyph metrics.
  */
 import type { StateCreator } from 'zustand'
-import type { GlobalState, GlyphMetrics } from 'src/store/types'
+import type { GlobalState, GlyphMetrics, PathData } from 'src/store/types'
 import {
   clampEditorActiveGlyphIndex,
   clampEditorCursorIndex,
@@ -219,5 +219,10 @@ export const buildUiActions = (set: ImmerSet) => ({
       if (!glyphId || state.previewGlyphMetrics?.glyphId === glyphId) {
         state.previewGlyphMetrics = null
       }
+    }),
+
+  setComponentGhostPaths: (paths: PathData[] | null) =>
+    set((state) => {
+      state.componentGhostPaths = paths
     }),
 })

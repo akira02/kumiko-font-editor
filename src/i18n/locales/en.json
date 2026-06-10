@@ -118,11 +118,7 @@
     "unusedGlyph": "Unused glyph",
     "value": "Value",
     "when": "When",
-    "xxxx": "xxxx",
-    "insertAsComponent": "Insert “{{char}}” as component",
-    "componentNotInProject": "“{{char}}” is not in this project, so it can't be inserted as a component",
-    "componentInserted": "Inserted component “{{char}}”",
-    "componentInsertFailed": "Could not insert component (it may create a circular reference)"
+    "xxxx": "xxxx"
   },
   "fontExport": {
     "close": "Close",

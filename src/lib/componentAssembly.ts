@@ -1,0 +1,168 @@
+// Geometry helpers for assembling CJK glyphs from parts of other glyphs,
+// guided by GlyphWiki part placement boxes.
+
+import type { FontData, PathData } from 'src/store'
+import type { GlyphwikiPartBox } from 'src/lib/glyphwikiComposition'
+
+export interface Rect {
+  xMin: number
+  yMin: number
+  xMax: number
+  yMax: number
+}
+
+export interface FontVerticalBox {
+  // Font-unit y of the em-box top/bottom (CJK design space).
+  top: number
+  bottom: number
+}
+
+export const getFontVerticalBox = (
+  fontData: Pick<FontData, 'unitsPerEm' | 'lineMetricsHorizontalLayout'>
+): FontVerticalBox => {
+  const unitsPerEm = fontData.unitsPerEm ?? 1000
+  const top =
+    fontData.lineMetricsHorizontalLayout?.ascender?.value ??
+    Math.round(unitsPerEm * 0.88)
+  return { top, bottom: top - unitsPerEm }
+}
+
+// GlyphWiki boxes live on a 200x200 canvas with y growing downward; the
+// canvas spans the full em box horizontally (advance width) and vertically.
+export const mapGlyphwikiBoxToFontUnits = (
+  box: GlyphwikiPartBox,
+  advanceWidth: number,
+  verticalBox: FontVerticalBox
+): Rect => {
+  const emHeight = verticalBox.top - verticalBox.bottom
+  return {
+    xMin: (box.x1 / 200) * advanceWidth,
+    xMax: (box.x2 / 200) * advanceWidth,
+    yMax: verticalBox.top - (box.y1 / 200) * emHeight,
+    yMin: verticalBox.top - (box.y2 / 200) * emHeight,
+  }
+}
+
+export const getPathsBounds = (paths: PathData[]): Rect | null => {
+  let bounds: Rect | null = null
+  for (const path of paths) {
+    for (const node of path.nodes) {
+      if (!bounds) {
+        bounds = { xMin: node.x, yMin: node.y, xMax: node.x, yMax: node.y }
+        continue
+      }
+      bounds.xMin = Math.min(bounds.xMin, node.x)
+      bounds.yMin = Math.min(bounds.yMin, node.y)
+      bounds.xMax = Math.max(bounds.xMax, node.x)
+      bounds.yMax = Math.max(bounds.yMax, node.y)
+    }
+  }
+  return bounds
+}
+
+const rectArea = (rect: Rect) =>
+  Math.max(0, rect.xMax - rect.xMin) * Math.max(0, rect.yMax - rect.yMin)
+
+const intersectionArea = (left: Rect, right: Rect) => {
+  const xOverlap = Math.max(
+    0,
+    Math.min(left.xMax, right.xMax) - Math.max(left.xMin, right.xMin)
+  )
+  const yOverlap = Math.max(
+    0,
+    Math.min(left.yMax, right.yMax) - Math.max(left.yMin, right.yMin)
+  )
+  return xOverlap * yOverlap
+}
+
+const PART_OVERLAP_THRESHOLD = 0.55
+
+// Pick the paths of a donor glyph that belong to the part occupying
+// `partBox` (both in the donor's font units).
+export const extractPartPaths = (paths: PathData[], partBox: Rect) =>
+  paths.filter((path) => {
+    const bounds = getPathsBounds([path])
+    if (!bounds) {
+      return false
+    }
+    const area = rectArea(bounds)
+    if (area === 0) {
+      // Degenerate (e.g. vertical stroke): fall back to center containment.
+      const centerX = (bounds.xMin + bounds.xMax) / 2
+      const centerY = (bounds.yMin + bounds.yMax) / 2
+      return (
+        centerX >= partBox.xMin &&
+        centerX <= partBox.xMax &&
+        centerY >= partBox.yMin &&
+        centerY <= partBox.yMax
+      )
+    }
+    return intersectionArea(bounds, partBox) / area >= PART_OVERLAP_THRESHOLD
+  })
+
+export interface AlignTransform {
+  scaleX: number
+  scaleY: number
+  offsetX: number
+  offsetY: number
+}
+
+export const computeAlignTransform = (
+  source: Rect,
+  target: Rect
+): AlignTransform => {
+  const sourceWidth = source.xMax - source.xMin
+  const sourceHeight = source.yMax - source.yMin
+  const scaleX = sourceWidth > 0 ? (target.xMax - target.xMin) / sourceWidth : 1
+  const scaleY =
+    sourceHeight > 0 ? (target.yMax - target.yMin) / sourceHeight : 1
+  return {
+    scaleX,
+    scaleY,
+    offsetX: target.xMin - source.xMin * scaleX,
+    offsetY: target.yMin - source.yMin * scaleY,
+  }
+}
+
+let transformIdCounter = 0
+const nextId = (prefix: string) =>
+  `${prefix}_ca${(transformIdCounter += 1).toString(36)}_${Math.random().toString(36).slice(2, 8)}`
+
+export const transformPaths = (
+  paths: PathData[],
+  transform: AlignTransform
+): PathData[] =>
+  paths.map((path) => ({
+    id: nextId('path'),
+    closed: path.closed,
+    nodes: path.nodes.map((node) => ({
+      ...node,
+      id: nextId('node'),
+      x: Math.round(node.x * transform.scaleX + transform.offsetX),
+      y: Math.round(node.y * transform.scaleY + transform.offsetY),
+    })),
+  }))
+
+// Lower is better: compares the part's normalized geometry (relative to the
+// em box) between a donor glyph and the target placement.
+export const scorePartFit = (
+  donorBox: GlyphwikiPartBox,
+  targetBox: GlyphwikiPartBox
+) => {
+  const donorWidth = (donorBox.x2 - donorBox.x1) / 200
+  const donorHeight = (donorBox.y2 - donorBox.y1) / 200
+  const targetWidth = (targetBox.x2 - targetBox.x1) / 200
+  const targetHeight = (targetBox.y2 - targetBox.y1) / 200
+  const donorCenterX = (donorBox.x1 + donorBox.x2) / 400
+  const donorCenterY = (donorBox.y1 + donorBox.y2) / 400
+  const targetCenterX = (targetBox.x1 + targetBox.x2) / 400
+  const targetCenterY = (targetBox.y1 + targetBox.y2) / 400
+
+  return (
+    Math.abs(donorWidth - targetWidth) +
+    Math.abs(donorHeight - targetHeight) +
+    0.5 *
+      (Math.abs(donorCenterX - targetCenterX) +
+        Math.abs(donorCenterY - targetCenterY))
+  )
+}
