@@ -116,3 +116,28 @@ export const orientOpenPathNodesForConnection = (
 
   return [...nodes].reverse()
 }
+
+export const wouldCreateComponentCycle = (
+  glyphMap: Record<string, GlyphData>,
+  hostGlyphId: string,
+  componentGlyphId: string,
+  depth = 0
+): boolean => {
+  if (hostGlyphId === componentGlyphId || depth > 16) {
+    return true
+  }
+
+  const componentGlyph = glyphMap[componentGlyphId]
+  if (!componentGlyph) {
+    return false
+  }
+
+  return componentGlyph.componentRefs.some((componentRef) =>
+    wouldCreateComponentCycle(
+      glyphMap,
+      hostGlyphId,
+      componentRef.glyphId,
+      depth + 1
+    )
+  )
+}

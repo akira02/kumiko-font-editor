@@ -118,7 +118,11 @@
     "unusedGlyph": "Unused glyph",
     "value": "Value",
     "when": "When",
-    "xxxx": "xxxx"
+    "xxxx": "xxxx",
+    "insertAsComponent": "以部件插入「{{char}}」",
+    "componentNotInProject": "專案中沒有「{{char}}」的字符，無法以部件插入",
+    "componentInserted": "已插入部件「{{char}}」",
+    "componentInsertFailed": "無法插入部件（可能造成循環引用）"
   },
   "fontExport": {
     "close": "關閉",

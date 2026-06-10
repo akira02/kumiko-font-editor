@@ -7,10 +7,12 @@ import type { GlobalState, GlyphMetrics, NodeType } from 'src/store/types'
 import {
   findNode,
   findPath,
+  generateId,
   getGlyphXBounds,
   isPathEndpointNode,
   translateGlyphHorizontally,
   recomputeGlyphSidebearings,
+  wouldCreateComponentCycle,
 } from 'src/store/glyphGeometry'
 import {
   clampEditorCursorIndex,
@@ -138,6 +140,39 @@ export const buildGlyphActions = (set: ImmerSet) => ({
       state.selectedGlyphId = addedGlyphIds[0] ?? state.selectedGlyphId
     })
     return addedGlyphIds
+  },
+
+  addComponentRef: (glyphId: string, componentGlyphId: string) => {
+    let added = false
+    set((state) => {
+      const glyph = state.fontData?.glyphs[glyphId]
+      const componentGlyph = state.fontData?.glyphs[componentGlyphId]
+      if (!glyph || !componentGlyph || !state.fontData) {
+        return
+      }
+      if (
+        wouldCreateComponentCycle(
+          state.fontData.glyphs,
+          glyphId,
+          componentGlyphId
+        )
+      ) {
+        return
+      }
+
+      glyph.componentRefs.push({
+        id: generateId('component'),
+        glyphId: componentGlyphId,
+        x: 0,
+        y: 0,
+        scaleX: 1,
+        scaleY: 1,
+        rotation: 0,
+      })
+      markGlyphDirty(state, glyphId)
+      added = true
+    })
+    return added
   },
 
   setSelectedLayerId: (id: string | null, clearTemporal: () => void) =>
