@@ -266,6 +266,8 @@ export interface GlobalState {
   editorTextCursorIndex: number
   editorActiveGlyphIndex: number
   previewGlyphMetrics: { glyphId: string; metrics: GlyphMetrics } | null
+  // Ghost outline previewed in the editor before inserting a component copy.
+  componentGhostPaths: PathData[] | null
   idsDictionary: Record<string, string[]>
   currentSearchQuery: string
   filteredGlyphList: GlyphData[]
@@ -418,5 +420,6 @@ export interface GlobalState {
   updateFontInfo: (update: { fontInfo: FontInfo; unitsPerEm?: number }) => void
   updateFontSettings: (fontDataUpdate: Partial<FontData>) => void
   setPreviewGlyphMetrics: (glyphId: string, metrics: GlyphMetrics) => void
+  setComponentGhostPaths: (paths: PathData[] | null) => void
   clearPreviewGlyphMetrics: (glyphId?: string) => void
 }

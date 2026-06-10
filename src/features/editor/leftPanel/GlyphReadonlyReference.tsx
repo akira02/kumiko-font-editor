@@ -2,6 +2,12 @@ import { Box, Text } from '@chakra-ui/react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { VarPackedPath } from 'src/font/VarPackedPath'
 import {
+  computeAlignTransform,
+  getPathsBounds,
+  transformPaths,
+  type Rect,
+} from 'src/lib/componentAssembly'
+import {
   useStore,
   type GlyphData,
   type GlyphComponentRef,
@@ -248,15 +254,22 @@ const getPreviewTransform = (
 export function GlyphReadonlyReference({
   glyph,
   glyphMap,
+  targetRect,
 }: {
   glyph: GlyphData
   glyphMap: Record<string, GlyphData>
+  // Destination box (current glyph's font units) the hovered part should be
+  // fitted into; null falls back to inserting at the donor's coordinates.
+  targetRect?: Rect | null
 }) {
   const { t } = useTranslation()
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const selectedGlyphId = useStore((state) => state.selectedGlyphId)
   const createPath = useStore((state) => state.createPath)
+  const setComponentGhostPaths = useStore(
+    (state) => state.setComponentGhostPaths
+  )
   const [hoveredPartId, setHoveredPartId] = useState<string | null>(null)
   const [forceRedraw, setForceRedraw] = useState(0)
   const width = useMemo(() => getPreviewWidth(glyph), [glyph])
@@ -354,17 +367,52 @@ export function GlyphReadonlyReference({
     return null
   }
 
+  // Fit the hovered part into the target placement so it lands at the
+  // right position and proportions in the edited glyph.
+  const buildInsertablePaths = useCallback(
+    (part: PreviewPart) => {
+      const bounds = getPathsBounds(part.pathsToInsert)
+      if (!bounds || !targetRect) {
+        return part.pathsToInsert.map(clonePath)
+      }
+      return transformPaths(
+        part.pathsToInsert,
+        computeAlignTransform(bounds, targetRect)
+      )
+    },
+    [targetRect]
+  )
+
+  const showGhostForPart = useCallback(
+    (partId: string | null) => {
+      const part = partId
+        ? (previewParts.find((candidate) => candidate.id === partId) ?? null)
+        : null
+      setComponentGhostPaths(part ? buildInsertablePaths(part) : null)
+    },
+    [buildInsertablePaths, previewParts, setComponentGhostPaths]
+  )
+
+  useEffect(() => {
+    return () => setComponentGhostPaths(null)
+  }, [setComponentGhostPaths])
+
   const handlePointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
     const point = toFontPoint(event.clientX, event.clientY)
     if (!point) {
       return
     }
     const part = hitTestPart(point)
-    setHoveredPartId(part?.id ?? null)
+    const partId = part?.id ?? null
+    if (partId !== hoveredPartId) {
+      setHoveredPartId(partId)
+      showGhostForPart(partId)
+    }
   }
 
   const handlePointerLeave = () => {
     setHoveredPartId(null)
+    showGhostForPart(null)
   }
 
   const handleClick = (event: React.MouseEvent<HTMLCanvasElement>) => {
@@ -374,9 +422,10 @@ export function GlyphReadonlyReference({
       return
     }
 
-    for (const path of part.pathsToInsert) {
-      createPath(selectedGlyphId, clonePath(path))
+    for (const path of buildInsertablePaths(part)) {
+      createPath(selectedGlyphId, path)
     }
+    setComponentGhostPaths(null)
   }
 
   return (

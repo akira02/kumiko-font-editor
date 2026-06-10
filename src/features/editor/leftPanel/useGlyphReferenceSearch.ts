@@ -5,6 +5,11 @@ import {
   getRelatedGlyphs,
   isCjkCharacter,
 } from 'src/lib/glyphRelations'
+import {
+  getGlyphwikiComposition,
+  type GlyphwikiPartBox,
+} from 'src/lib/glyphwikiComposition'
+import { scorePartFit } from 'src/lib/componentAssembly'
 import type { GlyphData } from 'src/store'
 
 interface SearchState {
@@ -58,7 +63,7 @@ export function useGlyphReferenceSearch({
     [glyphs]
   )
 
-  const resultGlyphs = useMemo(
+  const unsortedResultGlyphs = useMemo(
     () =>
       (isCjkGlyph
         ? (searchState?.resultGlyphIds ?? [])
@@ -68,6 +73,85 @@ export function useGlyphReferenceSearch({
         .filter((glyph): glyph is GlyphData => Boolean(glyph)),
     [glyphMap, isCjkGlyph, relatedGlyphs, searchState]
   )
+
+  const activeComponentForRanking =
+    selectedComponent ?? searchState?.activeComponent ?? null
+  const partFitKey =
+    isCjkGlyph && selectedCharacter && activeComponentForRanking
+      ? `${selectedCharacter}:${activeComponentForRanking}`
+      : null
+  const [partFitState, setPartFitState] = useState<{
+    key: string
+    targetPartBox: GlyphwikiPartBox | null
+    scoreByGlyphId: Map<string, number>
+  } | null>(null)
+  // Stale results are filtered by key instead of being reset synchronously.
+  const partFit =
+    partFitState && partFitState.key === partFitKey ? partFitState : null
+
+  useEffect(() => {
+    if (!partFitKey || !selectedCharacter || !activeComponentForRanking) {
+      return
+    }
+
+    let cancelled = false
+    void (async () => {
+      try {
+        const targetParts = await getGlyphwikiComposition(selectedCharacter)
+        const targetPartBox =
+          targetParts?.find((part) => part.char === activeComponentForRanking)
+            ?.box ?? null
+        const scoreByGlyphId = new Map<string, number>()
+        if (targetPartBox) {
+          for (const glyph of unsortedResultGlyphs) {
+            const character = getGlyphCharacter(glyph)
+            if (!character) {
+              continue
+            }
+            const donorParts = await getGlyphwikiComposition(character)
+            const donorBox = donorParts?.find(
+              (part) => part.char === activeComponentForRanking
+            )?.box
+            if (donorBox) {
+              scoreByGlyphId.set(
+                glyph.id,
+                scorePartFit(donorBox, targetPartBox)
+              )
+            }
+          }
+        }
+        if (!cancelled) {
+          setPartFitState({ key: partFitKey, targetPartBox, scoreByGlyphId })
+        }
+      } catch {
+        if (!cancelled) {
+          setPartFitState(null)
+        }
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [
+    activeComponentForRanking,
+    partFitKey,
+    selectedCharacter,
+    unsortedResultGlyphs,
+  ])
+
+  // Donors whose part proportions best match the target placement first;
+  // glyphs without GlyphWiki data keep their original relative order.
+  const resultGlyphs = useMemo(() => {
+    if (!partFit || partFit.scoreByGlyphId.size === 0) {
+      return unsortedResultGlyphs
+    }
+    return [...unsortedResultGlyphs].sort(
+      (left, right) =>
+        (partFit.scoreByGlyphId.get(left.id) ?? Number.POSITIVE_INFINITY) -
+        (partFit.scoreByGlyphId.get(right.id) ?? Number.POSITIVE_INFINITY)
+    )
+  }, [partFit, unsortedResultGlyphs])
 
   const previewGlyph =
     (manualPreviewGlyphId &&
@@ -147,6 +231,7 @@ export function useGlyphReferenceSearch({
     searchState: searchState ?? EMPTY_SEARCH_STATE,
     selectedCharacter,
     selectedComponent: activeComponent,
+    targetPartBox: partFit?.targetPartBox ?? null,
     setPreviewGlyphId: setManualPreviewGlyphId,
     setSelectedComponent: handleSelectComponent,
   }

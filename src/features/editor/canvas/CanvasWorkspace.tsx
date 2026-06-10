@@ -26,6 +26,28 @@ import {
 import type { ToolId } from 'src/features/editor/canvas/workspace/types'
 import { useCanvasClipboard } from 'src/features/editor/canvas/useCanvasClipboard'
 import { useCanvasKeyboardShortcuts } from 'src/features/editor/canvas/useCanvasKeyboardShortcuts'
+import { VarPackedPath } from 'src/font/VarPackedPath'
+import type { PathData } from 'src/store'
+
+const buildPath2DFromPaths = (paths: PathData[]) =>
+  new Path2D(
+    VarPackedPath.fromUnpackedContours(
+      paths.map((path) => ({
+        isClosed: path.closed,
+        points: path.nodes.map((node) => ({
+          x: node.x,
+          y: node.y,
+          type:
+            node.type === 'offcurve'
+              ? ('offCurveCubic' as const)
+              : node.type === 'qcurve'
+                ? ('offCurveQuad' as const)
+                : ('onCurve' as const),
+          smooth: node.type === 'smooth',
+        })),
+      }))
+    ).toSVGPath()
+  )
 
 export function CanvasWorkspace() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -50,6 +72,7 @@ export function CanvasWorkspace() {
   } | null>(null)
 
   const fontData = useStore((state) => state.fontData)
+  const componentGhostPaths = useStore((state) => state.componentGhostPaths)
   const selectedGlyphId = useStore((state) => state.selectedGlyphId)
   const editorGlyphIds = useStore((state) => state.editorGlyphIds)
   const editorText = useStore((state) => state.editorText)
@@ -405,6 +428,19 @@ export function CanvasWorkspace() {
       clearPreviewGlyphMetrics()
     }
   }, [clearPreviewGlyphMetrics, selectedGlyphId])
+
+  useEffect(() => {
+    const sceneController = sceneControllerRef.current
+    const controller = canvasControllerRef.current
+    if (!sceneController || !controller) {
+      return
+    }
+
+    sceneController.sceneModel.componentGhostPath = componentGhostPaths?.length
+      ? buildPath2DFromPaths(componentGhostPaths)
+      : undefined
+    controller.requestUpdate()
+  }, [componentGhostPaths])
 
   useEffect(() => {
     const sceneController = sceneControllerRef.current

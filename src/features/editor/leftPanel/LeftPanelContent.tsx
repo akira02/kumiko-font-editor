@@ -1,15 +1,9 @@
-import {
-  Button,
-  Divider,
-  HStack,
-  Stack,
-  Text,
-  Tooltip,
-  VStack,
-  useToast,
-} from '@chakra-ui/react'
+import { Divider, HStack, Stack, Text, VStack } from '@chakra-ui/react'
 import { useMemo } from 'react'
-import { useTranslation } from 'react-i18next'
+import {
+  getFontVerticalBox,
+  mapGlyphwikiBoxToFontUnits,
+} from 'src/lib/componentAssembly'
 import { useStore, type GlyphData } from 'src/store'
 import { ComponentSearchSection } from 'src/features/editor/leftPanel/ComponentSearchSection'
 import { GlyphPreviewCard } from 'src/features/editor/leftPanel/GlyphPreviewCard'
@@ -25,22 +19,6 @@ interface LeftPanelContentProps {
   onBack: () => void
 }
 
-const findGlyphByCharacter = (
-  glyphMap: Record<string, GlyphData>,
-  character: string | null | undefined
-) => {
-  const codePoint = character?.codePointAt(0)
-  if (codePoint === undefined) {
-    return null
-  }
-  const hex = codePoint.toString(16).toUpperCase().padStart(4, '0')
-  return (
-    Object.values(glyphMap).find(
-      (glyph) => glyph.unicode?.toUpperCase() === hex
-    ) ?? null
-  )
-}
-
 export function LeftPanelContent({
   glyphMap,
   glyphs,
@@ -48,9 +26,7 @@ export function LeftPanelContent({
   onAddGlyphToEditor,
   onBack,
 }: LeftPanelContentProps) {
-  const { t } = useTranslation()
-  const toast = useToast()
-  const addComponentRef = useStore((state) => state.addComponentRef)
+  const fontData = useStore((state) => state.fontData)
   const {
     isCjkGlyph,
     loading,
@@ -58,6 +34,7 @@ export function LeftPanelContent({
     resultGlyphs,
     searchState,
     selectedComponent,
+    targetPartBox,
     setPreviewGlyphId,
     setSelectedComponent,
   } = useGlyphReferenceSearch({
@@ -66,29 +43,20 @@ export function LeftPanelContent({
     selectedGlyph,
   })
 
-  const activeComponentChar = selectedComponent ?? searchState.activeComponent
-  const componentGlyph = useMemo(
-    () => findGlyphByCharacter(glyphMap, activeComponentChar),
-    [activeComponentChar, glyphMap]
-  )
-  const canInsertComponent = Boolean(
-    selectedGlyph && componentGlyph && componentGlyph.id !== selectedGlyph.id
-  )
-
-  const handleInsertComponent = () => {
-    if (!selectedGlyph || !componentGlyph) {
-      return
+  // Where the active component should land inside the edited glyph,
+  // in font units; null when GlyphWiki has no layout for this character.
+  const targetRect = useMemo(() => {
+    if (!targetPartBox || !selectedGlyph || !fontData) {
+      return null
     }
-    const added = addComponentRef(selectedGlyph.id, componentGlyph.id)
-    toast({
-      title: added
-        ? t('editor.componentInserted', { char: activeComponentChar })
-        : t('editor.componentInsertFailed'),
-      status: added ? 'success' : 'warning',
-      duration: 2600,
-      isClosable: true,
-    })
-  }
+    const advanceWidth =
+      selectedGlyph.metrics.width || fontData.unitsPerEm || 1000
+    return mapGlyphwikiBoxToFontUnits(
+      targetPartBox,
+      advanceWidth,
+      getFontVerticalBox(fontData)
+    )
+  }, [fontData, selectedGlyph, targetPartBox])
 
   return (
     <>
@@ -100,36 +68,12 @@ export function LeftPanelContent({
         />
 
         {isCjkGlyph && selectedGlyph ? (
-          <>
-            <ComponentSearchSection
-              components={searchState.components}
-              loading={loading}
-              selectedComponent={
-                selectedComponent ?? searchState.activeComponent
-              }
-              onSelectComponent={setSelectedComponent}
-            />
-            {activeComponentChar ? (
-              <Tooltip
-                label={t('editor.componentNotInProject', {
-                  char: activeComponentChar,
-                })}
-                isDisabled={canInsertComponent}
-                hasArrow
-              >
-                <Button
-                  size="sm"
-                  variant="outline"
-                  isDisabled={!canInsertComponent}
-                  onClick={handleInsertComponent}
-                >
-                  {t('editor.insertAsComponent', {
-                    char: activeComponentChar,
-                  })}
-                </Button>
-              </Tooltip>
-            ) : null}
-          </>
+          <ComponentSearchSection
+            components={searchState.components}
+            loading={loading}
+            selectedComponent={selectedComponent ?? searchState.activeComponent}
+            onSelectComponent={setSelectedComponent}
+          />
         ) : null}
 
         <HStack justify="space-between" align="center">
@@ -153,6 +97,7 @@ export function LeftPanelContent({
         <GlyphPreviewCard
           glyph={previewGlyph}
           glyphMap={glyphMap}
+          targetRect={targetRect}
           onAddToEditor={onAddGlyphToEditor}
         />
       </Stack>
