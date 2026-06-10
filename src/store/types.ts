@@ -299,6 +299,7 @@ export interface GlobalState {
   setOverviewGridState: (state: unknown | null) => void
   setOverviewTopGlyphId: (glyphId: string | null) => void
   deleteGlyph: (glyphId: string) => void
+  addComponentRef: (glyphId: string, componentGlyphId: string) => boolean
   addGlyphs: (
     glyphs: Array<{
       id: string
