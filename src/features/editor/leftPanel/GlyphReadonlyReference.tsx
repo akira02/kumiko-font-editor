@@ -2,7 +2,7 @@ import { Box, Text } from '@chakra-ui/react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { VarPackedPath } from 'src/font/VarPackedPath'
 import {
-  computeAlignTransform,
+  computeCenterPlacement,
   getFontVerticalBox,
   getPathsBounds,
   groupPathsByPartBoxes,
@@ -445,7 +445,7 @@ export function GlyphReadonlyReference({
       }
       return transformPaths(
         part.pathsToInsert,
-        computeAlignTransform(bounds, targetRect)
+        computeCenterPlacement(bounds, targetRect)
       )
     },
     [targetRect]

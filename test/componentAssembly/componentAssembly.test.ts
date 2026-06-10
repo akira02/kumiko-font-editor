@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  computeAlignTransform,
+  computeCenterPlacement,
   extractPartPaths,
   getFontVerticalBox,
   getPathsBounds,
@@ -50,13 +50,20 @@ describe('mapGlyphwikiBoxToFontUnits', () => {
   })
 })
 
-describe('computeAlignTransform / transformPaths', () => {
-  it('moves and scales paths into the target rect', () => {
+describe('computeCenterPlacement / transformPaths', () => {
+  it('centers paths on the target rect without scaling', () => {
     const paths = [makeRectPath(100, 100, 300, 500)]
     const target = { xMin: 50, yMin: 0, xMax: 150, yMax: 200 }
-    const transform = computeAlignTransform(getPathsBounds(paths)!, target)
+    const transform = computeCenterPlacement(getPathsBounds(paths)!, target)
+    expect(transform.scaleX).toBe(1)
+    expect(transform.scaleY).toBe(1)
     const moved = transformPaths(paths, transform)
-    expect(getPathsBounds(moved)).toEqual(target)
+    const bounds = getPathsBounds(moved)!
+    // Size preserved, centers aligned.
+    expect(bounds.xMax - bounds.xMin).toBe(200)
+    expect(bounds.yMax - bounds.yMin).toBe(400)
+    expect((bounds.xMin + bounds.xMax) / 2).toBe(100)
+    expect((bounds.yMin + bounds.yMax) / 2).toBe(100)
   })
 
   it('regenerates path and node ids', () => {
