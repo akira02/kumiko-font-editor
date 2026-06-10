@@ -1,5 +1,5 @@
 import { Divider, HStack, Stack, Text, VStack } from '@chakra-ui/react'
-import { useEffect, useMemo } from 'react'
+import { useMemo } from 'react'
 import {
   getFontVerticalBox,
   mapGlyphwikiBoxToFontUnits,
@@ -27,9 +27,6 @@ export function LeftPanelContent({
   onBack,
 }: LeftPanelContentProps) {
   const fontData = useStore((state) => state.fontData)
-  const setComponentTargetRect = useStore(
-    (state) => state.setComponentTargetRect
-  )
   const {
     isCjkGlyph,
     loading,
@@ -61,13 +58,6 @@ export function LeftPanelContent({
       getFontVerticalBox(fontData)
     )
   }, [fontData, selectedGlyph, targetPartBox])
-
-  // Mirror the destination region into the editor canvas so it's obvious
-  // which position is being searched.
-  useEffect(() => {
-    setComponentTargetRect(targetRect)
-    return () => setComponentTargetRect(null)
-  }, [setComponentTargetRect, targetRect])
 
   return (
     <>
