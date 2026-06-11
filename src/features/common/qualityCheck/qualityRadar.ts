@@ -314,6 +314,82 @@ const RADAR_DIMENSIONS: RadarDimension[] = [
   'balance',
 ]
 
+interface FeatureEvaluation {
+  score: number
+  reasons: RadarReason[]
+  outlierDimensions: Set<RadarDimension>
+}
+
+const evaluateFeatures = (
+  features: RadarFeatureValue[],
+  complexity: number,
+  featureStats: Map<string, RadarRobustStat>,
+  sizeTrend: RadarSizeTrend
+): FeatureEvaluation => {
+  const reasons: RadarReason[] = []
+  const outlierDimensions = new Set<RadarDimension>()
+  let score = 0
+
+  for (const feature of features) {
+    const stat = featureStats.get(feature.key)
+    if (!stat) {
+      continue
+    }
+    const adjusted = detrendValue(feature, complexity, sizeTrend)
+    const zScore = radarZScore(adjusted, stat)
+    const excess = Math.abs(zScore) - RADAR_REASON_Z
+    if (excess > 0) {
+      score += excess * excess
+      reasons.push({
+        key: feature.key,
+        label: feature.label,
+        dimension: feature.dimension,
+        format: feature.format,
+        value: feature.value,
+        median: stat.median,
+        // 期望值 = 此字複雜度下的迴歸預測（raw 與 detrend 的差補回中位）
+        expected:
+          adjusted !== feature.value
+            ? stat.median + (feature.value - adjusted)
+            : undefined,
+        zScore,
+      })
+    }
+    if (Math.abs(zScore) >= RADAR_OUTLIER_Z) {
+      outlierDimensions.add(feature.dimension)
+    }
+  }
+
+  reasons.sort((left, right) => Math.abs(right.zScore) - Math.abs(left.zScore))
+  return { score, reasons, outlierDimensions }
+}
+
+/**
+ * 以既有母體基準即時評估單一字形：編輯中的字每動一筆都會偏離快取的
+ * evaluationByGlyphId，這條路徑讓 UI 拿「凍結的尺」量「正在動的筆」。
+ */
+export const evaluateSampleAgainstRadar = (
+  sample: GlyphGeometrySample,
+  radar: Pick<RadarAnalysis, 'featureStats' | 'sizeTrend'>,
+  bodyBox: { top: number; bottom: number; unitsPerEm: number }
+): RadarGlyphEvaluation => {
+  const unitsPerEm = bodyBox.unitsPerEm
+  const bodyCenterY = (bodyBox.top + bodyBox.bottom) / 2
+  const { score, reasons } = evaluateFeatures(
+    collectGlyphFeatures(sample, unitsPerEm, bodyCenterY),
+    glyphComplexity(sample, unitsPerEm),
+    radar.featureStats,
+    radar.sizeTrend
+  )
+  return {
+    glyphId: sample.glyphId,
+    glyphName: sample.glyphName,
+    character: sample.character,
+    score,
+    reasons,
+  }
+}
+
 /**
  * 核心：從統一取樣得到的 sample 計算離群分析。
  * sample 已含 ink，故不重複攤平、不依賴 store，可在 Worker 執行。
@@ -367,46 +443,15 @@ export const computeRadarFromSamples = (
   }
 
   for (const entry of glyphFeatures) {
-    const reasons: RadarReason[] = []
-    const dimensionHit = new Set<RadarDimension>()
-    let score = 0
-
-    for (const feature of entry.features) {
-      const stat = featureStats.get(feature.key)
-      if (!stat) {
-        continue
-      }
-      const adjusted = detrendValue(feature, entry.complexity, sizeTrend)
-      const zScore = radarZScore(adjusted, stat)
-      const excess = Math.abs(zScore) - RADAR_REASON_Z
-      if (excess > 0) {
-        score += excess * excess
-        reasons.push({
-          key: feature.key,
-          label: feature.label,
-          dimension: feature.dimension,
-          format: feature.format,
-          value: feature.value,
-          median: stat.median,
-          // 期望值 = 此字複雜度下的迴歸預測（raw 與 detrend 的差補回中位）
-          expected:
-            adjusted !== feature.value
-              ? stat.median + (feature.value - adjusted)
-              : undefined,
-          zScore,
-        })
-      }
-      if (Math.abs(zScore) >= RADAR_OUTLIER_Z) {
-        dimensionHit.add(feature.dimension)
-      }
-    }
-
-    for (const dimension of dimensionHit) {
+    const { score, reasons, outlierDimensions } = evaluateFeatures(
+      entry.features,
+      entry.complexity,
+      featureStats,
+      sizeTrend
+    )
+    for (const dimension of outlierDimensions) {
       dimensionOutliers[dimension] += 1
     }
-    reasons.sort(
-      (left, right) => Math.abs(right.zScore) - Math.abs(left.zScore)
-    )
     evaluationByGlyphId.set(entry.sample.glyphId, {
       glyphId: entry.sample.glyphId,
       glyphName: entry.sample.glyphName,
