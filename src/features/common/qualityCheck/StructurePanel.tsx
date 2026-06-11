@@ -32,6 +32,7 @@ import {
   radarDimensionLabels,
   type RadarGlyphEvaluation,
 } from 'src/features/common/qualityCheck/qualityRadar'
+import { buildRadarAdvice } from 'src/features/common/qualityCheck/radarAdvice'
 
 interface StructurePanelProps {
   fontData: FontData | null
@@ -271,8 +272,13 @@ function SuspectRow({
           </HStack>
           <HStack spacing={1} flexWrap="wrap">
             {evaluation.reasons.slice(0, 3).map((reason) => (
-              <Tag key={reason.key} size="sm" variant="subtle">
-                {formatRadarReason(reason)}
+              <Tag
+                key={reason.key}
+                size="sm"
+                variant="subtle"
+                title={formatRadarReason(reason)}
+              >
+                {buildRadarAdvice(reason).title}
               </Tag>
             ))}
             {evaluation.reasons.length > 3 ? (
