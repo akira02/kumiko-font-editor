@@ -12,7 +12,7 @@ import {
 } from '@chakra-ui/react'
 import { useMemo } from 'react'
 import type { FontData, GlyphData } from 'src/store'
-import type { QualityCheckMode } from 'src/features/common/qualityCheck/qualityCheckMode'
+import type { QualityScope } from 'src/features/common/qualityCheck/qualityLint'
 import {
   sideLabels,
   strokeTypeLabels,
@@ -36,7 +36,7 @@ import {
 interface StructurePanelProps {
   fontData: FontData | null
   scopedGlyphs: GlyphData[]
-  mode: QualityCheckMode
+  scope: QualityScope
   onLocateGlyph: (glyphId: string) => void
 }
 
@@ -325,16 +325,17 @@ function GlyphSideTable({ sample }: { sample: GlyphGeometrySample }) {
 export function StructurePanel({
   fontData,
   scopedGlyphs,
-  mode,
+  scope,
   onLocateGlyph,
 }: StructurePanelProps) {
   // 母體分析在 Worker 背景跑（解析在主執行緒做一次，重計算丟背景）。
   const { analysis, isAnalyzing } = useQualityAnalysis(fontData, true)
   const baseline = analysis?.baseline ?? null
   const radar = analysis?.radar ?? null
+  const isFocusedScope = scope !== 'font'
 
   const scopedSamples = useMemo(() => {
-    if (!fontData || !baseline || mode !== 'selected') {
+    if (!fontData || !baseline || !isFocusedScope) {
       return []
     }
     const resolvedFont = resolveFontGlyphs(fontData)
@@ -348,13 +349,13 @@ export function StructurePanel({
         )
       )
       .filter((sample): sample is GlyphGeometrySample => sample !== null)
-  }, [baseline, fontData, mode, scopedGlyphs])
+  }, [baseline, fontData, isFocusedScope, scopedGlyphs])
 
   const visibleEvaluations = useMemo(() => {
     if (!radar) {
       return []
     }
-    if (mode === 'selected') {
+    if (isFocusedScope) {
       return scopedGlyphs
         .map((glyph) => radar.evaluationByGlyphId.get(glyph.id))
         .filter(
@@ -364,7 +365,7 @@ export function StructurePanel({
         .sort((left, right) => right.score - left.score)
     }
     return radar.suspects.slice(0, 50)
-  }, [mode, radar, scopedGlyphs])
+  }, [isFocusedScope, radar, scopedGlyphs])
 
   if (!baseline) {
     return (
@@ -387,7 +388,7 @@ export function StructurePanel({
 
   return (
     <Stack spacing={4}>
-      {radar ? (
+      {!isFocusedScope && radar ? (
         <SimpleGrid columns={{ base: 2, md: 5 }} spacing={3}>
           <RadarScoreTile
             label="整體健康度"
@@ -404,21 +405,28 @@ export function StructurePanel({
             />
           ))}
         </SimpleGrid>
-      ) : (
+      ) : !radar ? (
         <Box borderWidth={1} borderColor="field.line" bg="field.panel" p={4}>
           <Text fontSize="sm" color="field.muted">
             漢字樣本不足（需 20 個以上），尚無法建立統計基準。
           </Text>
         </Box>
-      )}
+      ) : null}
 
-      <Text fontSize="sm" color="field.muted">
-        依
-        3type《中文字体解密组报告》：每個漢字的真實字面框由最外側的「邊界筆畫」定義，
-        以線定義的是<b>框架筆畫</b>（粉紅），以點定義的是<b>樹枝筆畫</b>（藍）。
-        以下基準值由字體現有 {baseline.sampleCount} 個漢字推導：
-        各邊兩類筆畫邊距的眾數與 80% 集中區間，可用來檢查新做或新產生的字。
-      </Text>
+      {isFocusedScope ? (
+        <Text fontSize="sm" color="field.muted">
+          以整套字體現有 {baseline.sampleCount}{' '}
+          個漢字推導結構基準，再檢查範圍內的字是否偏離群體統計。
+        </Text>
+      ) : (
+        <Text fontSize="sm" color="field.muted">
+          依
+          3type《中文字体解密组报告》：每個漢字的真實字面框由最外側的「邊界筆畫」定義，
+          以線定義的是<b>框架筆畫</b>（粉紅），以點定義的是<b>樹枝筆畫</b>
+          （藍）。 以下基準值由字體現有 {baseline.sampleCount} 個漢字推導：
+          各邊兩類筆畫邊距的眾數與 80% 集中區間，可用來檢查新做或新產生的字。
+        </Text>
+      )}
 
       <HStack align="flex-start" spacing={6} flexWrap="wrap">
         <StructureRangeSvg baseline={baseline} />
@@ -456,10 +464,10 @@ export function StructurePanel({
         </Stack>
       </HStack>
 
-      {mode === 'selected' ? (
+      {isFocusedScope ? (
         <Stack spacing={3}>
           <Text fontSize="sm" fontWeight="900">
-            選取字的邊界筆畫分析（{scopedSamples.length} 個漢字）
+            範圍內字的邊界筆畫分析（{scopedSamples.length} 個漢字）
           </Text>
           {scopedSamples.length === 0 ? (
             <Box
@@ -469,7 +477,7 @@ export function StructurePanel({
               p={4}
             >
               <Text fontSize="sm" color="field.muted">
-                選取的字中沒有可分析的漢字輪廓。
+                檢查範圍內沒有可分析的漢字輪廓。
               </Text>
             </Box>
           ) : (
@@ -509,8 +517,8 @@ export function StructurePanel({
         <Box borderWidth={1} borderColor="field.line" bg="field.panel">
           <HStack justify="space-between" px={3} py={2} bg="field.panelMuted">
             <Text fontSize="sm" fontWeight="900">
-              {mode === 'selected'
-                ? '選取字的離群分析'
+              {isFocusedScope
+                ? '範圍內字的離群分析'
                 : '最值得人工檢查的字（風險排名）'}
             </Text>
             <HStack spacing={2}>
@@ -518,7 +526,7 @@ export function StructurePanel({
                 size="sm"
                 colorScheme={radar.suspects.length > 0 ? 'orange' : 'green'}
               >
-                {mode === 'selected'
+                {isFocusedScope
                   ? `${visibleEvaluations.filter((entry) => entry.score > 0).length} 個離群`
                   : `${radar.suspects.length} 個可疑字`}
               </Tag>
@@ -527,8 +535,8 @@ export function StructurePanel({
           {visibleEvaluations.length === 0 ? (
             <Box p={4}>
               <Text fontSize="sm" color="field.muted">
-                {mode === 'selected'
-                  ? '選取的字中沒有可分析的漢字。'
+                {isFocusedScope
+                  ? '檢查範圍內沒有可分析的漢字。'
                   : '沒有偏離群體統計基準的字。'}
               </Text>
             </Box>
@@ -538,11 +546,11 @@ export function StructurePanel({
                 <SuspectRow
                   key={evaluation.glyphId}
                   evaluation={evaluation}
-                  rank={mode === 'selected' ? null : index + 1}
+                  rank={isFocusedScope ? null : index + 1}
                   onLocateGlyph={onLocateGlyph}
                 />
               ))}
-              {mode !== 'selected' &&
+              {!isFocusedScope &&
               radar.suspects.length > visibleEvaluations.length ? (
                 <Text fontSize="xs" color="field.muted" px={3} py={2}>
                   其餘 {radar.suspects.length - visibleEvaluations.length}{' '}

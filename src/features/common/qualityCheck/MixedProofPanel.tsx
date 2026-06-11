@@ -1,8 +1,16 @@
-import { Box, Button, HStack, Input, Stack, Tag, Text } from '@chakra-ui/react'
-import { useMemo } from 'react'
+import {
+  Box,
+  Button,
+  HStack,
+  Input,
+  Stack,
+  Switch,
+  Tag,
+  Text,
+} from '@chakra-ui/react'
+import { useMemo, useState } from 'react'
 import type { FontData, GlyphData } from 'src/store'
 import { ProofLineSvg } from 'src/features/common/qualityCheck/ProofLineSvg'
-import type { QualityCheckMode } from 'src/features/common/qualityCheck/qualityCheckMode'
 import {
   buildMixedProofText,
   buildMixedScriptMetrics,
@@ -10,11 +18,13 @@ import {
   getGlyphCharacter,
   mixedProofPresets,
 } from 'src/features/common/qualityCheck/qualityProof'
+import type { QualityScope } from 'src/features/common/qualityCheck/qualityLint'
+import { useTranslation } from 'react-i18next'
 
 interface MixedProofPanelProps {
   fontData: FontData | null
   scopedGlyphs: GlyphData[]
-  mode: QualityCheckMode
+  scope: QualityScope
   proofText: string
   onProofTextChange: (value: string) => void
 }
@@ -29,16 +39,19 @@ const formatRatio = (numerator: number | null, denominator: number | null) =>
 export function MixedProofPanel({
   fontData,
   scopedGlyphs,
-  mode,
+  scope,
   proofText,
   onProofTextChange,
 }: MixedProofPanelProps) {
+  const { t } = useTranslation()
+  const [showHighlight, setShowHighlight] = useState(false)
+  const isFocusedScope = scope !== 'font'
   const proofTextWithScope = useMemo(
     () =>
-      mode === 'selected'
+      isFocusedScope
         ? buildMixedProofText(scopedGlyphs.map(getGlyphCharacter), proofText)
         : proofText,
-    [mode, proofText, scopedGlyphs]
+    [isFocusedScope, proofText, scopedGlyphs]
   )
   const proofRun = useMemo(
     () => buildProofRun(fontData, proofTextWithScope),
@@ -47,11 +60,13 @@ export function MixedProofPanel({
   const metrics = useMemo(() => buildMixedScriptMetrics(fontData), [fontData])
   const selectedGlyphIdSet = useMemo(
     () =>
-      mode === 'selected'
+      isFocusedScope
         ? new Set(scopedGlyphs.map((glyph) => glyph.id))
         : undefined,
-    [mode, scopedGlyphs]
+    [isFocusedScope, scopedGlyphs]
   )
+  const highlightedGlyphIds =
+    isFocusedScope && showHighlight ? selectedGlyphIdSet : undefined
 
   const capRatio = formatRatio(metrics.latinCapHeight, metrics.hanFaceHeight)
   const xRatio = formatRatio(metrics.latinXHeight, metrics.hanFaceHeight)
@@ -60,24 +75,37 @@ export function MixedProofPanel({
   return (
     <Stack spacing={4}>
       <Text fontSize="sm" color="field.muted">
-        混排檢查：不同文字系統、語言與數字同時出現在同一段文字時，觀察彼此的大小、
-        基線與節奏是否協調。
-        {mode === 'selected'
-          ? '選取的字已與拉丁字母、數字穿插排列（橘色標示）。'
-          : ''}
+        {isFocusedScope
+          ? t('qualityCheck.mixedProof.focusedDescription')
+          : t('qualityCheck.mixedProof.description')}
       </Text>
 
-      <HStack spacing={2} wrap="wrap">
-        {mixedProofPresets.map((preset) => (
-          <Button
-            key={preset}
-            size="xs"
-            variant={preset === proofText ? 'solid' : 'outline'}
-            onClick={() => onProofTextChange(preset)}
-          >
-            {preset.slice(0, 8)}
-          </Button>
-        ))}
+      <HStack spacing={3} wrap="wrap" justify="space-between">
+        <HStack spacing={2} wrap="wrap">
+          {mixedProofPresets.map((preset) => (
+            <Button
+              key={preset}
+              size="xs"
+              variant={preset === proofText ? 'solid' : 'outline'}
+              onClick={() => onProofTextChange(preset)}
+            >
+              {preset.slice(0, 8)}
+            </Button>
+          ))}
+        </HStack>
+        {isFocusedScope ? (
+          <HStack spacing={2} ml="auto">
+            <Switch
+              size="sm"
+              aria-label={t('qualityCheck.highlightScopedGlyphs')}
+              isChecked={showHighlight}
+              onChange={(event) => setShowHighlight(event.target.checked)}
+            />
+            <Text fontSize="xs" color="field.muted" fontWeight="800">
+              {t('qualityCheck.highlightScopedGlyphs')}
+            </Text>
+          </HStack>
+        ) : null}
       </HStack>
 
       <Input
@@ -107,14 +135,14 @@ export function MixedProofPanel({
         p={4}
       >
         {proofSizes.map((fontSize) => (
-          <Box key={fontSize}>
+          <Box key={fontSize} overflowX="auto">
             <Text fontFamily="mono" fontSize="xs" fontWeight="900" mb={1}>
               {fontSize}px
             </Text>
             <ProofLineSvg
               proofRun={proofRun}
               fontSize={fontSize}
-              highlightGlyphIds={selectedGlyphIdSet}
+              highlightGlyphIds={highlightedGlyphIds}
             />
           </Box>
         ))}

@@ -16,7 +16,7 @@ import { useRightPanelModel } from 'src/features/common/glyphInspector/useRightP
 import { SlidingTabList } from 'src/features/common/SlidingTabList'
 import { FontSettingsModal } from 'src/features/common/projectControl/FontSettingsModal'
 import { ProjectControlActions } from 'src/features/common/projectControl/ProjectControlActions'
-import { QualityCheckModal } from 'src/features/common/qualityCheck/QualityCheckModal'
+import { FontQualityCheckModal } from 'src/features/common/qualityCheck/QualityCheckModal'
 import { MetricsCard } from 'src/features/editor/rightPanel/MetricsCard'
 import { NodeInspectorCard } from 'src/features/editor/rightPanel/NodeInspectorCard'
 import { TransformCard } from 'src/features/editor/rightPanel/TransformCard'
@@ -162,7 +162,7 @@ export function EditorRightPanel() {
         qualitySummary={panel.commitQualityReport.summary}
         onOpenQualityCheck={qualityCheckModal.onOpen}
       />
-      <QualityCheckModal
+      <FontQualityCheckModal
         isOpen={qualityCheckModal.isOpen}
         onClose={qualityCheckModal.onClose}
       />

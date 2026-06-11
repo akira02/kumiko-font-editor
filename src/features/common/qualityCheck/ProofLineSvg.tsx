@@ -98,12 +98,13 @@ export function ProofLineSvg({
     const x = previous ? previous.x + previous.glyph.advance : 0
     return [...placements, { glyph, x }]
   }, [])
+  const widthPx = Math.max(fontSize, (proofRun.totalAdvance / 1000) * fontSize)
 
   return (
     <Box
       as="svg"
       viewBox={`0 ${PROOF_DESCENDER} ${proofRun.totalAdvance} ${PROOF_ASCENDER - PROOF_DESCENDER}`}
-      width="100%"
+      width={`${widthPx}px`}
       height={`${Math.max(28, fontSize * 1.8)}px`}
       display="block"
       preserveAspectRatio="xMinYMid meet"

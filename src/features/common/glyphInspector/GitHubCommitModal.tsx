@@ -357,32 +357,45 @@ function QualitySummaryCard({
   summary: QualitySummary
   onOpenQualityCheck?: () => void
 }) {
+  const { t } = useTranslation()
   const statusText = summary.hasBlockingIssues
-    ? `${summary.blockingCount} 阻擋 · ${summary.warningCount} 警告`
+    ? t('qualityCheck.commit.blockingStatus', {
+        blocking: summary.blockingCount,
+        warning: summary.warningCount,
+      })
     : summary.warningCount > 0
-      ? `${summary.warningCount} 警告 · 可提交`
-      : '沒有阻擋問題'
+      ? t('qualityCheck.commit.warningStatus', {
+          warning: summary.warningCount,
+        })
+      : t('qualityCheck.commit.cleanStatus')
 
   return (
     <Box borderWidth={1} borderRadius="lg" p={4} bg="gray.50">
       <HStack justify="space-between" align="center" spacing={4}>
         <Box>
           <HStack spacing={2} mb={1}>
-            <Text fontWeight="medium">提交前品質檢查</Text>
+            <Text fontWeight="medium">{t('qualityCheck.commit.title')}</Text>
             <Badge colorScheme={summary.hasBlockingIssues ? 'red' : 'green'}>
-              {summary.hasBlockingIssues ? '阻擋' : '通過'}
+              {summary.hasBlockingIssues
+                ? t('qualityCheck.summary.blocking')
+                : t('qualityCheck.commit.pass')}
             </Badge>
           </HStack>
           <Text fontSize="sm" color="gray.600">
-            {statusText}，已檢查 {summary.glyphCount} glyphs
+            {t('qualityCheck.commit.checkedSummary', {
+              status: statusText,
+              count: summary.glyphCount,
+            })}
             {summary.deletedCount !== null
-              ? `，刪除 ${summary.deletedCount}`
+              ? t('qualityCheck.commit.deletedSuffix', {
+                  count: summary.deletedCount,
+                })
               : ''}
           </Text>
         </Box>
         {onOpenQualityCheck ? (
           <Button size="sm" variant="outline" onClick={onOpenQualityCheck}>
-            打開檢查
+            {t('qualityCheck.openShort')}
           </Button>
         ) : null}
       </HStack>

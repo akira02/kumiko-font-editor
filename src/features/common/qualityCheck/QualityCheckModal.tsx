@@ -17,7 +17,7 @@ import {
   Tabs,
   Text,
 } from '@chakra-ui/react'
-import { useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { FrameSelect, GraphUp, List, MessageText } from 'iconoir-react'
 import { SlidingTabList } from 'src/features/common/SlidingTabList'
@@ -30,9 +30,11 @@ import type { QualityCheckMode } from 'src/features/common/qualityCheck/qualityC
 import {
   buildQualityReport,
   type QualityIssue,
+  type QualityReport,
   type QualityScope,
 } from 'src/features/common/qualityCheck/qualityLint'
 import { mixedProofPresets } from 'src/features/common/qualityCheck/qualityProof'
+import { useTranslation } from 'react-i18next'
 
 interface QualityCheckModalProps {
   isOpen: boolean
@@ -44,30 +46,36 @@ interface QualityCheckModalProps {
 }
 
 const scopeOptions: Array<{
-  id: Exclude<QualityScope, 'selected'>
-  label: string
+  id: Exclude<QualityScope, 'current' | 'selected'>
+  labelKey: string
 }> = [
-  { id: 'changed', label: '本次變更' },
-  { id: 'current', label: '目前字符' },
-  { id: 'font', label: '整套字體' },
-]
-
-const qualityTabLabels = [
-  <TabLabel key="lint" icon={<List width={15} height={15} />}>
-    Lint
-  </TabLabel>,
-  <TabLabel key="mixed-proof" icon={<MessageText width={15} height={15} />}>
-    混排
-  </TabLabel>,
-  <TabLabel key="gray-proof" icon={<GraphUp width={15} height={15} />}>
-    灰度
-  </TabLabel>,
-  <TabLabel key="structure" icon={<FrameSelect width={15} height={15} />}>
-    結構
-  </TabLabel>,
+  { id: 'changed', labelKey: 'qualityCheck.scope.changed' },
+  { id: 'font', labelKey: 'qualityCheck.scope.font' },
 ]
 
 const EMPTY_SELECTED_GLYPH_IDS: string[] = []
+
+const scopeLabelKeys: Record<QualityScope, string> = {
+  changed: 'qualityCheck.scope.changed',
+  current: 'qualityCheck.scope.current',
+  selected: 'qualityCheck.scope.selected',
+  font: 'qualityCheck.scope.font',
+}
+
+const EMPTY_QUALITY_REPORT: QualityReport = {
+  glyphs: [],
+  issues: [],
+  summary: {
+    glyphCount: 0,
+    blockingCount: 0,
+    warningCount: 0,
+    infoCount: 0,
+    deletedCount: null,
+    hasBlockingIssues: false,
+  },
+}
+
+type FontQualityScope = Exclude<QualityScope, 'current' | 'selected'>
 
 export function QualityCheckModal({
   isOpen,
@@ -76,8 +84,73 @@ export function QualityCheckModal({
   initialScope = 'changed',
   selectedGlyphIds = EMPTY_SELECTED_GLYPH_IDS,
 }: QualityCheckModalProps) {
-  const [scope, setScope] =
-    useState<Exclude<QualityScope, 'selected'>>(initialScope)
+  if (mode === 'selected') {
+    return (
+      <SelectedGlyphQualityCheckModal
+        isOpen={isOpen}
+        onClose={onClose}
+        selectedGlyphIds={selectedGlyphIds}
+      />
+    )
+  }
+
+  return (
+    <FontQualityCheckModal
+      isOpen={isOpen}
+      onClose={onClose}
+      initialScope={initialScope}
+    />
+  )
+}
+
+export function FontQualityCheckModal({
+  isOpen,
+  onClose,
+  initialScope = 'changed',
+}: Pick<QualityCheckModalProps, 'isOpen' | 'onClose' | 'initialScope'>) {
+  const [scope, setScope] = useState<FontQualityScope>(
+    initialScope === 'font' ? 'font' : 'changed'
+  )
+
+  return (
+    <QualityCheckDialog
+      isOpen={isOpen}
+      onClose={onClose}
+      scope={scope}
+      scopeControl={<ScopeSelector scope={scope} onScopeChange={setScope} />}
+    />
+  )
+}
+
+export function SelectedGlyphQualityCheckModal({
+  isOpen,
+  onClose,
+  selectedGlyphIds = EMPTY_SELECTED_GLYPH_IDS,
+}: Pick<QualityCheckModalProps, 'isOpen' | 'onClose' | 'selectedGlyphIds'>) {
+  return (
+    <QualityCheckDialog
+      isOpen={isOpen}
+      onClose={onClose}
+      scope="selected"
+      selectedGlyphIds={selectedGlyphIds}
+    />
+  )
+}
+
+function QualityCheckDialog({
+  isOpen,
+  onClose,
+  scope,
+  selectedGlyphIds = EMPTY_SELECTED_GLYPH_IDS,
+  scopeControl = null,
+}: {
+  isOpen: boolean
+  onClose: () => void
+  scope: QualityScope
+  selectedGlyphIds?: string[]
+  scopeControl?: ReactNode
+}) {
+  const { t } = useTranslation()
   const [activeTabIndex, setActiveTabIndex] = useState(0)
   const [proofText, setProofText] = useState(mixedProofPresets[0])
   const fontData = useStore((state) => state.fontData)
@@ -86,30 +159,89 @@ export function QualityCheckModal({
   const localDeletedGlyphIds = useStore((state) => state.localDeletedGlyphIds)
   const addGlyphToEditor = useStore((state) => state.addGlyphToEditor)
   const setWorkspaceView = useStore((state) => state.setWorkspaceView)
+  const isWholeFontScope = scope === 'font'
+  const scopeLabel = t(scopeLabelKeys[scope])
+  const qualityTabLabels = [
+    <TabLabel key="lint" icon={<List width={15} height={15} />}>
+      {t('qualityCheck.tabs.lint')}
+    </TabLabel>,
+    <TabLabel key="mixed-proof" icon={<MessageText width={15} height={15} />}>
+      {t('qualityCheck.tabs.mixedProof')}
+    </TabLabel>,
+    <TabLabel key="gray-proof" icon={<GraphUp width={15} height={15} />}>
+      {t('qualityCheck.tabs.grayProof')}
+    </TabLabel>,
+    <TabLabel key="structure" icon={<FrameSelect width={15} height={15} />}>
+      {t('qualityCheck.tabs.structure')}
+    </TabLabel>,
+  ]
+  const [qualityReport, setQualityReport] =
+    useState<QualityReport>(EMPTY_QUALITY_REPORT)
+  const [isReportPending, setIsReportPending] = useState(false)
 
-  const qualityReport = useMemo(
-    () =>
-      buildQualityReport({
-        // 關閉時不重算整套字體的報告
-        fontData: isOpen ? fontData : null,
-        scope: mode === 'selected' ? 'selected' : scope,
-        selectedGlyphId,
-        selectedGlyphIds,
-        dirtyGlyphIds: localDirtyGlyphIds,
-        deletedGlyphIds: localDeletedGlyphIds,
-      }),
-    [
-      fontData,
-      isOpen,
-      localDeletedGlyphIds,
-      localDirtyGlyphIds,
-      mode,
-      selectedGlyphIds,
-      selectedGlyphId,
-      scope,
-    ]
-  )
+  useEffect(() => {
+    if (!isOpen) {
+      return
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setActiveTabIndex(0)
+    }, 0)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
+  }, [isOpen, scope])
+
+  useEffect(() => {
+    let reportTimeoutId: number | undefined
+
+    const stateTimeoutId = window.setTimeout(() => {
+      if (!isOpen) {
+        setQualityReport(EMPTY_QUALITY_REPORT)
+        setIsReportPending(false)
+        return
+      }
+
+      setIsReportPending(true)
+      setQualityReport(EMPTY_QUALITY_REPORT)
+      reportTimeoutId = window.setTimeout(() => {
+        setQualityReport(
+          buildQualityReport({
+            fontData,
+            scope,
+            selectedGlyphId,
+            selectedGlyphIds,
+            dirtyGlyphIds: localDirtyGlyphIds,
+            deletedGlyphIds: localDeletedGlyphIds,
+          })
+        )
+        setIsReportPending(false)
+      }, 0)
+    }, 0)
+
+    return () => {
+      window.clearTimeout(stateTimeoutId)
+      if (reportTimeoutId !== undefined) {
+        window.clearTimeout(reportTimeoutId)
+      }
+    }
+  }, [
+    fontData,
+    isOpen,
+    localDeletedGlyphIds,
+    localDirtyGlyphIds,
+    scope,
+    selectedGlyphId,
+    selectedGlyphIds,
+  ])
+
   const { glyphs, issues, summary } = qualityReport
+  const displayValue = (value: number | string) =>
+    isReportPending ? '...' : value
+  const displayGlyphCount = isReportPending
+    ? '...'
+    : t('qualityCheck.summary.glyphCount', { count: summary.glyphCount })
   const handleLocateGlyph = (glyphId: string) => {
     addGlyphToEditor(glyphId)
     setWorkspaceView('editor')
@@ -131,45 +263,62 @@ export function QualityCheckModal({
           >
             <Box>
               <HStack spacing={3} align="center">
-                <Text as="span">品質檢查</Text>
-                {mode === 'selected' ? (
-                  <Badge colorScheme="orange">選取的字 {glyphs.length}</Badge>
+                <Text as="span">{t('qualityCheck.title')}</Text>
+                {!isWholeFontScope ? (
+                  <Badge colorScheme="orange">
+                    {scopeLabel} {isReportPending ? '...' : glyphs.length}
+                  </Badge>
                 ) : null}
               </HStack>
               <Text fontSize="xs" color="field.muted" fontWeight="800" mt={1}>
-                Lint、混排、灰度與結構 proof
+                {isWholeFontScope
+                  ? t('qualityCheck.description.font')
+                  : t('qualityCheck.description.focused', {
+                      scope: scopeLabel,
+                    })}
               </Text>
             </Box>
-            {mode === 'selected' ? null : (
-              <ScopeSelector scope={scope} onScopeChange={setScope} />
-            )}
+            {scopeControl}
           </Stack>
         </ModalHeader>
         <ModalCloseButton />
         <ModalBody overflowY="auto">
           <Stack spacing={4}>
-            <SimpleGrid columns={{ base: 1, md: 5 }} spacing={3}>
+            <SimpleGrid
+              columns={{
+                base: 1,
+                md: summary.deletedCount === null ? 5 : 6,
+              }}
+              spacing={3}
+            >
               <SummaryTile
-                label="檢查範圍"
-                value={`${summary.glyphCount} glyphs`}
+                label={t('qualityCheck.summary.scope')}
+                value={scopeLabel}
               />
               <SummaryTile
-                label="阻擋"
-                value={summary.blockingCount}
+                label={t('qualityCheck.summary.glyphs')}
+                value={displayGlyphCount}
+              />
+              <SummaryTile
+                label={t('qualityCheck.summary.blocking')}
+                value={displayValue(summary.blockingCount)}
                 tone="red"
               />
               <SummaryTile
-                label="警告"
-                value={summary.warningCount}
+                label={t('qualityCheck.summary.warning')}
+                value={displayValue(summary.warningCount)}
                 tone="orange"
               />
-              <SummaryTile label="提示" value={summary.infoCount} />
               <SummaryTile
-                label="刪除"
-                value={
-                  summary.deletedCount === null ? 'N/A' : summary.deletedCount
-                }
+                label={t('qualityCheck.summary.info')}
+                value={displayValue(summary.infoCount)}
               />
+              {summary.deletedCount === null ? null : (
+                <SummaryTile
+                  label={t('qualityCheck.summary.deleted')}
+                  value={displayValue(summary.deletedCount)}
+                />
+              )}
             </SimpleGrid>
 
             <Tabs
@@ -187,17 +336,21 @@ export function QualityCheckModal({
 
               <TabPanels>
                 <TabPanel px={0}>
-                  <LintPanel
-                    issues={issues}
-                    glyphCount={glyphs.length}
-                    onLocateIssue={handleLocateIssue}
-                  />
+                  {isReportPending ? (
+                    <ReportLoadingPanel />
+                  ) : (
+                    <LintPanel
+                      issues={issues}
+                      glyphCount={glyphs.length}
+                      onLocateIssue={handleLocateIssue}
+                    />
+                  )}
                 </TabPanel>
                 <TabPanel px={0}>
                   <MixedProofPanel
                     fontData={fontData}
                     scopedGlyphs={glyphs}
-                    mode={mode}
+                    scope={scope}
                     proofText={proofText}
                     onProofTextChange={setProofText}
                   />
@@ -206,14 +359,14 @@ export function QualityCheckModal({
                   <GrayProofPanel
                     fontData={fontData}
                     scopedGlyphs={glyphs}
-                    mode={mode}
+                    scope={scope}
                   />
                 </TabPanel>
                 <TabPanel px={0}>
                   <StructurePanel
                     fontData={fontData}
                     scopedGlyphs={glyphs}
-                    mode={mode}
+                    scope={scope}
                     onLocateGlyph={handleLocateGlyph}
                   />
                 </TabPanel>
@@ -223,7 +376,7 @@ export function QualityCheckModal({
         </ModalBody>
         <ModalFooter gap={3}>
           <Button variant="ghost" onClick={onClose}>
-            關閉
+            {t('common.close')}
           </Button>
         </ModalFooter>
       </ModalContent>
@@ -257,13 +410,27 @@ function SummaryTile({
   )
 }
 
+function ReportLoadingPanel() {
+  const { t } = useTranslation()
+
+  return (
+    <Box borderWidth={1} borderColor="field.line" bg="field.panel" p={6}>
+      <Text fontSize="sm" color="field.muted" fontWeight="800">
+        {t('qualityCheck.loadingReport')}
+      </Text>
+    </Box>
+  )
+}
+
 function ScopeSelector({
   scope,
   onScopeChange,
 }: {
-  scope: Exclude<QualityScope, 'selected'>
-  onScopeChange: (scope: Exclude<QualityScope, 'selected'>) => void
+  scope: FontQualityScope
+  onScopeChange: (scope: FontQualityScope) => void
 }) {
+  const { t } = useTranslation()
+
   return (
     <HStack
       spacing={1}
@@ -282,7 +449,7 @@ function ScopeSelector({
           variant={scope === option.id ? 'solid' : 'ghost'}
           onClick={() => onScopeChange(option.id)}
         >
-          {option.label}
+          {t(option.labelKey)}
         </Button>
       ))}
     </HStack>

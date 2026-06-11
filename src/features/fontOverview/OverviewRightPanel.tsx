@@ -1,21 +1,17 @@
-import {
-  Box,
-  Button,
-  HStack,
-  Stack,
-  Text,
-  useDisclosure,
-} from '@chakra-ui/react'
+import { Box, Stack, Text, useDisclosure } from '@chakra-ui/react'
 import { useState } from 'react'
-import { PageSearch } from 'iconoir-react'
 import { ExportFontModal } from 'src/features/common/fontExport/ExportFontModal'
 import { useFontExport } from 'src/features/common/fontExport/useFontExport'
 import { GitHubCommitModal } from 'src/features/common/glyphInspector/GitHubCommitModal'
 import { GlyphSummaryCard } from 'src/features/common/glyphInspector/GlyphSummaryCard'
 import { useRightPanelModel } from 'src/features/common/glyphInspector/useRightPanelModel'
+import { SelectedGlyphsCard } from 'src/features/fontOverview/SelectedGlyphsCard'
 import { FontSettingsModal } from 'src/features/common/projectControl/FontSettingsModal'
 import { ProjectControlActions } from 'src/features/common/projectControl/ProjectControlActions'
-import { QualityCheckModal } from 'src/features/common/qualityCheck/QualityCheckModal'
+import {
+  FontQualityCheckModal,
+  SelectedGlyphQualityCheckModal,
+} from 'src/features/common/qualityCheck/QualityCheckModal'
 import type { QualityCheckMode } from 'src/features/common/qualityCheck/qualityCheckMode'
 import type { QualityScope } from 'src/features/common/qualityCheck/qualityLint'
 import { useStore } from 'src/store'
@@ -23,10 +19,14 @@ import { useTranslation } from 'react-i18next'
 
 interface OverviewRightPanelProps {
   selectedGlyphIds?: string[]
+  onDeleteSelectedGlyphs: () => void
+  onEnterEditor: (glyphId: string) => void
 }
 
 export function OverviewRightPanel({
   selectedGlyphIds = [],
+  onDeleteSelectedGlyphs,
+  onEnterEditor,
 }: OverviewRightPanelProps) {
   const { t } = useTranslation()
 
@@ -50,7 +50,19 @@ export function OverviewRightPanel({
     qualityCheckModal.onOpen()
   }
 
+  const hasSelection = selectedGlyphIds.length > 0
   const hasMultiSelection = selectedGlyphIds.length >= 2
+  const handleEnterSelectedGlyphs = () => {
+    const primaryGlyphId = selectedGlyphIds[0]
+    if (primaryGlyphId) {
+      onEnterEditor(primaryGlyphId)
+    }
+  }
+  const handleOpenSelectedQualityCheck = () => {
+    if (hasSelection) {
+      openQualityCheck('selected')
+    }
+  }
 
   return (
     <Box
@@ -87,26 +99,13 @@ export function OverviewRightPanel({
         />
 
         {hasMultiSelection ? (
-          <Box borderWidth={1} borderColor="field.line" bg="field.panel" p={3}>
-            <HStack justify="space-between" spacing={3}>
-              <Text fontSize="sm" fontWeight="800">
-                已選取 {selectedGlyphIds.length} 個字符
-              </Text>
-              <Button
-                size="xs"
-                leftIcon={<PageSearch width={14} height={14} />}
-                onClick={() => openQualityCheck('selected')}
-              >
-                品質檢查
-              </Button>
-            </HStack>
-            <Text fontSize="xs" color="field.muted" mt={1}>
-              只對選取的字進行 Lint、混排、灰度與結構檢查。
-            </Text>
-          </Box>
-        ) : null}
-
-        {!panel.glyph ? (
+          <SelectedGlyphsCard
+            selectedGlyphCount={selectedGlyphIds.length}
+            onDeleteGlyphs={onDeleteSelectedGlyphs}
+            onEnterEditor={handleEnterSelectedGlyphs}
+            onOpenQualityCheck={handleOpenSelectedQualityCheck}
+          />
+        ) : !panel.glyph ? (
           <Text fontSize="sm" color="field.muted" fontFamily="mono">
             {t('fontOverview.noGlyphSelected')}
           </Text>
@@ -119,7 +118,12 @@ export function OverviewRightPanel({
             selectedLayerId={panel.selectedLayerId}
             workspaceView={panel.workspaceView}
             onDeleteGlyph={panel.handleDeleteGlyph}
-            onEnterEditor={() => panel.setWorkspaceView('editor')}
+            onEnterEditor={() => {
+              if (panel.glyph) {
+                onEnterEditor(panel.glyph.id)
+              }
+            }}
+            onOpenQualityCheck={handleOpenSelectedQualityCheck}
             onLayerChange={panel.setSelectedLayerId}
           />
         )}
@@ -148,16 +152,20 @@ export function OverviewRightPanel({
         qualitySummary={panel.commitQualityReport.summary}
         onOpenQualityCheck={() => openQualityCheck('font', 'changed')}
       />
-      <QualityCheckModal
-        key={`${qualityCheckMode}-${qualityCheckScope}`}
-        isOpen={qualityCheckModal.isOpen}
-        onClose={qualityCheckModal.onClose}
-        mode={qualityCheckMode}
-        initialScope={qualityCheckScope}
-        selectedGlyphIds={
-          qualityCheckMode === 'selected' ? selectedGlyphIds : undefined
-        }
-      />
+      {qualityCheckMode === 'selected' ? (
+        <SelectedGlyphQualityCheckModal
+          isOpen={qualityCheckModal.isOpen}
+          onClose={qualityCheckModal.onClose}
+          selectedGlyphIds={hasSelection ? selectedGlyphIds : undefined}
+        />
+      ) : (
+        <FontQualityCheckModal
+          key={qualityCheckScope}
+          isOpen={qualityCheckModal.isOpen}
+          onClose={qualityCheckModal.onClose}
+          initialScope={qualityCheckScope}
+        />
+      )}
     </Box>
   )
 }
