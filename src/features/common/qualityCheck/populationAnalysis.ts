@@ -20,11 +20,16 @@ export interface PopulationAnalysis {
 }
 
 export const runPopulationAnalysis = (
-  resolvedFont: ResolvedFont
+  resolvedFont: ResolvedFont,
+  semanticEnclosureChars?: ReadonlySet<string>
 ): PopulationAnalysis => {
   const samples = buildFontGeometrySamples(resolvedFont)
   return {
     baseline: buildStructureBaseline(samples, resolvedFont.bodyBox),
-    radar: computeRadarFromSamples(samples, resolvedFont.bodyBox),
+    radar: computeRadarFromSamples(
+      samples,
+      resolvedFont.bodyBox,
+      semanticEnclosureChars
+    ),
   }
 }

@@ -43,6 +43,20 @@ const describeBody = (
   const high = reason.zScore > 0
   const delta = formatDelta(reason)
 
+  // 對稱性 key 也帶 bearing: 前綴，必須在逐側邊距的前綴判斷之前處理
+  if (reason.key === 'bearing:symmetryH') {
+    // value = lsb − rsb；偏高表示左留白多 → 字整體偏右。
+    // 整體平移 d 會讓 lsb−rsb 變動 2d，故建議量為差距的一半
+    const shift = formatRadarValue(
+      Math.abs(reason.value - reason.median) / 2,
+      'units'
+    )
+    return {
+      title: `左右皆框架筆畫的字未視覺置中，整體偏${high ? '右' : '左'}`,
+      action: `將整體往${high ? '左' : '右'}移約 ${shift}`,
+    }
+  }
+
   if (reason.key.startsWith('bearing:')) {
     const side = reason.key.split(':')[1] as StructureSide
     return {

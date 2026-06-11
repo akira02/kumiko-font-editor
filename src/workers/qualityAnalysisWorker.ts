@@ -1,9 +1,12 @@
 import { runPopulationAnalysis } from 'src/features/common/qualityCheck/populationAnalysis'
+import { getEnclosureCharacterSet } from 'src/features/common/qualityCheck/semanticStructure'
 import type { ResolvedFont } from 'src/features/common/qualityCheck/resolvedGlyph'
 
 /**
  * 母體幾何分析 Worker：接收主執行緒已解析好的純資料字形，
  * 在背景執行緒做攤平 + 統計，避免阻塞 UI。
+ * GlyphWiki 語意結構資料由 Worker 自行載入（一次性、有快取），
+ * 載入失敗時分析照常進行，只是少了語意分組。
  */
 interface AnalyzeMessage {
   type: 'analyze'
@@ -13,7 +16,7 @@ interface AnalyzeMessage {
   }
 }
 
-self.onmessage = (event: MessageEvent<AnalyzeMessage>) => {
+self.onmessage = async (event: MessageEvent<AnalyzeMessage>) => {
   if (event.data.type !== 'analyze') {
     return
   }
@@ -22,7 +25,8 @@ self.onmessage = (event: MessageEvent<AnalyzeMessage>) => {
   const post = (self as DedicatedWorkerGlobalScope).postMessage.bind(self)
 
   try {
-    const analysis = runPopulationAnalysis(resolvedFont)
+    const enclosureChars = await getEnclosureCharacterSet()
+    const analysis = runPopulationAnalysis(resolvedFont, enclosureChars)
     post({ type: 'analysis-success', payload: { requestId, analysis } })
   } catch (error) {
     post({

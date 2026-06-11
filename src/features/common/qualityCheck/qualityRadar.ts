@@ -32,6 +32,11 @@ interface RadarFeatureDefinition {
 
 export interface RadarFeatureValue extends RadarFeatureDefinition {
   value: number
+  /**
+   * 比較群組：同視窗內再細分的比較母體（如按包圍結構分組）。
+   * 只影響統計分組，不進 RadarReason.key，advice 文案對應不受影響。
+   */
+  cohort?: string
 }
 
 export interface RadarRobustStat {
@@ -39,6 +44,13 @@ export interface RadarRobustStat {
   median: number
   /** robust 標準差（1.4826 × MAD，MAD 退化時退回更寬的離散度估計） */
   scale: number
+  /**
+   * 雙側尺度（double-MAD）：3type 報告指出邊距分布是偏態的
+   * （眾數貼近範圍最大值端），對稱的單一尺度會高估長尾側、
+   * 低估短尾側的偏離。低於中位數與高於中位數的偏差各自估尺度。
+   */
+  scaleBelow: number
+  scaleAbove: number
   p10: number
   p90: number
 }
@@ -49,7 +61,7 @@ export interface RadarReason {
   dimension: RadarDimension
   format: RadarValueFormat
   value: number
-  /** 比較母體（同複雜度層）的中位數與 80% 區間，已換算回此字的原始尺度 */
+  /** 比較母體（複雜度相鄰視窗）的中位數與 80% 區間 */
   median: number
   p10: number
   p90: number
@@ -60,7 +72,7 @@ export interface RadarGlyphEvaluation {
   glyphId: string
   glyphName: string
   character: string
-  /** 超出正常區間的累積程度；0 表示完全落在群體內 */
+  /** 各維度最大偏離的平方和；0 表示完全落在群體內 */
   score: number
   reasons: RadarReason[]
 }
@@ -73,28 +85,31 @@ export interface RadarDimensionScore {
 }
 
 /**
- * 延伸性（3type 報告）：字面大小應隨筆畫複雜度正相關成長（冒比二高大），
- * 故尺寸特徵不能直接要求一致，需先對複雜度做線性迴歸、再以殘差比較。
+ * 複雜度視窗：一/丶這類筆畫極簡的字，邊距與字面天生就跟複雜字不同，
+ * 拿全體統計比會永遠霸佔風險榜。固定層數的 quantile 分層也不夠：
+ * 最低層的中位字仍有三五畫，單筆畫字在層內依舊是極端值。
+ * 改為沿複雜度排序取重疊滑動視窗，每個字只跟「複雜度最接近的 K 個字」比，
+ * 丶的比較對象就真的是丨丿冫亅。視窗內同時保留複雜度自身的分布，
+ * 供 peer-mismatch 折扣判斷「這個字在視窗內是否仍缺乏真正的同儕」。
  */
-export interface RadarSizeTrend {
-  medianComplexity: number
-  slopeByKey: Map<string, number>
+export interface RadarComplexityWindow {
+  /** 視窗複雜度中位數，評分時以此挑最近視窗 */
+  centerComplexity: number
+  /** 視窗內複雜度分布（peer-mismatch 折扣用） */
+  complexityStat: RadarRobustStat
+  statsByKey: Map<string, RadarRobustStat>
 }
 
-/**
- * 複雜度分層：一/丶這類筆畫極簡的字，邊距與字面天生就跟複雜字不同，
- * 拿全體統計比會永遠霸佔風險榜。分層後每個字只跟「複雜度相近的字」比。
- */
 export interface RadarStrata {
-  /** 各層複雜度上界（遞增，最後一層為 Infinity） */
-  binUpperBounds: number[]
-  statsByBin: Array<Map<string, RadarRobustStat>>
+  /** 依 centerComplexity 遞增排列的重疊視窗 */
+  windows: RadarComplexityWindow[]
 }
 
 export interface RadarAnalysis {
   sampleCount: number
   strata: RadarStrata
-  sizeTrend: RadarSizeTrend
+  /** 母體中被 GlyphWiki 組成資料判定為包圍結構的字（即時評分路徑沿用同一分類） */
+  enclosureCharacters: Set<string>
   dimensionScores: RadarDimensionScore[]
   overallScore: number
   /** 依風險分數排序的可疑字形（score ≥ RADAR_SUSPECT_SCORE） */
@@ -106,14 +121,26 @@ export interface RadarAnalysis {
 export const RADAR_REASON_Z = 2
 /** 特徵 |z| 達此值將該字計入維度離群 */
 export const RADAR_OUTLIER_Z = 2.5
-/** 風險分數達此值才列入可疑字（單特徵 z≥3 或多項中度偏離） */
+/** 風險分數達此值才列入可疑字（單維度 z≥3 或多維度中度偏離） */
 export const RADAR_SUSPECT_SCORE = 1
 /** 單一特徵計分時 |z| 封頂，避免極端字以天文數字霸佔排名 */
 const RADAR_Z_CAP = 8
 const MIN_RADAR_SAMPLES = 20
-/** 複雜度分層：每層最少樣本數與層數上限 */
-const MIN_BIN_SIZE = 30
-const MAX_BINS = 6
+/**
+ * 視窗大小 K = clamp(ceil(N/3), 40, 150)：
+ * 下限 40 保住 median/MAD 的估計品質（scale 誤差 ≈ 1.16/√K），
+ * 上限 150 維持比較母體的局部性；字數少時平滑退化為全體統計。
+ */
+const MIN_WINDOW_SIZE = 40
+const MAX_WINDOW_SIZE = 150
+/** 視窗間隔 = K / 3，相鄰視窗約 2/3 重疊 */
+const WINDOW_STRIDE_DIVISOR = 3
+/**
+ * peer-mismatch 折扣強度：字的複雜度在視窗內 |z| 每超出 1 一個單位，
+ * 特徵 z 分數的折扣分母加 0.5。視窗已經很局部，只需弱折扣處理
+ * 排序兩端（最簡單/最複雜的一批字）視窗內仍偏斜的殘餘問題。
+ */
+const PEER_MISMATCH_RATE = 0.5
 const MAD_TO_SIGMA = 1.4826
 const IQR_TO_SIGMA = 1 / 1.349
 
@@ -122,21 +149,62 @@ const STRUCTURE_SIDES: StructureSide[] = ['left', 'right', 'top', 'bottom']
 const collectGlyphFeatures = (
   sample: GlyphGeometrySample,
   unitsPerEm: number,
-  bodyCenterY: number
+  bodyCenterY: number,
+  semanticEnclosure: boolean
 ): RadarFeatureValue[] => {
   const features: RadarFeatureValue[] = []
   const advance = Math.max(1, sample.advance)
   const ink = sample.ink
 
-  // 邊界：依邊界筆畫理論，框架/樹枝筆畫分開建立分布
+  /**
+   * 包圍結構分組：口框/日目類兩側皆框架筆畫的字，依排版慣例字面要
+   * 收窄補償（包圍結構視覺上顯大），跟無包圍的字本來就不該同尺比。
+   * 以每軸的框架筆畫數（0/1/2）當 cohort，尺寸/邊距/墨量特徵
+   * 只跟同包圍程度的字比較。
+   * GlyphWiki 組成資料判定為包圍結構的字（semanticEnclosure）
+   * 直接視四側為框架筆畫：幾何分型會隨畫壞的輪廓共變，語意分類不會。
+   */
+  const sideType = (side: StructureSide) =>
+    semanticEnclosure ? 'framing' : sample.sides[side].type
+  const hFraming =
+    (sideType('left') === 'framing' ? 1 : 0) +
+    (sideType('right') === 'framing' ? 1 : 0)
+  const vFraming =
+    (sideType('top') === 'framing' ? 1 : 0) +
+    (sideType('bottom') === 'framing' ? 1 : 0)
+  const hCohort = `h${hFraming}`
+  const vCohort = `v${vFraming}`
+  const faceCohort = `${hCohort}${vCohort}`
+
+  // 邊界：依邊界筆畫理論，框架/樹枝筆畫分開建立分布；
+  // cohort 帶對側類型，全包圍字的邊距只跟其他全包圍字比
+  const oppositeSide: Record<StructureSide, StructureSide> = {
+    left: 'right',
+    right: 'left',
+    top: 'bottom',
+    bottom: 'top',
+  }
   for (const side of STRUCTURE_SIDES) {
-    const sideSample = sample.sides[side]
+    const type = sideType(side)
     features.push({
-      key: `bearing:${side}:${sideSample.type}`,
-      label: `${sideLabels[side]}${strokeTypeLabels[sideSample.type]}邊距`,
+      key: `bearing:${side}:${type}`,
+      label: `${sideLabels[side]}${strokeTypeLabels[type]}邊距`,
       dimension: 'boundary',
       format: 'units',
-      value: sideSample.bearing,
+      value: sample.sides[side].bearing,
+      cohort: sideType(oppositeSide[side]),
+    })
+  }
+
+  // 對稱性（3type 報告 P83）：左右皆框架筆畫的字應在字身框中視覺置中，
+  // lsb−rsb 的離群直接量測未置中（比墨水重心對框架字更銳利）
+  if (sideType('left') === 'framing' && sideType('right') === 'framing') {
+    features.push({
+      key: 'bearing:symmetryH',
+      label: '左右置中偏移',
+      dimension: 'balance',
+      format: 'units',
+      value: sample.sides.left.bearing - sample.sides.right.bearing,
     })
   }
 
@@ -149,6 +217,7 @@ const collectGlyphFeatures = (
     dimension: 'proportion',
     format: 'percent',
     value: faceWidth / advance,
+    cohort: hCohort,
   })
   features.push({
     key: 'face:heightRatio',
@@ -156,6 +225,7 @@ const collectGlyphFeatures = (
     dimension: 'proportion',
     format: 'percent',
     value: faceHeight / unitsPerEm,
+    cohort: vCohort,
   })
   if (faceHeight > 0) {
     features.push({
@@ -164,17 +234,20 @@ const collectGlyphFeatures = (
       dimension: 'proportion',
       format: 'ratio',
       value: faceWidth / faceHeight,
+      cohort: faceCohort,
     })
   }
 
   // 墨量與密度分布
   if (ink.inkToFaceRatio !== null) {
+    // 字面收窄會直接推高墨量比，跟著包圍程度分組
     features.push({
       key: 'ink:toFace',
       label: '字面內墨量比',
       dimension: 'ink',
       format: 'percent',
       value: ink.inkToFaceRatio,
+      cohort: faceCohort,
     })
   }
   if (ink.inkToEmRatio !== null) {
@@ -193,6 +266,7 @@ const collectGlyphFeatures = (
       dimension: 'ink',
       format: 'percent',
       value: ink.spreadX / advance,
+      cohort: hCohort,
     })
     features.push({
       key: 'ink:spreadY',
@@ -200,6 +274,7 @@ const collectGlyphFeatures = (
       dimension: 'ink',
       format: 'percent',
       value: ink.spreadY / unitsPerEm,
+      cohort: vCohort,
     })
   }
 
@@ -235,6 +310,26 @@ const quantileOf = (sorted: number[], q: number) => {
   return sorted[lowerIndex] * (1 - weight) + sorted[upperIndex] * weight
 }
 
+/** 單側 MAD 樣本少於此數時不可信，退回整體尺度 */
+const MIN_SIDE_SAMPLES = 5
+
+const oneSidedScale = (
+  sorted: number[],
+  median: number,
+  side: 'below' | 'above',
+  fallback: number
+) => {
+  const deviations = sorted
+    .filter((value) => (side === 'below' ? value <= median : value >= median))
+    .map((value) => Math.abs(value - median))
+    .sort((left, right) => left - right)
+  if (deviations.length < MIN_SIDE_SAMPLES) {
+    return fallback
+  }
+  const sideMad = quantileOf(deviations, 0.5)
+  return sideMad > 0 ? sideMad * MAD_TO_SIGMA : fallback
+}
+
 export const buildRobustStat = (values: number[]): RadarRobustStat | null => {
   if (values.length === 0) {
     return null
@@ -255,14 +350,22 @@ export const buildRobustStat = (values: number[]): RadarRobustStat | null => {
       : iqr > 0
         ? iqr * IQR_TO_SIGMA
         : (p90 - p10) / 2.563
-  return { count: sorted.length, median, scale, p10, p90 }
+  return {
+    count: sorted.length,
+    median,
+    scale,
+    scaleBelow: oneSidedScale(sorted, median, 'below', scale),
+    scaleAbove: oneSidedScale(sorted, median, 'above', scale),
+    p10,
+    p90,
+  }
 }
 
-export const radarZScore = (value: number, stat: RadarRobustStat) =>
-  stat.scale > 0 ? (value - stat.median) / stat.scale : 0
-
-/** 尺寸特徵：受延伸性影響，需先依複雜度 detrend 再比較 */
-const SIZE_TREND_KEYS = new Set(['face:widthRatio', 'face:heightRatio'])
+export const radarZScore = (value: number, stat: RadarRobustStat) => {
+  // 偏態分布用該側自己的尺度量偏離
+  const scale = value >= stat.median ? stat.scaleAbove : stat.scaleBelow
+  return scale > 0 ? (value - stat.median) / scale : 0
+}
 
 /** 複雜度代理值：墨水面積開根號（≈ 筆畫數 × 筆畫尺度），對 UPM 正規化 */
 export const glyphComplexity = (
@@ -270,151 +373,95 @@ export const glyphComplexity = (
   unitsPerEm: number
 ) => Math.sqrt(Math.max(0, sample.ink.inkArea)) / unitsPerEm
 
-const fitTrendSlope = (pairs: Array<[number, number]>) => {
-  if (pairs.length < MIN_RADAR_SAMPLES) {
-    return 0
-  }
-  let meanX = 0
-  let meanY = 0
-  for (const [x, y] of pairs) {
-    meanX += x
-    meanY += y
-  }
-  meanX /= pairs.length
-  meanY /= pairs.length
-  let covariance = 0
-  let variance = 0
-  for (const [x, y] of pairs) {
-    covariance += (x - meanX) * (y - meanY)
-    variance += (x - meanX) * (x - meanX)
-  }
-  // 延伸性只允許正相關；負斜率多半是雜訊，套用會反向「修正」
-  return variance > 0 ? Math.max(0, covariance / variance) : 0
-}
-
-const buildSizeTrend = (
-  glyphFeatures: Array<{ complexity: number; features: RadarFeatureValue[] }>
-): RadarSizeTrend => {
-  const complexityStat = buildRobustStat(
-    glyphFeatures.map((entry) => entry.complexity)
-  )
-  const slopeByKey = new Map<string, number>()
-  for (const key of SIZE_TREND_KEYS) {
-    const pairs: Array<[number, number]> = []
-    for (const entry of glyphFeatures) {
-      const feature = entry.features.find((candidate) => candidate.key === key)
-      if (feature) {
-        pairs.push([entry.complexity, feature.value])
-      }
-    }
-    slopeByKey.set(key, fitTrendSlope(pairs))
-  }
-  return { medianComplexity: complexityStat?.median ?? 0, slopeByKey }
-}
-
-/** 把尺寸特徵換算成「中位複雜度下」的等效值，使分布可跨複雜度比較 */
-const detrendValue = (
-  feature: RadarFeatureValue,
-  complexity: number,
-  sizeTrend: RadarSizeTrend
-) => {
-  const slope = sizeTrend.slopeByKey.get(feature.key)
-  if (!slope) {
-    return feature.value
-  }
-  return feature.value - slope * (complexity - sizeTrend.medianComplexity)
-}
-
-const binIndexForComplexity = (
-  binUpperBounds: number[],
-  complexity: number
-) => {
-  for (let index = 0; index < binUpperBounds.length; index += 1) {
-    if (complexity <= binUpperBounds[index]) {
-      return index
-    }
-  }
-  return binUpperBounds.length - 1
-}
-
 interface GlyphFeatureEntry {
   complexity: number
   features: RadarFeatureValue[]
 }
 
-const buildStrata = (
-  glyphFeatures: GlyphFeatureEntry[],
-  sizeTrend: RadarSizeTrend
-): RadarStrata => {
-  const globalValues = new Map<string, number[]>()
-  for (const entry of glyphFeatures) {
-    for (const feature of entry.features) {
-      const values = globalValues.get(feature.key) ?? []
-      values.push(detrendValue(feature, entry.complexity, sizeTrend))
-      globalValues.set(feature.key, values)
-    }
-  }
-  const globalStats = new Map<string, RadarRobustStat>()
-  for (const [key, values] of globalValues) {
-    if (values.length < MIN_RADAR_SAMPLES) {
-      continue
-    }
-    const stat = buildRobustStat(values)
-    if (stat) {
-      globalStats.set(key, stat)
-    }
-  }
+/** 統計分組鍵：cohort 細分比較母體，但不改變 RadarReason 對外的 key */
+const featureStatKey = (feature: RadarFeatureValue) =>
+  feature.cohort ? `${feature.key}@${feature.cohort}` : feature.key
 
-  const binCount = Math.max(
-    1,
-    Math.min(MAX_BINS, Math.floor(glyphFeatures.length / MIN_BIN_SIZE))
+const buildStrata = (glyphFeatures: GlyphFeatureEntry[]): RadarStrata => {
+  const sorted = [...glyphFeatures].sort(
+    (left, right) => left.complexity - right.complexity
   )
-  if (binCount === 1) {
-    return {
-      binUpperBounds: [Number.POSITIVE_INFINITY],
-      statsByBin: [globalStats],
-    }
-  }
-
-  const sortedComplexities = glyphFeatures
-    .map((entry) => entry.complexity)
-    .sort((left, right) => left - right)
-  const binUpperBounds = Array.from({ length: binCount }, (_, index) =>
-    index === binCount - 1
-      ? Number.POSITIVE_INFINITY
-      : quantileOf(sortedComplexities, (index + 1) / binCount)
+  const total = sorted.length
+  const windowSize = Math.min(
+    total,
+    Math.max(MIN_WINDOW_SIZE, Math.min(MAX_WINDOW_SIZE, Math.ceil(total / 3)))
   )
+  const stride = Math.max(1, Math.floor(windowSize / WINDOW_STRIDE_DIVISOR))
+  const lastStart = total - windowSize
 
-  const valuesByBin = Array.from(
-    { length: binCount },
-    () => new Map<string, number[]>()
-  )
-  for (const entry of glyphFeatures) {
-    const binValues =
-      valuesByBin[binIndexForComplexity(binUpperBounds, entry.complexity)]
-    for (const feature of entry.features) {
-      const values = binValues.get(feature.key) ?? []
-      values.push(detrendValue(feature, entry.complexity, sizeTrend))
-      binValues.set(feature.key, values)
-    }
-  }
-
-  const statsByBin = valuesByBin.map((binValues) => {
-    // 該層樣本不足的特徵退回全體統計
-    const stats = new Map(globalStats)
-    for (const [key, values] of binValues) {
-      if (values.length < MIN_RADAR_SAMPLES) {
-        continue
+  const windows: RadarComplexityWindow[] = []
+  for (let start = 0; ; start += stride) {
+    const windowStart = Math.min(start, lastStart)
+    const slice = sorted.slice(windowStart, windowStart + windowSize)
+    const complexityStat = buildRobustStat(
+      slice.map((entry) => entry.complexity)
+    )
+    if (complexityStat) {
+      const valuesByKey = new Map<string, number[]>()
+      for (const entry of slice) {
+        for (const feature of entry.features) {
+          const statKey = featureStatKey(feature)
+          const values = valuesByKey.get(statKey) ?? []
+          values.push(feature.value)
+          valuesByKey.set(statKey, values)
+        }
       }
-      const stat = buildRobustStat(values)
-      if (stat) {
-        stats.set(key, stat)
+      const statsByKey = new Map<string, RadarRobustStat>()
+      for (const [key, values] of valuesByKey) {
+        // 視窗內樣本不足的特徵直接不評（如某側 framing 邊距太稀少）。
+        // 寧可少量一項，也不要退回全體統計拿錯誤的尺去量
+        if (values.length < MIN_RADAR_SAMPLES) {
+          continue
+        }
+        const stat = buildRobustStat(values)
+        if (stat) {
+          statsByKey.set(key, stat)
+        }
       }
+      windows.push({
+        centerComplexity: complexityStat.median,
+        complexityStat,
+        statsByKey,
+      })
     }
-    return stats
-  })
+    if (windowStart >= lastStart) {
+      break
+    }
+  }
+  return { windows }
+}
 
-  return { binUpperBounds, statsByBin }
+const nearestWindow = (
+  strata: RadarStrata,
+  complexity: number
+): RadarComplexityWindow | null => {
+  const windows = strata.windows
+  if (windows.length === 0) {
+    return null
+  }
+  let low = 0
+  let high = windows.length - 1
+  while (low < high) {
+    const mid = (low + high) >> 1
+    if (windows[mid].centerComplexity < complexity) {
+      low = mid + 1
+    } else {
+      high = mid
+    }
+  }
+  if (
+    low > 0 &&
+    complexity - windows[low - 1].centerComplexity <
+      windows[low].centerComplexity - complexity
+  ) {
+    return windows[low - 1]
+  }
+  return windows[low]
 }
 
 const RADAR_DIMENSIONS: RadarDimension[] = [
@@ -433,42 +480,56 @@ interface FeatureEvaluation {
 const evaluateFeatures = (
   features: RadarFeatureValue[],
   complexity: number,
-  strata: RadarStrata,
-  sizeTrend: RadarSizeTrend
+  strata: RadarStrata
 ): FeatureEvaluation => {
-  const featureStats =
-    strata.statsByBin[binIndexForComplexity(strata.binUpperBounds, complexity)]
   const reasons: RadarReason[] = []
   const outlierDimensions = new Set<RadarDimension>()
-  let score = 0
+  const window = nearestWindow(strata, complexity)
+  if (!window) {
+    return { score: 0, reasons, outlierDimensions }
+  }
 
+  // peer-mismatch 折扣：字的複雜度離視窗中心越遠，比較結果越不可信，
+  // 所有特徵 z 等比收縮（針對排序兩端視窗內仍是極端值的字）
+  const complexityZ = radarZScore(complexity, window.complexityStat)
+  const peerShrink =
+    1 / (1 + PEER_MISMATCH_RATE * Math.max(0, Math.abs(complexityZ) - 1))
+
+  // 同維度特徵高度共線（字面小 → 邊距/寬比/長寬比/密度全偏），
+  // 每維度只取最大偏離計分，避免同一件事疊計多次
+  const maxExcessByDimension = new Map<RadarDimension, number>()
   for (const feature of features) {
-    const stat = featureStats.get(feature.key)
+    const stat = window.statsByKey.get(featureStatKey(feature))
     if (!stat) {
       continue
     }
-    const adjusted = detrendValue(feature, complexity, sizeTrend)
-    const zScore = radarZScore(adjusted, stat)
+    const zScore = radarZScore(feature.value, stat) * peerShrink
     const excess = Math.min(Math.abs(zScore), RADAR_Z_CAP) - RADAR_REASON_Z
     if (excess > 0) {
-      score += excess * excess
-      // detrend 的位移補回原始尺度，UI 顯示的比較區間才對得上目前值
-      const offset = feature.value - adjusted
+      const previous = maxExcessByDimension.get(feature.dimension) ?? 0
+      if (excess > previous) {
+        maxExcessByDimension.set(feature.dimension, excess)
+      }
       reasons.push({
         key: feature.key,
         label: feature.label,
         dimension: feature.dimension,
         format: feature.format,
         value: feature.value,
-        median: stat.median + offset,
-        p10: stat.p10 + offset,
-        p90: stat.p90 + offset,
+        median: stat.median,
+        p10: stat.p10,
+        p90: stat.p90,
         zScore,
       })
     }
     if (Math.abs(zScore) >= RADAR_OUTLIER_Z) {
       outlierDimensions.add(feature.dimension)
     }
+  }
+
+  let score = 0
+  for (const excess of maxExcessByDimension.values()) {
+    score += excess * excess
   }
 
   reasons.sort((left, right) => Math.abs(right.zScore) - Math.abs(left.zScore))
@@ -481,16 +542,20 @@ const evaluateFeatures = (
  */
 export const evaluateSampleAgainstRadar = (
   sample: GlyphGeometrySample,
-  radar: Pick<RadarAnalysis, 'strata' | 'sizeTrend'>,
+  radar: Pick<RadarAnalysis, 'strata' | 'enclosureCharacters'>,
   bodyBox: { top: number; bottom: number; unitsPerEm: number }
 ): RadarGlyphEvaluation => {
   const unitsPerEm = bodyBox.unitsPerEm
   const bodyCenterY = (bodyBox.top + bodyBox.bottom) / 2
   const { score, reasons } = evaluateFeatures(
-    collectGlyphFeatures(sample, unitsPerEm, bodyCenterY),
+    collectGlyphFeatures(
+      sample,
+      unitsPerEm,
+      bodyCenterY,
+      radar.enclosureCharacters.has(sample.character)
+    ),
     glyphComplexity(sample, unitsPerEm),
-    radar.strata,
-    radar.sizeTrend
+    radar.strata
   )
   return {
     glyphId: sample.glyphId,
@@ -507,7 +572,8 @@ export const evaluateSampleAgainstRadar = (
  */
 export const computeRadarFromSamples = (
   samples: GlyphGeometrySample[],
-  bodyBox: { top: number; bottom: number; unitsPerEm: number }
+  bodyBox: { top: number; bottom: number; unitsPerEm: number },
+  semanticEnclosureChars?: ReadonlySet<string>
 ): RadarAnalysis | null => {
   if (samples.length < MIN_RADAR_SAMPLES) {
     return null
@@ -516,15 +582,26 @@ export const computeRadarFromSamples = (
   const unitsPerEm = bodyBox.unitsPerEm
   const bodyCenterY = (bodyBox.top + bodyBox.bottom) / 2
 
+  // 只保留母體中實際出現的包圍字，即時評分路徑用同一份分類
+  const enclosureCharacters = new Set<string>()
+  for (const sample of samples) {
+    if (sample.character && semanticEnclosureChars?.has(sample.character)) {
+      enclosureCharacters.add(sample.character)
+    }
+  }
+
   const glyphFeatures = samples.map((sample) => ({
     sample,
     complexity: glyphComplexity(sample, unitsPerEm),
-    features: collectGlyphFeatures(sample, unitsPerEm, bodyCenterY),
+    features: collectGlyphFeatures(
+      sample,
+      unitsPerEm,
+      bodyCenterY,
+      enclosureCharacters.has(sample.character)
+    ),
   }))
 
-  const sizeTrend = buildSizeTrend(glyphFeatures)
-  // 統計分布建立在 detrend 後的值、並依複雜度分層
-  const strata = buildStrata(glyphFeatures, sizeTrend)
+  const strata = buildStrata(glyphFeatures)
 
   const evaluationByGlyphId = new Map<string, RadarGlyphEvaluation>()
   const dimensionOutliers: Record<RadarDimension, number> = {
@@ -538,8 +615,7 @@ export const computeRadarFromSamples = (
     const { score, reasons, outlierDimensions } = evaluateFeatures(
       entry.features,
       entry.complexity,
-      strata,
-      sizeTrend
+      strata
     )
     for (const dimension of outlierDimensions) {
       dimensionOutliers[dimension] += 1
@@ -571,7 +647,7 @@ export const computeRadarFromSamples = (
   return {
     sampleCount,
     strata,
-    sizeTrend,
+    enclosureCharacters,
     dimensionScores,
     overallScore,
     suspects,
