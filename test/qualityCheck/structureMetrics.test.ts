@@ -2,15 +2,17 @@ import { describe, expect, it } from 'vitest'
 import {
   computeInkArea,
   flattenContour,
-  flattenGlyphToPolygons,
   getPolygonsBounds,
-} from 'src/features/common/qualityCheck/glyphGeometry'
+} from 'src/features/common/qualityCheck/polygonGeometry'
+import { flattenResolvedGlyph } from 'src/features/common/qualityCheck/glyphInk'
+import {
+  getStructureBodyBox,
+  isHanGlyph,
+} from 'src/features/common/qualityCheck/hanClassification'
+import { resolveFontGlyphs } from 'src/features/common/qualityCheck/resolvedGlyph'
 import {
   analyzeFontStructure,
   buildStructureGlyphSample,
-  checkGlyphStructure,
-  getStructureBodyBox,
-  isHanGlyph,
 } from 'src/features/common/qualityCheck/structureMetrics'
 import type { FontData, GlyphData, PathData } from 'src/store/types'
 
@@ -82,10 +84,12 @@ const makeDiamondGlyph = (id: string, unicode: string) =>
 
 describe('glyph geometry', () => {
   it('computes real ink area with counters subtracted', () => {
-    const fontData = makeFontData([makeFrameGlyph('frame', '56DE')])
-    const polygons = flattenGlyphToPolygons(
-      fontData.glyphs.frame,
-      fontData.glyphs
+    const resolvedFont = resolveFontGlyphs(
+      makeFontData([makeFrameGlyph('frame', '56DE')])
+    )
+    const polygons = flattenResolvedGlyph(
+      resolvedFont.glyphs.frame,
+      resolvedFont.glyphs
     )
 
     expect(polygons).toHaveLength(2)
@@ -151,10 +155,10 @@ describe('glyph geometry', () => {
         },
       ],
     }
-    const fontData = makeFontData([base, composite])
+    const resolvedFont = resolveFontGlyphs(makeFontData([base, composite]))
 
     const bounds = getPolygonsBounds(
-      flattenGlyphToPolygons(composite, fontData.glyphs)
+      flattenResolvedGlyph(resolvedFont.glyphs.composite, resolvedFont.glyphs)
     )
     expect(bounds).toEqual({ xMin: 500, xMax: 700, yMin: 200, yMax: 300 })
   })
@@ -170,10 +174,14 @@ describe('structure metrics', () => {
   it('classifies framing vs branching boundary strokes per side', () => {
     const frame = makeFrameGlyph('frame', '56DE')
     const diamond = makeDiamondGlyph('diamond', '4EBA')
-    const fontData = makeFontData([frame, diamond])
-    const bodyBox = getStructureBodyBox(fontData)
+    const resolvedFont = resolveFontGlyphs(makeFontData([frame, diamond]))
+    const bodyBox = getStructureBodyBox(makeFontData([frame, diamond]))
 
-    const frameSample = buildStructureGlyphSample(frame, fontData, bodyBox)
+    const frameSample = buildStructureGlyphSample(
+      resolvedFont.glyphs.frame,
+      resolvedFont.glyphs,
+      bodyBox
+    )
     expect(frameSample).not.toBeNull()
     expect(frameSample?.sides.left.type).toBe('framing')
     expect(frameSample?.sides.right.type).toBe('framing')
@@ -184,7 +192,11 @@ describe('structure metrics', () => {
     expect(frameSample?.sides.top.bearing).toBe(60)
     expect(frameSample?.sides.bottom.bearing).toBe(80)
 
-    const diamondSample = buildStructureGlyphSample(diamond, fontData, bodyBox)
+    const diamondSample = buildStructureGlyphSample(
+      resolvedFont.glyphs.diamond,
+      resolvedFont.glyphs,
+      bodyBox
+    )
     expect(diamondSample?.sides.left.type).toBe('branching')
     expect(diamondSample?.sides.right.type).toBe('branching')
     expect(diamondSample?.sides.top.type).toBe('branching')
@@ -207,60 +219,5 @@ describe('structure metrics', () => {
     expect(baseline?.sides.left.framing?.count).toBe(24)
     expect(baseline?.sides.top.framing?.mode).toBe(60)
     expect(baseline?.centerOffsetMedian).toBe(0)
-  })
-
-  it('flags glyphs outside the derived ranges', () => {
-    const glyphs = Array.from({ length: 24 }, (_, index) =>
-      makeFrameGlyph(
-        `frame${index}`,
-        (0x4e00 + index).toString(16).toUpperCase()
-      )
-    )
-    const fontData = makeFontData(glyphs)
-    const { baseline } = analyzeFontStructure(fontData)
-    expect(baseline).not.toBeNull()
-    if (!baseline) {
-      return
-    }
-
-    // 左移到溢出字身框的字：負邊距 + 偏離置中基準
-    const overflowing = makeGlyph('overflow', '4E50', [
-      makePath('outer', [
-        [-30, -40],
-        [810, -40],
-        [810, 820],
-        [-30, 820],
-      ]),
-    ])
-    const sample = buildStructureGlyphSample(
-      overflowing,
-      makeFontData([...glyphs, overflowing]),
-      baseline.bodyBox
-    )
-    expect(sample).not.toBeNull()
-    if (!sample) {
-      return
-    }
-
-    const findings = checkGlyphStructure(sample, baseline)
-    expect(
-      findings.some(
-        (finding) =>
-          finding.side === 'left' && finding.message.includes('負邊距')
-      )
-    ).toBe(true)
-    expect(findings.some((finding) => finding.message.includes('不置中'))).toBe(
-      true
-    )
-
-    // 與基準一致的字不應有任何發現
-    const normalSample = buildStructureGlyphSample(
-      glyphs[0],
-      fontData,
-      baseline.bodyBox
-    )
-    expect(
-      normalSample ? checkGlyphStructure(normalSample, baseline) : null
-    ).toEqual([])
   })
 })

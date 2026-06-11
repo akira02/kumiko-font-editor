@@ -15,7 +15,6 @@ import type { QualityCheckMode } from 'src/features/common/qualityCheck/qualityC
 import {
   analyzeFontStructure,
   buildStructureGlyphSample,
-  isHanGlyph,
   sideLabels,
   strokeTypeLabels,
   type SideDistribution,
@@ -23,6 +22,8 @@ import {
   type StructureGlyphSample,
   type StructureSide,
 } from 'src/features/common/qualityCheck/structureMetrics'
+import { isHanGlyph } from 'src/features/common/qualityCheck/hanClassification'
+import { resolveFontGlyphs } from 'src/features/common/qualityCheck/resolvedGlyph'
 import {
   buildRadarAnalysis,
   formatRadarReason,
@@ -333,10 +334,15 @@ export function StructurePanel({
     if (!fontData || !baseline || mode !== 'selected') {
       return []
     }
+    const resolvedFont = resolveFontGlyphs(fontData)
     return scopedGlyphs
       .filter((glyph) => isHanGlyph(glyph))
       .map((glyph) =>
-        buildStructureGlyphSample(glyph, fontData, baseline.bodyBox)
+        buildStructureGlyphSample(
+          resolvedFont.glyphs[glyph.id],
+          resolvedFont.glyphs,
+          baseline.bodyBox
+        )
       )
       .filter((sample): sample is StructureGlyphSample => sample !== null)
   }, [baseline, fontData, mode, scopedGlyphs])

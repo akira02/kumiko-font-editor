@@ -1,10 +1,15 @@
 import { buildGlyphPreviewData } from 'src/lib/glyphOverview'
-import { getGlyphLayer, type FontData, type GlyphData } from 'src/store'
-import { getGlyphInkMetrics } from 'src/features/common/qualityCheck/glyphGeometry'
+import type { FontData, GlyphData } from 'src/store'
+import { computeGlyphInk } from 'src/features/common/qualityCheck/glyphInk'
 import {
+  resolveFontGlyphs,
+  type ResolvedFont,
+} from 'src/features/common/qualityCheck/resolvedGlyph'
+import {
+  getGlyphCharacter as getCharacterOrName,
   getGlyphCodePoint,
   isHanCodePoint,
-} from 'src/features/common/qualityCheck/structureMetrics'
+} from 'src/features/common/qualityCheck/hanClassification'
 
 export interface ProofShape {
   d: string
@@ -20,6 +25,8 @@ export interface ProofGlyph {
   shapes: ProofShape[]
   /** 墨水面積 /（advance × UPM）：對版面灰度的貢獻 */
   inkRatio: number | null
+  /** 墨水面積 / 真實字面框面積：單字黑度 */
+  faceInkRatio: number | null
   isSpace: boolean
   isMissing: boolean
   isHan: boolean
@@ -70,18 +77,13 @@ export const grayArticlePresets = [
   '山徑沿著溪谷蜿蜒而上，兩旁的樹影隨風搖晃，偶爾傳來幾聲鳥鳴。越往高處走，霧氣越濃，岩石上的青苔顯得格外鮮綠。同行的友人停下腳步，指著遠方雲層裂開的縫隙，陽光正好落在對面的山脊上，像一條金色的線把整片森林分成明暗兩半。我們在涼亭裡休息，喝著熱茶，聊起多年前第一次登山的情景，那些細節如今依然清晰，彷彿昨日才發生一樣。',
 ]
 
-const DEFAULT_UNITS_PER_EM = 1000
 const SPACE_ADVANCE_RATIO = 0.5
 const MISSING_ADVANCE_RATIO = 0.6
 export const DEFAULT_PROOF_CHARACTER_LIMIT = 140
 export const GRAY_PROOF_CHARACTER_LIMIT = 320
 
-export const getGlyphCharacter = (glyph: GlyphData) => {
-  const codePoint = getGlyphCodePoint(glyph)
-  return codePoint === null
-    ? glyph.name.slice(0, 2)
-    : String.fromCodePoint(codePoint)
-}
+export const getGlyphCharacter = (glyph: GlyphData) =>
+  getCharacterOrName(glyph, glyph.name.slice(0, 2))
 
 const buildUnicodeGlyphMap = (fontData: FontData) => {
   const glyphByCharacter = new Map<string, GlyphData>()
@@ -173,7 +175,8 @@ export const buildProofRun = (
   text: string,
   characterLimit = DEFAULT_PROOF_CHARACTER_LIMIT
 ): ProofRun => {
-  const unitsPerEm = fontData?.unitsPerEm ?? DEFAULT_UNITS_PER_EM
+  const resolvedFont: ResolvedFont = resolveFontGlyphs(fontData)
+  const unitsPerEm = resolvedFont.bodyBox.unitsPerEm
   const glyphByCharacter = fontData
     ? buildUnicodeGlyphMap(fontData)
     : new Map<string, GlyphData>()
@@ -188,19 +191,14 @@ export const buildProofRun = (
     .entries()) {
     const isSpace = /\s/u.test(character)
     const glyph = glyphByCharacter.get(character)
-    const activeLayer = glyph
-      ? (getGlyphLayer(glyph, glyph.activeLayerId) ?? glyph)
+    const resolved = glyph ? resolvedFont.glyphs[glyph.id] : null
+    const ink = resolved
+      ? computeGlyphInk(resolved, resolvedFont.glyphs, unitsPerEm)
       : null
-    const advance = glyph
-      ? Math.max(
-          activeLayer?.metrics.width ?? glyph.metrics.width,
-          unitsPerEm * 0.2
-        )
+    const advance = resolved
+      ? Math.max(resolved.advance, unitsPerEm * 0.2)
       : unitsPerEm * (isSpace ? SPACE_ADVANCE_RATIO : MISSING_ADVANCE_RATIO)
-    const inkRatio =
-      glyph && fontData
-        ? getGlyphInkMetrics(glyph, fontData.glyphs, unitsPerEm).inkToEmRatio
-        : null
+    const inkRatio = ink?.inkToEmRatio ?? null
     if (inkRatio !== null) {
       inkRatios.push(inkRatio)
     }
@@ -223,6 +221,7 @@ export const buildProofRun = (
           ? buildGlyphPreviewData(glyph, fontData.glyphs).shapes
           : [],
       inkRatio,
+      faceInkRatio: ink?.inkToFaceRatio ?? null,
       isSpace,
       isMissing: !glyph && !isSpace,
       isHan: codePoint !== undefined && isHanCodePoint(codePoint),
@@ -241,14 +240,10 @@ export const buildProofRun = (
 
 /**
  * 灰度統計：整段文字的平均明暗密度與離群字。
- * 灰度指「一大段文字排出來後，在視覺上形成的整體明暗密度」，
- * 因此以漢字（同為全形字身）為母體計算平均與標準差。
+ * 以漢字（同為全形字身）為母體計算平均與標準差。
+ * 所需的墨量已在 buildProofRun 算入 ProofGlyph，故此處不需再碰幾何。
  */
-export const buildGrayStats = (
-  proofRun: ProofRun,
-  fontData: FontData | null | undefined
-): GrayStats => {
-  const unitsPerEm = fontData?.unitsPerEm ?? DEFAULT_UNITS_PER_EM
+export const buildGrayStats = (proofRun: ProofRun): GrayStats => {
   const occurrenceRatios = proofRun.glyphs
     .filter(
       (proofGlyph) =>
@@ -266,17 +261,12 @@ export const buildGrayStats = (
     ) {
       continue
     }
-    const glyph = fontData?.glyphs[proofGlyph.glyphId]
-    const faceInkRatio =
-      glyph && fontData
-        ? getGlyphInkMetrics(glyph, fontData.glyphs, unitsPerEm).inkToFaceRatio
-        : null
     uniqueSamples.set(proofGlyph.glyphId, {
       glyphId: proofGlyph.glyphId,
       glyphName: proofGlyph.glyphName ?? proofGlyph.character,
       character: proofGlyph.character,
       inkRatio: proofGlyph.inkRatio,
-      faceInkRatio,
+      faceInkRatio: proofGlyph.faceInkRatio,
     })
   }
 
@@ -325,16 +315,20 @@ export const buildGlyphInkSamples = (
     return []
   }
 
-  const unitsPerEm = fontData.unitsPerEm ?? DEFAULT_UNITS_PER_EM
+  const resolvedFont = resolveFontGlyphs(fontData)
+  const unitsPerEm = resolvedFont.bodyBox.unitsPerEm
   return glyphs
     .map((glyph) => {
-      const metrics = getGlyphInkMetrics(glyph, fontData.glyphs, unitsPerEm)
+      const resolved = resolvedFont.glyphs[glyph.id]
+      const metrics = resolved
+        ? computeGlyphInk(resolved, resolvedFont.glyphs, unitsPerEm)
+        : null
       return {
         glyphId: glyph.id,
         glyphName: glyph.name,
         character: getGlyphCharacter(glyph),
-        inkRatio: metrics.inkToEmRatio,
-        faceInkRatio: metrics.inkToFaceRatio,
+        inkRatio: metrics?.inkToEmRatio ?? null,
+        faceInkRatio: metrics?.inkToFaceRatio ?? null,
       }
     })
     .sort(
@@ -353,18 +347,23 @@ export interface MixedScriptMetrics {
 }
 
 const measureAverageHeight = (
-  fontData: FontData,
+  resolvedFont: ResolvedFont,
+  glyphByCharacter: Map<string, GlyphData>,
   characters: string,
   unitsPerEm: number
 ) => {
-  const glyphByCharacter = buildUnicodeGlyphMap(fontData)
   const heights: number[] = []
   for (const character of characters) {
     const glyph = glyphByCharacter.get(character)
-    if (!glyph) {
+    const resolved = glyph ? resolvedFont.glyphs[glyph.id] : null
+    if (!resolved) {
       continue
     }
-    const bounds = getGlyphInkMetrics(glyph, fontData.glyphs, unitsPerEm).bounds
+    const bounds = computeGlyphInk(
+      resolved,
+      resolvedFont.glyphs,
+      unitsPerEm
+    ).bounds
     if (bounds) {
       heights.push(bounds.yMax - bounds.yMin)
     }
@@ -387,7 +386,9 @@ export const buildMixedScriptMetrics = (
     }
   }
 
-  const unitsPerEm = fontData.unitsPerEm ?? DEFAULT_UNITS_PER_EM
+  const resolvedFont = resolveFontGlyphs(fontData)
+  const unitsPerEm = resolvedFont.bodyBox.unitsPerEm
+  const glyphByCharacter = buildUnicodeGlyphMap(fontData)
   const hanCharacters = Object.values(fontData.glyphs)
     .map((glyph) => getGlyphCodePoint(glyph))
     .filter(
@@ -399,9 +400,29 @@ export const buildMixedScriptMetrics = (
     .join('')
 
   return {
-    hanFaceHeight: measureAverageHeight(fontData, hanCharacters, unitsPerEm),
-    latinCapHeight: measureAverageHeight(fontData, 'HIONEM', unitsPerEm),
-    latinXHeight: measureAverageHeight(fontData, 'xnoumv', unitsPerEm),
-    digitHeight: measureAverageHeight(fontData, '0123456789', unitsPerEm),
+    hanFaceHeight: measureAverageHeight(
+      resolvedFont,
+      glyphByCharacter,
+      hanCharacters,
+      unitsPerEm
+    ),
+    latinCapHeight: measureAverageHeight(
+      resolvedFont,
+      glyphByCharacter,
+      'HIONEM',
+      unitsPerEm
+    ),
+    latinXHeight: measureAverageHeight(
+      resolvedFont,
+      glyphByCharacter,
+      'xnoumv',
+      unitsPerEm
+    ),
+    digitHeight: measureAverageHeight(
+      resolvedFont,
+      glyphByCharacter,
+      '0123456789',
+      unitsPerEm
+    ),
   }
 }

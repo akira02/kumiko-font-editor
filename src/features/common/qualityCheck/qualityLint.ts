@@ -6,7 +6,7 @@ import {
   type PathData,
   type PathNode,
 } from 'src/store'
-import { isHanGlyph } from 'src/features/common/qualityCheck/structureMetrics'
+import { isHanGlyph } from 'src/features/common/qualityCheck/hanClassification'
 
 export type QualityScope = 'changed' | 'current' | 'selected' | 'font'
 export type QualityIssueSeverity = 'blocking' | 'warning' | 'info'
