@@ -25,6 +25,58 @@ type ImmerSet = Parameters<
   StateCreator<GlobalState, [['zustand/immer', never]], []>
 >[0]
 
+const isHandleNode = (node: PathNode) =>
+  node.type === 'offcurve' || node.type === 'qcurve'
+
+const addAttachedHandleIds = (
+  path: PathData,
+  anchorIndex: number,
+  direction: -1 | 1,
+  expandedSelection: Set<string>
+) => {
+  let currentIndex = anchorIndex
+
+  while (true) {
+    currentIndex += direction
+
+    if (currentIndex < 0 || currentIndex >= path.nodes.length) {
+      if (!path.closed) {
+        return
+      }
+      currentIndex = direction > 0 ? 0 : path.nodes.length - 1
+    }
+
+    if (currentIndex === anchorIndex) {
+      return
+    }
+
+    const node = path.nodes[currentIndex]
+    if (!node || !isHandleNode(node)) {
+      return
+    }
+
+    expandedSelection.add(node.id)
+  }
+}
+
+const expandSelectionWithAttachedHandles = (
+  path: PathData,
+  selectedNodeIds: Set<string>
+) => {
+  const expandedSelection = new Set(selectedNodeIds)
+
+  path.nodes.forEach((node, index) => {
+    if (!selectedNodeIds.has(node.id) || isHandleNode(node)) {
+      return
+    }
+
+    addAttachedHandleIds(path, index, -1, expandedSelection)
+    addAttachedHandleIds(path, index, 1, expandedSelection)
+  })
+
+  return expandedSelection
+}
+
 export const buildPathActions = (set: ImmerSet) => ({
   createPath: (glyphId: string, path: Omit<PathData, 'id'> & { id?: string }) =>
     set((state) => {
@@ -473,9 +525,13 @@ export const buildPathActions = (set: ImmerSet) => ({
           if (!nodeIds) {
             return path
           }
+          const expandedNodeIds = expandSelectionWithAttachedHandles(
+            path,
+            nodeIds
+          )
           return {
             ...path,
-            nodes: path.nodes.filter((node) => !nodeIds.has(node.id)),
+            nodes: path.nodes.filter((node) => !expandedNodeIds.has(node.id)),
           }
         })
         .filter((path) => path.nodes.length > 0)
