@@ -1,4 +1,7 @@
 {
+  "common": {
+    "close": "關閉"
+  },
   "editor": {
     "addAlternate": "Add alternate",
     "addAnchor": "Add anchor",
@@ -126,6 +129,57 @@
     "exportFont": "匯出字型",
     "iUnderstandUnsupportedImportedOpentypeLookups": "I understand unsupported imported OpenType lookups will be removed from rebuilt layout tables."
   },
+  "qualityCheck": {
+    "title": "品質檢查",
+    "open": "打開品質檢查",
+    "openShort": "打開檢查",
+    "highlightScopedGlyphs": "標示範圍內字",
+    "loadingReport": "正在準備檢查結果…",
+    "scope": {
+      "changed": "本次變更",
+      "current": "目前字符",
+      "selected": "選取的字",
+      "font": "整套字體"
+    },
+    "tabs": {
+      "lint": "Lint",
+      "mixedProof": "混排",
+      "grayProof": "灰度",
+      "structure": "結構"
+    },
+    "description": {
+      "font": "整套字體的 Lint、灰度分布與結構離群檢查",
+      "focused": "{{scope}}的 Lint 與 proof 比對，全域基準僅作參考"
+    },
+    "summary": {
+      "scope": "檢查範圍",
+      "glyphs": "Glyphs",
+      "glyphCount": "{{count}} glyphs",
+      "blocking": "阻擋",
+      "warning": "警告",
+      "info": "提示",
+      "deleted": "刪除"
+    },
+    "mixedProof": {
+      "description": "混排檢查：不同文字系統、語言與數字同時出現在同一段文字時，觀察彼此的大小、基線與節奏是否協調。",
+      "focusedDescription": "混排檢查：不同文字系統、語言與數字同時出現在同一段文字時，觀察彼此的大小、基線與節奏是否協調。檢查範圍內的字已與拉丁字母、數字穿插排列。"
+    },
+    "grayProof": {
+      "description": "把測試文章整段排出來，檢查整體灰度是否均勻，並找出排版時特別黑或特別淡的字。",
+      "focusedDescription": "把檢查範圍內的字混排進一篇隨機文章，檢查它們的灰度（排版後的明暗密度）是否與其他字不同。"
+    },
+    "commit": {
+      "title": "提交前品質檢查",
+      "pass": "通過",
+      "blockingStatus": "{{blocking}} 阻擋 · {{warning}} 警告",
+      "warningStatus": "{{warning}} 警告 · 可提交",
+      "cleanStatus": "沒有阻擋問題",
+      "checkedSummary": "{{status}}，已檢查 {{count}} glyphs",
+      "deletedSuffix": "，刪除 {{count}}",
+      "blockingToastTitle": "有阻擋品質問題",
+      "blockingToastDescription": "請先打開品質檢查，修正 blocking lint 後再提交。"
+    }
+  },
   "fontOverview": {
     "add": "新增",
     "addGlyph": "新增字符",
@@ -155,6 +209,13 @@
     "overview": "Overview",
     "searchPlaceholder": "搜尋字符、glyph name 或 unicode",
     "selected": "已選",
+    "selection": {
+      "badge": "Selection",
+      "selectedGlyphs": "已選取 {{count}} 個字符",
+      "description": "對這組字進行檢查，或一起放進字符編輯器。",
+      "deletedToastTitle": "已刪除字符",
+      "deletedToastDescription": "{{count}} 個字符已從目前專案移除。"
+    },
     "showOnlyEmptyGlyphs": "只看空白待編輯字符",
     "sourceLabel": "來源：",
     "total": "合計",

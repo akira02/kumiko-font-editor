@@ -6,13 +6,13 @@ import {
   Progress,
   SimpleGrid,
   Stack,
+  Switch,
   Tag,
   Text,
 } from '@chakra-ui/react'
 import { useMemo, useState } from 'react'
 import type { FontData, GlyphData } from 'src/store'
 import { ProofParagraphSvg } from 'src/features/common/qualityCheck/ProofLineSvg'
-import type { QualityCheckMode } from 'src/features/common/qualityCheck/qualityCheckMode'
 import {
   GRAY_PROOF_CHARACTER_LIMIT,
   buildGrayProofText,
@@ -21,11 +21,13 @@ import {
   getGlyphCharacter,
   grayArticlePresets,
 } from 'src/features/common/qualityCheck/qualityProof'
+import type { QualityScope } from 'src/features/common/qualityCheck/qualityLint'
+import { useTranslation } from 'react-i18next'
 
 interface GrayProofPanelProps {
   fontData: FontData | null
   scopedGlyphs: GlyphData[]
-  mode: QualityCheckMode
+  scope: QualityScope
 }
 
 const paragraphSizes = [13, 20]
@@ -36,36 +38,39 @@ const toPercent = (ratio: number | null) =>
 export function GrayProofPanel({
   fontData,
   scopedGlyphs,
-  mode,
+  scope,
 }: GrayProofPanelProps) {
+  const { t } = useTranslation()
   const [articleIndex, setArticleIndex] = useState(0)
+  const [showHighlight, setShowHighlight] = useState(false)
   const article = grayArticlePresets[articleIndex] ?? grayArticlePresets[0]
+  const isFocusedScope = scope !== 'font'
 
   const selectedCharacters = useMemo(
-    () => (mode === 'selected' ? scopedGlyphs.map(getGlyphCharacter) : []),
-    [mode, scopedGlyphs]
+    () => (isFocusedScope ? scopedGlyphs.map(getGlyphCharacter) : []),
+    [isFocusedScope, scopedGlyphs]
   )
   const selectedGlyphIdSet = useMemo(
     () =>
-      mode === 'selected'
+      isFocusedScope
         ? new Set(scopedGlyphs.map((glyph) => glyph.id))
         : undefined,
-    [mode, scopedGlyphs]
+    [isFocusedScope, scopedGlyphs]
   )
 
   const proofText = useMemo(
     () =>
-      mode === 'selected'
+      isFocusedScope
         ? buildGrayProofText(article, selectedCharacters)
         : article,
-    [article, mode, selectedCharacters]
+    [article, isFocusedScope, selectedCharacters]
   )
   const proofCharacterLimit = useMemo(
     () =>
-      mode === 'selected'
+      isFocusedScope
         ? Math.max(GRAY_PROOF_CHARACTER_LIMIT, Array.from(proofText).length)
         : GRAY_PROOF_CHARACTER_LIMIT,
-    [mode, proofText]
+    [isFocusedScope, proofText]
   )
 
   const proofRun = useMemo(
@@ -73,12 +78,14 @@ export function GrayProofPanel({
     [fontData, proofCharacterLimit, proofText]
   )
   const grayStats = useMemo(() => buildGrayStats(proofRun), [proofRun])
+  const highlightedGlyphIds =
+    isFocusedScope && showHighlight ? selectedGlyphIdSet : undefined
 
   const meanPercent = toPercent(grayStats.meanInkRatio)
   const stdPercent = toPercent(grayStats.stdInkRatio)
 
   const selectedComparisons = useMemo(() => {
-    if (mode !== 'selected' || grayStats.meanInkRatio === null) {
+    if (!isFocusedScope || grayStats.meanInkRatio === null) {
       return []
     }
     const mean = grayStats.meanInkRatio
@@ -120,29 +127,44 @@ export function GrayProofPanel({
       })
     }
     return comparisons
-  }, [grayStats, mode, proofRun.glyphs, selectedGlyphIdSet])
+  }, [grayStats, isFocusedScope, proofRun.glyphs, selectedGlyphIdSet])
 
   return (
     <Stack spacing={4}>
       <Text fontSize="sm" color="field.muted">
-        {mode === 'selected'
-          ? '把選取的字混排進一篇隨機文章，檢查它們的灰度（排版後的明暗密度）是否與其他字不同。選取的字以橘色標示。'
-          : '把測試文章整段排出來，檢查整體灰度是否均勻，並找出排版時特別黑或特別淡的字。'}
+        {isFocusedScope
+          ? t('qualityCheck.grayProof.focusedDescription')
+          : t('qualityCheck.grayProof.description')}
       </Text>
 
-      <HStack spacing={2} wrap="wrap">
-        {grayArticlePresets.map((preset, index) => (
-          <Button
-            key={preset.slice(0, 8)}
-            size="xs"
-            variant={index === articleIndex ? 'solid' : 'outline'}
-            onClick={() => setArticleIndex(index)}
-          >
-            文章 {index + 1}
-          </Button>
-        ))}
-        <Tag size="sm">{grayStats.sampleCount} 個漢字樣本</Tag>
-        <Tag size="sm">missing {proofRun.missingCount}</Tag>
+      <HStack spacing={3} wrap="wrap" justify="space-between">
+        <HStack spacing={2} wrap="wrap">
+          {grayArticlePresets.map((preset, index) => (
+            <Button
+              key={preset.slice(0, 8)}
+              size="xs"
+              variant={index === articleIndex ? 'solid' : 'outline'}
+              onClick={() => setArticleIndex(index)}
+            >
+              文章 {index + 1}
+            </Button>
+          ))}
+          <Tag size="sm">{grayStats.sampleCount} 個漢字樣本</Tag>
+          <Tag size="sm">missing {proofRun.missingCount}</Tag>
+        </HStack>
+        {isFocusedScope ? (
+          <HStack spacing={2} ml="auto">
+            <Switch
+              size="sm"
+              aria-label={t('qualityCheck.highlightScopedGlyphs')}
+              isChecked={showHighlight}
+              onChange={(event) => setShowHighlight(event.target.checked)}
+            />
+            <Text fontSize="xs" color="field.muted" fontWeight="800">
+              {t('qualityCheck.highlightScopedGlyphs')}
+            </Text>
+          </HStack>
+        ) : null}
       </HStack>
 
       <SimpleGrid columns={{ base: 1, md: 3 }} spacing={3}>
@@ -189,20 +211,20 @@ export function GrayProofPanel({
             <ProofParagraphSvg
               proofRun={proofRun}
               fontSize={fontSize}
-              highlightGlyphIds={selectedGlyphIdSet}
+              highlightGlyphIds={highlightedGlyphIds}
             />
           </Box>
         ))}
       </Stack>
 
-      {mode === 'selected' ? (
+      {isFocusedScope ? (
         <Box borderWidth={1} borderColor="field.line" bg="field.panel" p={4}>
           <Text fontSize="sm" fontWeight="900" mb={3}>
-            選取字 vs 文章平均灰度
+            範圍內字 vs 文章平均灰度
           </Text>
           {selectedComparisons.length === 0 ? (
             <Text fontSize="sm" color="field.muted">
-              選取的字沒有可估算灰度的輪廓，或不在文章中。
+              檢查範圍內沒有可估算灰度的輪廓，或不在文章中。
             </Text>
           ) : (
             <SimpleGrid columns={{ base: 1, md: 2 }} spacing={3}>

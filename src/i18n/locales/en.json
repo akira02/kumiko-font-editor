@@ -1,4 +1,7 @@
 {
+  "common": {
+    "close": "Close"
+  },
   "editor": {
     "addAlternate": "Add alternate",
     "addAnchor": "Add anchor",
@@ -126,6 +129,57 @@
     "exportFont": "Export font",
     "iUnderstandUnsupportedImportedOpentypeLookups": "I understand unsupported imported OpenType lookups will be removed from rebuilt layout tables."
   },
+  "qualityCheck": {
+    "title": "Quality check",
+    "open": "Open quality check",
+    "openShort": "Open check",
+    "highlightScopedGlyphs": "Highlight scoped glyphs",
+    "loadingReport": "Preparing check results…",
+    "scope": {
+      "changed": "Changed glyphs",
+      "current": "Current glyph",
+      "selected": "Selected glyphs",
+      "font": "Full font"
+    },
+    "tabs": {
+      "lint": "Lint",
+      "mixedProof": "Mixed proof",
+      "grayProof": "Gray proof",
+      "structure": "Structure"
+    },
+    "description": {
+      "font": "Lint, gray distribution, and structural outlier checks for the full font",
+      "focused": "Lint and proof comparison for {{scope}}. Full-font baselines are used for reference."
+    },
+    "summary": {
+      "scope": "Scope",
+      "glyphs": "Glyphs",
+      "glyphCount": "{{count}} glyphs",
+      "blocking": "Blocking",
+      "warning": "Warnings",
+      "info": "Info",
+      "deleted": "Deleted"
+    },
+    "mixedProof": {
+      "description": "Mixed proof: inspect size, baseline, and rhythm when different scripts, languages, and numbers appear in the same line.",
+      "focusedDescription": "Mixed proof: inspect size, baseline, and rhythm when different scripts, languages, and numbers appear in the same line. Scoped glyphs are interleaved with Latin letters and numbers."
+    },
+    "grayProof": {
+      "description": "Set a test article as a paragraph to inspect whether the overall gray value is even and find glyphs that appear too dark or too light.",
+      "focusedDescription": "Mix scoped glyphs into a random article and compare whether their gray value differs from surrounding text."
+    },
+    "commit": {
+      "title": "Pre-commit quality check",
+      "pass": "Pass",
+      "blockingStatus": "{{blocking}} blocking · {{warning}} warning(s)",
+      "warningStatus": "{{warning}} warning(s) · ready to commit",
+      "cleanStatus": "No blocking issues",
+      "checkedSummary": "{{status}}, checked {{count}} glyphs",
+      "deletedSuffix": ", {{count}} deleted",
+      "blockingToastTitle": "Blocking quality issues",
+      "blockingToastDescription": "Open quality check and fix blocking lint issues before committing."
+    }
+  },
   "fontOverview": {
     "add": "Add",
     "addGlyph": "Add glyph",
@@ -155,6 +209,13 @@
     "overview": "Overview",
     "searchPlaceholder": "Search characters, glyph names, or Unicode",
     "selected": "Selected",
+    "selection": {
+      "badge": "Selection",
+      "selectedGlyphs": "{{count}} glyph(s) selected",
+      "description": "Check this group of glyphs or place them in the glyph editor together.",
+      "deletedToastTitle": "Glyphs deleted",
+      "deletedToastDescription": "{{count}} glyph(s) were removed from the current project."
+    },
     "showOnlyEmptyGlyphs": "Only show empty glyphs to edit",
     "sourceLabel": "Source:",
     "total": "Total",

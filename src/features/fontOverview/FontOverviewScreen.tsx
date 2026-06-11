@@ -43,6 +43,7 @@ export function FontOverviewScreen() {
   const selectedGlyphId = useStore((state) => state.selectedGlyphId)
   const setSelectedGlyphId = useStore((state) => state.setSelectedGlyphId)
   const addGlyphs = useStore((state) => state.addGlyphs)
+  const deleteGlyph = useStore((state) => state.deleteGlyph)
   const setEditorTextState = useStore((state) => state.setEditorTextState)
   const setWorkspaceView = useStore((state) => state.setWorkspaceView)
   const closeProjectState = useStore((state) => state.closeProjectState)
@@ -454,6 +455,27 @@ export function FontOverviewScreen() {
     ]
   )
 
+  const handleDeleteSelectedGlyphs = useCallback(() => {
+    if (overviewSelectedGlyphIdList.length === 0) {
+      return
+    }
+
+    for (const glyphId of overviewSelectedGlyphIdList) {
+      deleteGlyph(glyphId)
+    }
+    selectOverviewGlyphs([], null)
+    selectionAnchorGlyphIdRef.current = null
+    toast({
+      title: t('fontOverview.selection.deletedToastTitle'),
+      description: t('fontOverview.selection.deletedToastDescription', {
+        count: overviewSelectedGlyphIdList.length,
+      }),
+      status: 'success',
+      duration: 2200,
+      isClosable: true,
+    })
+  }, [deleteGlyph, overviewSelectedGlyphIdList, selectOverviewGlyphs, t, toast])
+
   const handleGridStateChange = useCallback((state: GridStateSnapshot) => {
     pendingOverviewGridStateRef.current = state
   }, [])
@@ -510,7 +532,11 @@ export function FontOverviewScreen() {
         </GridItem>
 
         <GridItem area="right" minW={0} minH={0}>
-          <OverviewRightPanel selectedGlyphIds={overviewSelectedGlyphIdList} />
+          <OverviewRightPanel
+            selectedGlyphIds={overviewSelectedGlyphIdList}
+            onDeleteSelectedGlyphs={handleDeleteSelectedGlyphs}
+            onEnterEditor={handleEnterEditor}
+          />
         </GridItem>
       </Grid>
 

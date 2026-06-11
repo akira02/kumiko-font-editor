@@ -31,6 +31,7 @@ import {
 } from 'src/features/common/glyphInspector/githubCommitFlowUtils'
 import type { GitHubCommitModalProps } from 'src/features/common/glyphInspector/GitHubCommitModal'
 import { useGitHubSyncStatus } from 'src/features/common/glyphInspector/useGitHubSyncStatus'
+import { useTranslation } from 'react-i18next'
 
 interface UseGitHubCommitFlowInput {
   projectId: string | null
@@ -81,6 +82,7 @@ export const useGitHubCommitFlow = ({
   markDraftSaved,
 }: UseGitHubCommitFlowInput) => {
   const toast = useToast()
+  const { t } = useTranslation()
   const gitHubModal = useDisclosure()
   const [isPreparingGitHubCommit, setIsPreparingGitHubCommit] = useState(false)
   const [forkStatusOverrideState, setForkStatusOverrideState] =
@@ -407,8 +409,8 @@ export const useGitHubCommitFlow = ({
 
     if (hasBlockingQualityIssues) {
       toast({
-        title: '有阻擋品質問題',
-        description: '請先打開品質檢查，修正 blocking lint 後再提交。',
+        title: t('qualityCheck.commit.blockingToastTitle'),
+        description: t('qualityCheck.commit.blockingToastDescription'),
         status: 'warning',
         duration: 3600,
         isClosable: true,

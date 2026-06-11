@@ -16,6 +16,7 @@ import {
 } from 'src/lib/glyphOverview'
 import type { GlyphData, GlyphLayerData, WorkspaceView } from 'src/store'
 import { useTranslation } from 'react-i18next'
+import { PageSearch } from 'iconoir-react'
 
 interface GlyphSummaryCardProps {
   activeLayer: GlyphLayerData | null
@@ -26,6 +27,7 @@ interface GlyphSummaryCardProps {
   workspaceView: WorkspaceView
   onDeleteGlyph: () => void
   onEnterEditor: () => void
+  onOpenQualityCheck?: () => void
   onLayerChange: (layerId: string) => void
 }
 
@@ -38,6 +40,7 @@ export function GlyphSummaryCard({
   workspaceView,
   onDeleteGlyph,
   onEnterEditor,
+  onOpenQualityCheck,
   onLayerChange,
 }: GlyphSummaryCardProps) {
   const { t } = useTranslation()
@@ -155,6 +158,16 @@ export function GlyphSummaryCard({
             <Button size="sm" onClick={onEnterEditor}>
               {t('glyphInspector.enterGlyphEditor')}
             </Button>
+            {onOpenQualityCheck ? (
+              <Button
+                size="sm"
+                variant="outline"
+                leftIcon={<PageSearch width={14} height={14} />}
+                onClick={onOpenQualityCheck}
+              >
+                {t('qualityCheck.title')}
+              </Button>
+            ) : null}
             <Button size="sm" variant="outline" onClick={onDeleteGlyph}>
               {t('glyphInspector.deleteGlyph')}
             </Button>

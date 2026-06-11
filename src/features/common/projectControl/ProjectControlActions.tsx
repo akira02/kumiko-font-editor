@@ -78,9 +78,9 @@ export function ProjectControlActions({
             />
           </Tooltip>
         ) : null}
-        <Tooltip label="品質檢查">
+        <Tooltip label={t('qualityCheck.title')}>
           <IconButton
-            aria-label="打開品質檢查"
+            aria-label={t('qualityCheck.open')}
             icon={
               <PageSearch
                 width={18}
