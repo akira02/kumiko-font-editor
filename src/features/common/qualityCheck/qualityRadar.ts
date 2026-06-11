@@ -1,10 +1,12 @@
-import type { FontData, GlyphData } from 'src/store'
-import { getGlyphLayer } from 'src/store'
-import { getGlyphInkMetrics } from 'src/features/common/qualityCheck/glyphGeometry'
+import type { FontData } from 'src/store'
+import { computeGlyphInk } from 'src/features/common/qualityCheck/glyphInk'
+import type { GlyphInkMetrics } from 'src/features/common/qualityCheck/glyphInk'
 import {
-  buildStructureGlyphSample,
-  getStructureBodyBox,
-  isHanGlyph,
+  resolveFontGlyphs,
+  type ResolvedFont,
+} from 'src/features/common/qualityCheck/resolvedGlyph'
+import {
+  buildHanStructureSamples,
   sideLabels,
   strokeTypeLabels,
   type StructureGlyphSample,
@@ -43,7 +45,7 @@ export interface RadarFeatureValue extends RadarFeatureDefinition {
 export interface RadarRobustStat {
   count: number
   median: number
-  /** robust 標準差（1.4826 × MAD，MAD 退化時退回 IQR 估計） */
+  /** robust 標準差（1.4826 × MAD，MAD 退化時退回更寬的離散度估計） */
   scale: number
   p10: number
   p90: number
@@ -96,15 +98,13 @@ const IQR_TO_SIGMA = 1 / 1.349
 const STRUCTURE_SIDES: StructureSide[] = ['left', 'right', 'top', 'bottom']
 
 const collectGlyphFeatures = (
-  glyph: GlyphData,
-  fontData: FontData,
   sample: StructureGlyphSample,
+  ink: GlyphInkMetrics,
   unitsPerEm: number,
   bodyCenterY: number
 ): RadarFeatureValue[] => {
   const features: RadarFeatureValue[] = []
-  const activeLayer = getGlyphLayer(glyph, glyph.activeLayerId) ?? glyph
-  const advance = Math.max(1, activeLayer.metrics.width)
+  const advance = Math.max(1, sample.advance)
 
   // 邊界：依邊界筆畫理論，框架/樹枝筆畫分開建立分布
   for (const side of STRUCTURE_SIDES) {
@@ -146,7 +146,6 @@ const collectGlyphFeatures = (
   }
 
   // 墨量與密度分布
-  const ink = getGlyphInkMetrics(glyph, fontData.glyphs, unitsPerEm)
   if (ink.inkToFaceRatio !== null) {
     features.push({
       key: 'ink:toFace',
@@ -247,46 +246,30 @@ const RADAR_DIMENSIONS: RadarDimension[] = [
   'balance',
 ]
 
-export const buildRadarAnalysis = (
-  fontData: FontData | null | undefined
+/**
+ * 核心：從已建好的 structure sample 計算離群分析。
+ * 不重複攤平、不依賴 store，可在 Worker 執行。
+ */
+export const computeRadarFromSamples = (
+  resolvedFont: ResolvedFont,
+  samples: StructureGlyphSample[]
 ): RadarAnalysis | null => {
-  if (!fontData) {
+  if (samples.length < MIN_RADAR_SAMPLES) {
     return null
   }
 
-  const bodyBox = getStructureBodyBox(fontData)
-  const unitsPerEm = bodyBox.unitsPerEm
-  const bodyCenterY = (bodyBox.top + bodyBox.bottom) / 2
+  const unitsPerEm = resolvedFont.bodyBox.unitsPerEm
+  const bodyCenterY =
+    (resolvedFont.bodyBox.top + resolvedFont.bodyBox.bottom) / 2
 
-  const glyphFeatures: Array<{
-    glyph: GlyphData
-    character: string
-    features: RadarFeatureValue[]
-  }> = []
-  for (const glyph of Object.values(fontData.glyphs)) {
-    if (!isHanGlyph(glyph)) {
-      continue
+  const glyphFeatures = samples.map((sample) => {
+    const glyph = resolvedFont.glyphs[sample.glyphId]
+    const ink = computeGlyphInk(glyph, resolvedFont.glyphs, unitsPerEm)
+    return {
+      sample,
+      features: collectGlyphFeatures(sample, ink, unitsPerEm, bodyCenterY),
     }
-    const sample = buildStructureGlyphSample(glyph, fontData, bodyBox)
-    if (!sample) {
-      continue
-    }
-    glyphFeatures.push({
-      glyph,
-      character: sample.character,
-      features: collectGlyphFeatures(
-        glyph,
-        fontData,
-        sample,
-        unitsPerEm,
-        bodyCenterY
-      ),
-    })
-  }
-
-  if (glyphFeatures.length < MIN_RADAR_SAMPLES) {
-    return null
-  }
+  })
 
   const valuesByFeature = new Map<string, number[]>()
   for (const entry of glyphFeatures) {
@@ -351,10 +334,10 @@ export const buildRadarAnalysis = (
     reasons.sort(
       (left, right) => Math.abs(right.zScore) - Math.abs(left.zScore)
     )
-    evaluationByGlyphId.set(entry.glyph.id, {
-      glyphId: entry.glyph.id,
-      glyphName: entry.glyph.name,
-      character: entry.character,
+    evaluationByGlyphId.set(entry.sample.glyphId, {
+      glyphId: entry.sample.glyphId,
+      glyphName: entry.sample.glyphName,
+      character: entry.sample.character,
       score,
       reasons,
     })
@@ -383,6 +366,18 @@ export const buildRadarAnalysis = (
     suspects,
     evaluationByGlyphId,
   }
+}
+
+/** 便利函數：從 FontData 一路算出離群分析（主執行緒用）。 */
+export const buildRadarAnalysis = (
+  fontData: FontData | null | undefined
+): RadarAnalysis | null => {
+  if (!fontData) {
+    return null
+  }
+  const resolvedFont = resolveFontGlyphs(fontData)
+  const samples = buildHanStructureSamples(resolvedFont)
+  return computeRadarFromSamples(resolvedFont, samples)
 }
 
 export const formatRadarValue = (

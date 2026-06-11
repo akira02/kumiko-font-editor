@@ -72,10 +72,7 @@ export function GrayProofPanel({
     () => buildProofRun(fontData, proofText, proofCharacterLimit),
     [fontData, proofCharacterLimit, proofText]
   )
-  const grayStats = useMemo(
-    () => buildGrayStats(proofRun, fontData),
-    [fontData, proofRun]
-  )
+  const grayStats = useMemo(() => buildGrayStats(proofRun), [proofRun])
 
   const meanPercent = toPercent(grayStats.meanInkRatio)
   const stdPercent = toPercent(grayStats.stdInkRatio)

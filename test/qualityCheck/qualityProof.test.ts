@@ -95,7 +95,7 @@ describe('quality proof helpers', () => {
 
   it('computes gray averages by proof text occurrence', () => {
     const proofRun = buildProofRun(fontData, '永永一')
-    const stats = buildGrayStats(proofRun, fontData)
+    const stats = buildGrayStats(proofRun)
 
     expect(stats.sampleCount).toBe(3)
     expect(stats.meanInkRatio).toBeCloseTo((0.64 + 0.64 + 0.1) / 3, 2)

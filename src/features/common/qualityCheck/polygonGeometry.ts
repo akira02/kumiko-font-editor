@@ -1,4 +1,7 @@
-import { getGlyphLayer, type GlyphData } from 'src/store'
+/**
+ * 純多邊形幾何：輪廓攤平、面積、矩、邊界框。
+ * 不依賴 store 型別，輸入輸出皆為點陣列，可在任何環境（含 Worker）執行。
+ */
 
 export interface GeometryPoint {
   x: number
@@ -12,26 +15,16 @@ export interface GeometryBounds {
   yMax: number
 }
 
-export interface GlyphInkMetrics {
-  bounds: GeometryBounds | null
-  /** 真實墨水面積（counter 會扣除） */
-  inkArea: number
-  /** 真實字面框面積（outline bbox） */
-  faceArea: number
-  /** 墨水面積 / 真實字面框面積：單字本身的黑度 */
-  inkToFaceRatio: number | null
-  /** 墨水面積 /（advance × UPM）：排版時對版面灰度的貢獻 */
-  inkToEmRatio: number | null
-  /** 墨水視覺重心（counter 扣除後） */
-  centroidX: number | null
-  centroidY: number | null
-  /** 墨水沿軸向的分布標準差：水平/垂直密度分布的代理值 */
-  spreadX: number | null
-  spreadY: number | null
+export interface InkMoments {
+  area: number
+  centroidX: number
+  centroidY: number
+  /** 墨水分布的軸向標準差 */
+  spreadX: number
+  spreadY: number
 }
 
 const CURVE_FLATTEN_STEPS = 8
-const MAX_COMPONENT_DEPTH = 8
 
 interface FlattenNode {
   x: number
@@ -165,72 +158,6 @@ export const flattenContour = (
   return polygon
 }
 
-interface ComponentTransform {
-  x: number
-  y: number
-  scaleX: number
-  scaleY: number
-  rotation: number
-}
-
-const transformPolygon = (
-  polygon: GeometryPoint[],
-  transform: ComponentTransform
-): GeometryPoint[] => {
-  const radians = (transform.rotation * Math.PI) / 180
-  const cos = Math.cos(radians)
-  const sin = Math.sin(radians)
-  return polygon.map((point) => {
-    const scaledX = point.x * transform.scaleX
-    const scaledY = point.y * transform.scaleY
-    return {
-      x: scaledX * cos - scaledY * sin + transform.x,
-      y: scaledX * sin + scaledY * cos + transform.y,
-    }
-  })
-}
-
-/**
- * 取得 glyph（active layer，含遞迴 component）攤平後的所有閉合輪廓。
- */
-export const flattenGlyphToPolygons = (
-  glyph: GlyphData,
-  glyphMap: Record<string, GlyphData>,
-  visited = new Set<string>(),
-  depth = 0
-): GeometryPoint[][] => {
-  if (visited.has(glyph.id) || depth > MAX_COMPONENT_DEPTH) {
-    return []
-  }
-
-  const nextVisited = new Set(visited)
-  nextVisited.add(glyph.id)
-  const activeLayer = getGlyphLayer(glyph, glyph.activeLayerId) ?? glyph
-
-  const polygons: GeometryPoint[][] = activeLayer.paths
-    .filter((path) => path.closed && path.nodes.length >= 3)
-    .map((path) => flattenContour(path.nodes))
-    .filter((polygon) => polygon.length >= 3)
-
-  for (const componentRef of activeLayer.componentRefs) {
-    const componentGlyph = glyphMap[componentRef.glyphId]
-    if (!componentGlyph) {
-      continue
-    }
-    const componentPolygons = flattenGlyphToPolygons(
-      componentGlyph,
-      glyphMap,
-      nextVisited,
-      depth + 1
-    )
-    for (const polygon of componentPolygons) {
-      polygons.push(transformPolygon(polygon, componentRef))
-    }
-  }
-
-  return polygons
-}
-
 const getSignedArea = (polygon: GeometryPoint[]) => {
   let area = 0
   for (let index = 0; index < polygon.length; index += 1) {
@@ -263,11 +190,20 @@ const isPointInPolygon = (point: GeometryPoint, polygon: GeometryPoint[]) => {
   return inside
 }
 
+interface ClassifiedContour {
+  polygon: GeometryPoint[]
+  area: number
+  /** +1 實心、-1 挖空（counter） */
+  sign: number
+}
+
 /**
  * 用輪廓包含層級判斷實心（+1）/挖空（-1），不依賴 winding。
  * 這可避免兩個方向相反的獨立實心輪廓互相抵消。
  */
-const classifyInkContours = (polygons: GeometryPoint[][]) => {
+const classifyInkContours = (
+  polygons: GeometryPoint[][]
+): ClassifiedContour[] => {
   const contours = polygons
     .map((polygon) => ({
       polygon,
@@ -295,15 +231,6 @@ export const computeInkArea = (polygons: GeometryPoint[][]) =>
     (total, contour) => total + contour.sign * contour.area,
     0
   )
-
-export interface InkMoments {
-  area: number
-  centroidX: number
-  centroidY: number
-  /** 墨水分布的軸向標準差 */
-  spreadX: number
-  spreadY: number
-}
 
 /**
  * 墨水的一階/二階矩（閉式多邊形積分，挖空區帶負號），
@@ -382,50 +309,4 @@ export const getPolygonsBounds = (
     }
   }
   return bounds
-}
-
-const inkMetricsCache = new WeakMap<
-  Record<string, GlyphData>,
-  WeakMap<GlyphData, GlyphInkMetrics>
->()
-
-export const getGlyphInkMetrics = (
-  glyph: GlyphData,
-  glyphMap: Record<string, GlyphData>,
-  unitsPerEm: number
-): GlyphInkMetrics => {
-  let glyphMapCache = inkMetricsCache.get(glyphMap)
-  if (!glyphMapCache) {
-    glyphMapCache = new WeakMap()
-    inkMetricsCache.set(glyphMap, glyphMapCache)
-  }
-  const cached = glyphMapCache.get(glyph)
-  if (cached) {
-    return cached
-  }
-
-  const polygons = flattenGlyphToPolygons(glyph, glyphMap)
-  const bounds = getPolygonsBounds(polygons)
-  const moments = computeInkMoments(polygons)
-  const inkArea = moments?.area ?? 0
-  const faceArea = bounds
-    ? Math.max(0, bounds.xMax - bounds.xMin) *
-      Math.max(0, bounds.yMax - bounds.yMin)
-    : 0
-  const activeLayer = getGlyphLayer(glyph, glyph.activeLayerId) ?? glyph
-  const emArea = Math.max(0, activeLayer.metrics.width) * unitsPerEm
-
-  const metrics: GlyphInkMetrics = {
-    bounds,
-    inkArea,
-    faceArea,
-    inkToFaceRatio: faceArea > 0 ? Math.min(1, inkArea / faceArea) : null,
-    inkToEmRatio: emArea > 0 ? Math.min(1, inkArea / emArea) : null,
-    centroidX: moments?.centroidX ?? null,
-    centroidY: moments?.centroidY ?? null,
-    spreadX: moments?.spreadX ?? null,
-    spreadY: moments?.spreadY ?? null,
-  }
-  glyphMapCache.set(glyph, metrics)
-  return metrics
 }

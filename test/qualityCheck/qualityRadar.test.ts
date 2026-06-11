@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   computeInkMoments,
   flattenContour,
-} from 'src/features/common/qualityCheck/glyphGeometry'
+} from 'src/features/common/qualityCheck/polygonGeometry'
 import {
   buildRadarAnalysis,
   buildRobustStat,
