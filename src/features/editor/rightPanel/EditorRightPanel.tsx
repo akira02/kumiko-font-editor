@@ -17,6 +17,7 @@ import { SlidingTabList } from 'src/features/common/SlidingTabList'
 import { FontSettingsModal } from 'src/features/common/projectControl/FontSettingsModal'
 import { ProjectControlActions } from 'src/features/common/projectControl/ProjectControlActions'
 import { FontQualityCheckModal } from 'src/features/common/qualityCheck/QualityCheckModal'
+import { GlyphInsightCard } from 'src/features/editor/rightPanel/GlyphInsightCard'
 import { MetricsCard } from 'src/features/editor/rightPanel/MetricsCard'
 import { NodeInspectorCard } from 'src/features/editor/rightPanel/NodeInspectorCard'
 import { TransformCard } from 'src/features/editor/rightPanel/TransformCard'
@@ -119,6 +120,8 @@ export function EditorRightPanel() {
                     displayedMetrics={panel.displayedMetrics}
                     onMetricsChange={panel.handleMetricsChange}
                   />
+
+                  <GlyphInsightCard />
                 </Stack>
               </TabPanel>
               <TabPanel px={0} pb={0}>
