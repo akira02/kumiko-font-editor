@@ -205,7 +205,9 @@ export const buildUiActions = (set: ImmerSet) => ({
 
   updateViewport: (zoom: number, panX: number, panY: number) =>
     set((state) => {
-      state.viewport.zoom = Math.min(800, Math.max(0.1, zoom))
+      // Clamp range must match CanvasController MIN/MAX_MAGNIFICATION,
+      // otherwise the mirrored value diverges from the canvas state.
+      state.viewport.zoom = Math.min(800, Math.max(0.005, zoom))
       state.viewport.pan = { x: panX, y: panY }
     }),
 

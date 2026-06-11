@@ -413,6 +413,10 @@ export function CanvasWorkspace() {
       updateViewport(vp.zoom, vp.pan.x, vp.pan.y)
     }
 
+    // Restore the persisted viewport once; afterwards the controller owns
+    // viewport state and the store only mirrors it for persistence/overlays.
+    controller.setViewport(useStore.getState().viewport)
+
     setCanvasSize({
       width: controller.canvasWidth,
       height: controller.canvasHeight,
@@ -505,7 +509,8 @@ export function CanvasWorkspace() {
     sceneController.sceneModel.selection = selectionPointIds
     sceneController.selection = selectionPointIds
 
-    controller.setViewport(viewport)
+    // Never push the store viewport back here: it is a delayed echo of the
+    // controller's own state and rewinds the canvas mid-pan (visible jump).
     controller.requestUpdate()
   }, [
     activeToolId,
@@ -515,7 +520,6 @@ export function CanvasWorkspace() {
     positionedGlyph,
     positionedGlyphs,
     selectedNodeIds,
-    viewport,
   ])
 
   useEffect(() => {
