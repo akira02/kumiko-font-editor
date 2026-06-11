@@ -91,6 +91,15 @@ describe('buildRobustStat / radarZScore', () => {
     const stat = buildRobustStat([10, 10, 10, 10, 10, 14, 6, 18, 2])!
     expect(stat.scale).toBeGreaterThan(0)
   })
+
+  it('uses one-sided scales for skewed distributions', () => {
+    // 下側緊密、上側長尾（3type 報告：邊距眾數貼近範圍最大值端）
+    const stat = buildRobustStat([8, 9, 9, 10, 10, 10, 12, 15, 20, 30, 50])!
+    expect(stat.scaleBelow).toBeLessThan(stat.scaleAbove)
+    // 同樣距離的偏離：往緊密側是大事，往長尾側是常態
+    expect(Math.abs(radarZScore(6, stat))).toBeGreaterThan(3)
+    expect(radarZScore(14, stat)).toBeLessThan(2)
+  })
 })
 
 const makeSquarePath = (
@@ -206,11 +215,14 @@ describe('buildRadarAnalysis', () => {
 
     const radar = analyzeFontPopulation(makeFontData(glyphs)).radar!
     const simpleGlyph = radar.evaluationByGlyphId.get('g22')!
-    // 修正前：widthRatio/heightRatio 直接比一致性，簡單小字必被誤報
+    // 修正前：widthRatio/heightRatio 直接比一致性，簡單小字必被誤報。
+    // 字數少到只有單一視窗時，由 peer-mismatch 折扣接手壓住誤報
     expect(
       simpleGlyph.reasons.some((reason) => reason.dimension === 'proportion')
     ).toBe(false)
-    expect(radar.sizeTrend.slopeByKey.get('face:widthRatio')).toBeGreaterThan(0)
+    expect(radar.suspects.some((suspect) => suspect.glyphId === 'g22')).toBe(
+      false
+    )
   })
 
   it('returns null when there are not enough Han samples', () => {
@@ -223,7 +235,8 @@ const makeStratumSample = (
   id: string,
   faceWidth: number,
   inkArea: number,
-  jitter: number
+  jitter: number,
+  sideType: 'framing' | 'branching' = 'branching'
 ): GlyphGeometrySample => {
   const advance = 1000
   const xMin = (advance - faceWidth) / 2 + jitter
@@ -231,6 +244,7 @@ const makeStratumSample = (
   const yMin = 200
   const yMax = 560
   const faceArea = faceWidth * (yMax - yMin)
+  const coverage = sideType === 'framing' ? 0.9 : 0.3
   return {
     glyphId: id,
     glyphName: id,
@@ -238,21 +252,21 @@ const makeStratumSample = (
     advance,
     bounds: { xMin, yMin, xMax, yMax },
     sides: {
-      left: { type: 'branching', bearing: Math.round(xMin), coverage: 0.3 },
+      left: { type: sideType, bearing: Math.round(xMin), coverage },
       right: {
-        type: 'branching',
+        type: sideType,
         bearing: Math.round(advance - xMax),
-        coverage: 0.3,
+        coverage,
       },
       top: {
-        type: 'branching',
+        type: sideType,
         bearing: Math.round(880 - yMax),
-        coverage: 0.3,
+        coverage,
       },
       bottom: {
-        type: 'branching',
+        type: sideType,
         bearing: Math.round(yMin - -120),
-        coverage: 0.3,
+        coverage,
       },
     },
     ink: {
@@ -291,7 +305,7 @@ describe('complexity strata', () => {
       bottom: -120,
       unitsPerEm: 1000,
     })!
-    expect(radar.strata.binUpperBounds.length).toBeGreaterThan(1)
+    expect(radar.strata.windows.length).toBeGreaterThan(1)
     // 正常的簡單小字不再因為「跟全字體不同」被列為可疑
     expect(radar.suspects.some((suspect) => suspect.glyphId === 's0')).toBe(
       false
@@ -300,6 +314,152 @@ describe('complexity strata', () => {
     expect(radar.suspects.some((suspect) => suspect.glyphId === 'wrong')).toBe(
       true
     )
+  })
+
+  it('does not let stroke-like ultra-simple glyphs dominate the suspects', () => {
+    const samples: GlyphGeometrySample[] = []
+    // 連續複雜度光譜：字面與墨量隨複雜度平滑成長
+    for (let index = 0; index < 200; index += 1) {
+      const faceWidth = 300 + index * 3
+      samples.push(
+        makeStratumSample(
+          `g${index}`,
+          faceWidth,
+          0.5 * faceWidth * 360,
+          ((index % 5) - 2) * 4
+        )
+      )
+    }
+    // 3 個丶/丨類極簡字：字面遠小於最低視窗的中位字，但延續同一條趨勢
+    for (let index = 0; index < 3; index += 1) {
+      samples.push(makeStratumSample(`dot${index}`, 120, 0.5 * 120 * 360, 0))
+    }
+    // 真離群：複雜度低卻撐滿字面
+    samples.push(makeStratumSample('bloated', 900, 0.5 * 400 * 360, 0))
+
+    const radar = computeRadarFromSamples(samples, {
+      top: 880,
+      bottom: -120,
+      unitsPerEm: 1000,
+    })!
+    // 修正前：極簡字在最低 quantile 層內仍是極端值，霸佔風險榜前列
+    expect(
+      radar.suspects.some((suspect) => suspect.glyphId.startsWith('dot'))
+    ).toBe(false)
+    expect(
+      radar.suspects.some((suspect) => suspect.glyphId === 'bloated')
+    ).toBe(true)
+  })
+
+  it('compares enclosure glyphs against their own cohort, not open glyphs', () => {
+    const samples: GlyphGeometrySample[] = []
+    // 24 個口框/日目類全包圍字：依排版慣例字面收窄
+    for (let index = 0; index < 24; index += 1) {
+      samples.push(
+        makeStratumSample(
+          `box${index}`,
+          560 + (index % 5) * 4,
+          100000,
+          0,
+          'framing'
+        )
+      )
+    }
+    // 違反慣例的口框字：跟無包圍字一樣撐滿字面
+    samples.push(makeStratumSample('wrongbox', 700, 100000, 0, 'framing'))
+    // 20 個無包圍字：正常撐滿字面
+    for (let index = 0; index < 20; index += 1) {
+      samples.push(
+        makeStratumSample(`open${index}`, 700 + (index % 5) * 4, 100000, 0)
+      )
+    }
+
+    const radar = computeRadarFromSamples(samples, {
+      top: 880,
+      bottom: -120,
+      unitsPerEm: 1000,
+    })!
+    // 修正前：包圍字跟全視窗比，整個家族因「字面偏窄、留白偏多」集體上榜
+    const suspectIds = radar.suspects.map((suspect) => suspect.glyphId)
+    expect(suspectIds.filter((id) => id.startsWith('box'))).toEqual([])
+    expect(suspectIds.filter((id) => id.startsWith('open'))).toEqual([])
+    // 同 cohort 內的真離群仍被抓到
+    expect(suspectIds).toContain('wrongbox')
+  })
+
+  it('keeps semantic-enclosure glyphs in the framing cohort even when drawn broken', () => {
+    const buildSamples = () => {
+      const samples: GlyphGeometrySample[] = []
+      for (let index = 0; index < 24; index += 1) {
+        samples.push(
+          makeStratumSample(
+            `box${index}`,
+            560 + (index % 5) * 4,
+            100000,
+            0,
+            'framing'
+          )
+        )
+      }
+      for (let index = 0; index < 20; index += 1) {
+        samples.push(
+          makeStratumSample(`open${index}`, 700 + (index % 5) * 4, 100000, 0)
+        )
+      }
+      // 畫壞的包圍字：撐滿字面且邊緣不成線 → 幾何分型誤判為無包圍，
+      // 跟撐滿字面的 open 群比起來毫無異狀
+      samples.push(makeStratumSample('broken', 700, 100000, 0, 'branching'))
+      return samples
+    }
+    const bodyBox = { top: 880, bottom: -120, unitsPerEm: 1000 }
+
+    // 沒有語意資料：幾何 cohort 跟著畫壞的輪廓跑，錯誤被遮蔽
+    const blindRadar = computeRadarFromSamples(buildSamples(), bodyBox)!
+    expect(
+      blindRadar.suspects.some((suspect) => suspect.glyphId === 'broken')
+    ).toBe(false)
+
+    // GlyphWiki 判定它是包圍字：強制與包圍 cohort 比 → 字面過寬被抓到
+    const radar = computeRadarFromSamples(
+      buildSamples(),
+      bodyBox,
+      new Set(['broken'])
+    )!
+    expect(radar.enclosureCharacters.has('broken')).toBe(true)
+    expect(radar.suspects.some((suspect) => suspect.glyphId === 'broken')).toBe(
+      true
+    )
+  })
+
+  it('flags an off-center framing glyph via the symmetry feature', () => {
+    const samples: GlyphGeometrySample[] = []
+    // 24 個左右皆框架的字：大致置中（lsb−rsb 在 ±6 內抖動）
+    for (let index = 0; index < 24; index += 1) {
+      samples.push(
+        makeStratumSample(
+          `box${index}`,
+          560,
+          100000,
+          ((index % 5) - 2) * 3,
+          'framing'
+        )
+      )
+    }
+    // 未置中的框架字：整體右移 40（lsb−rsb = 80）
+    samples.push(makeStratumSample('offcenter', 560, 100000, 40, 'framing'))
+
+    const radar = computeRadarFromSamples(samples, {
+      top: 880,
+      bottom: -120,
+      unitsPerEm: 1000,
+    })!
+    const evaluation = radar.evaluationByGlyphId.get('offcenter')!
+    expect(
+      evaluation.reasons.some((reason) => reason.key === 'bearing:symmetryH')
+    ).toBe(true)
+    expect(
+      radar.suspects.some((suspect) => suspect.glyphId === 'offcenter')
+    ).toBe(true)
   })
 })
 

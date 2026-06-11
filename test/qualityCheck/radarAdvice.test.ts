@@ -57,6 +57,28 @@ describe('buildRadarAdvice', () => {
     expect(advice.detail).toContain('76.0%–84.0%')
   })
 
+  it('describes framing symmetry offset without hitting the per-side path', () => {
+    // 回歸：bearing:symmetryH 帶 bearing: 前綴，曾被逐側邊距分支
+    // 攔截並以 'symmetryH' 查 BEARING_ACTIONS 而拋例外
+    const advice = buildRadarAdvice(
+      makeReason({
+        key: 'bearing:symmetryH',
+        label: '左右置中偏移',
+        dimension: 'balance',
+        value: 80,
+        median: 0,
+        p10: -10,
+        p90: 10,
+        zScore: 3.1,
+      })
+    )
+    expect(advice.title).toContain('未視覺置中')
+    expect(advice.title).toContain('偏右')
+    // 建議平移量 = (80 − 0) / 2
+    expect(advice.action).toContain('往左')
+    expect(advice.action).toContain('40')
+  })
+
   it('describes centroid imbalance with a corrective direction', () => {
     const advice = buildRadarAdvice(
       makeReason({

@@ -10,12 +10,16 @@ import {
  * 主執行緒便利函數：同步從 FontData 算出母體分析（小字體、測試、Worker 不可用時的後援）。
  */
 export const analyzeFontPopulation = (
-  fontData: FontData | null | undefined
+  fontData: FontData | null | undefined,
+  semanticEnclosureChars?: ReadonlySet<string>
 ): PopulationAnalysis => {
   if (!fontData) {
     return { baseline: null, radar: null }
   }
-  return runPopulationAnalysis(resolveFontGlyphs(fontData))
+  return runPopulationAnalysis(
+    resolveFontGlyphs(fontData),
+    semanticEnclosureChars
+  )
 }
 
 interface AnalysisSuccessMessage {
