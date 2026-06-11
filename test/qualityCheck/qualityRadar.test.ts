@@ -142,6 +142,49 @@ describe('buildRadarAnalysis', () => {
     expect(balanceScore.score).toBeLessThan(100)
   })
 
+  it('does not flag a simple glyph whose smaller face follows the complexity trend', () => {
+    const glyphs: GlyphData[] = []
+    // 22 個複雜字：大字面、大墨量（實心方塊 → 複雜度與字面尺寸完全線性相關）
+    for (let index = 0; index < 22; index += 1) {
+      const jitter = (index % 5) * 6
+      const size = 850 + jitter
+      glyphs.push(
+        makeHanGlyph(
+          index,
+          makeSquarePath(
+            (1000 - size) / 2,
+            -120 + (880 + 120 - size) / 2,
+            (1000 + size) / 2,
+            -120 + (880 + 120 + size) / 2
+          )
+        )
+      )
+    }
+    // 3 個簡單字：依延伸性原則做小，落在複雜度→尺寸趨勢線上
+    for (let index = 22; index < 25; index += 1) {
+      const size = 550
+      glyphs.push(
+        makeHanGlyph(
+          index,
+          makeSquarePath(
+            (1000 - size) / 2,
+            -120 + (880 + 120 - size) / 2,
+            (1000 + size) / 2,
+            -120 + (880 + 120 + size) / 2
+          )
+        )
+      )
+    }
+
+    const radar = analyzeFontPopulation(makeFontData(glyphs)).radar!
+    const simpleGlyph = radar.evaluationByGlyphId.get('g22')!
+    // 修正前：widthRatio/heightRatio 直接比一致性，簡單小字必被誤報
+    expect(
+      simpleGlyph.reasons.some((reason) => reason.dimension === 'proportion')
+    ).toBe(false)
+    expect(radar.sizeTrend.slopeByKey.get('face:widthRatio')).toBeGreaterThan(0)
+  })
+
   it('returns null when there are not enough Han samples', () => {
     const glyphs = [makeHanGlyph(0, makeSquarePath(50, -50, 950, 820))]
     expect(analyzeFontPopulation(makeFontData(glyphs)).radar).toBeNull()
