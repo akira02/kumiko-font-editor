@@ -29,8 +29,19 @@ interface UseCanvasKeyboardShortcutsOptions {
   ) => void
 }
 
-const isTypingTarget = (target: EventTarget | null) =>
-  target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement
+const isTypingTarget = (target: EventTarget | null, activeToolId: ToolId) => {
+  if (
+    target instanceof HTMLTextAreaElement &&
+    target.dataset.kumikoHiddenTextInput === 'true' &&
+    activeToolId !== 'text'
+  ) {
+    return false
+  }
+
+  return (
+    target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement
+  )
+}
 
 export function useCanvasKeyboardShortcuts({
   activeEditorGlyphId,
@@ -123,7 +134,7 @@ export function useCanvasKeyboardShortcuts({
         event.stopPropagation()
       }
 
-      if (isTypingTarget(event.target)) {
+      if (isTypingTarget(event.target, activeToolId)) {
         return
       }
 

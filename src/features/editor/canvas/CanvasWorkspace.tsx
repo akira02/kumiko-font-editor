@@ -136,6 +136,9 @@ export function CanvasWorkspace() {
 
   const handleToolSelect = useCallback(
     (toolId: ToolId) => {
+      if (toolId !== 'text') {
+        hiddenTextInputRef.current?.blur()
+      }
       sceneControllerRef.current?.setActiveTool(toolId)
       setActiveToolId(toolId)
       setSelectedNodeIds([])

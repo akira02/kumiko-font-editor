@@ -32,6 +32,7 @@ export function HiddenTextInput({
     <>
       <textarea
         ref={inputRef}
+        data-kumiko-hidden-text-input="true"
         value={textInputValue}
         onChange={onChange}
         onSelect={onSelect}

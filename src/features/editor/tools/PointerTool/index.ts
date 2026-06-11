@@ -55,6 +55,12 @@ export class PointerTool extends BaseTool {
   identifier = 'pointer-tool'
 
   private dragState: PointerDragState = createInitialPointerDragState()
+  private doubleClickSelectionBase:
+    | {
+        selection: Set<string>
+        selectedPathHit?: PathHitInfo
+      }
+    | undefined
 
   handleHover(event: ToolEvent): void {
     this.updateSelectionTransformBounds()
@@ -112,14 +118,39 @@ export class PointerTool extends BaseTool {
       this.sceneController.selection
     )
 
+    const selectionMode = getPointerSelectionMode(initialEvent)
+
     if (initialEvent.detail === 2 || initialEvent.myTapCount === 2) {
       initialEvent.preventDefault()
       eventStream.done()
+      const selectionBase = this.doubleClickSelectionBase
+      this.dragState = {
+        ...createInitialPointerDragState(),
+        anchorPoint: point,
+        currentPoint: point,
+        pendingHit: hit,
+        selectionMode,
+        initialSelection: new Set(
+          selectionBase?.selection ?? this.sceneController.selection
+        ),
+        initialSelectedPathHit:
+          selectionBase?.selectedPathHit ??
+          this.sceneController.selectedPathHit,
+        altKey: initialEvent.altKey,
+        transformHandle,
+      }
       this.handleDoubleClick(hit)
+      this.dragState = createInitialPointerDragState()
+      this.doubleClickSelectionBase = undefined
       return
     }
 
-    const selectionMode = getPointerSelectionMode(initialEvent)
+    if ((initialEvent.detail ?? 1) <= 1) {
+      this.doubleClickSelectionBase = {
+        selection: new Set(this.sceneController.selection),
+        selectedPathHit: this.sceneController.selectedPathHit,
+      }
+    }
 
     this.dragState = {
       mode: 'pending',
