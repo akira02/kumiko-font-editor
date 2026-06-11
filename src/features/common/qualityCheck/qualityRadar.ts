@@ -50,6 +50,8 @@ export interface RadarReason {
   format: RadarValueFormat
   value: number
   median: number
+  /** 依複雜度迴歸後的期望值（僅尺寸特徵有，取代 median 作為比較對象） */
+  expected?: number
   zScore: number
 }
 
@@ -69,9 +71,19 @@ export interface RadarDimensionScore {
   outlierCount: number
 }
 
+/**
+ * 延伸性（3type 報告）：字面大小應隨筆畫複雜度正相關成長（冒比二高大），
+ * 故尺寸特徵不能直接要求一致，需先對複雜度做線性迴歸、再以殘差比較。
+ */
+export interface RadarSizeTrend {
+  medianComplexity: number
+  slopeByKey: Map<string, number>
+}
+
 export interface RadarAnalysis {
   sampleCount: number
   featureStats: Map<string, RadarRobustStat>
+  sizeTrend: RadarSizeTrend
   dimensionScores: RadarDimensionScore[]
   overallScore: number
   /** 依風險分數排序的可疑字形（score > 0） */
@@ -231,6 +243,70 @@ export const buildRobustStat = (values: number[]): RadarRobustStat | null => {
 export const radarZScore = (value: number, stat: RadarRobustStat) =>
   stat.scale > 0 ? (value - stat.median) / stat.scale : 0
 
+/** 尺寸特徵：受延伸性影響，需先依複雜度 detrend 再比較 */
+const SIZE_TREND_KEYS = new Set(['face:widthRatio', 'face:heightRatio'])
+
+/** 複雜度代理值：墨水面積開根號（≈ 筆畫數 × 筆畫尺度），對 UPM 正規化 */
+export const glyphComplexity = (
+  sample: GlyphGeometrySample,
+  unitsPerEm: number
+) => Math.sqrt(Math.max(0, sample.ink.inkArea)) / unitsPerEm
+
+const fitTrendSlope = (pairs: Array<[number, number]>) => {
+  if (pairs.length < MIN_RADAR_SAMPLES) {
+    return 0
+  }
+  let meanX = 0
+  let meanY = 0
+  for (const [x, y] of pairs) {
+    meanX += x
+    meanY += y
+  }
+  meanX /= pairs.length
+  meanY /= pairs.length
+  let covariance = 0
+  let variance = 0
+  for (const [x, y] of pairs) {
+    covariance += (x - meanX) * (y - meanY)
+    variance += (x - meanX) * (x - meanX)
+  }
+  // 延伸性只允許正相關；負斜率多半是雜訊，套用會反向「修正」
+  return variance > 0 ? Math.max(0, covariance / variance) : 0
+}
+
+const buildSizeTrend = (
+  glyphFeatures: Array<{ complexity: number; features: RadarFeatureValue[] }>
+): RadarSizeTrend => {
+  const complexityStat = buildRobustStat(
+    glyphFeatures.map((entry) => entry.complexity)
+  )
+  const slopeByKey = new Map<string, number>()
+  for (const key of SIZE_TREND_KEYS) {
+    const pairs: Array<[number, number]> = []
+    for (const entry of glyphFeatures) {
+      const feature = entry.features.find((candidate) => candidate.key === key)
+      if (feature) {
+        pairs.push([entry.complexity, feature.value])
+      }
+    }
+    slopeByKey.set(key, fitTrendSlope(pairs))
+  }
+  return { medianComplexity: complexityStat?.median ?? 0, slopeByKey }
+}
+
+/** 把尺寸特徵換算成「中位複雜度下」的等效值，使分布可跨複雜度比較 */
+const detrendValue = (
+  feature: RadarFeatureValue,
+  complexity: number,
+  sizeTrend: RadarSizeTrend
+) => {
+  const slope = sizeTrend.slopeByKey.get(feature.key)
+  if (!slope) {
+    return feature.value
+  }
+  return feature.value - slope * (complexity - sizeTrend.medianComplexity)
+}
+
 const RADAR_DIMENSIONS: RadarDimension[] = [
   'boundary',
   'proportion',
@@ -255,14 +331,18 @@ export const computeRadarFromSamples = (
 
   const glyphFeatures = samples.map((sample) => ({
     sample,
+    complexity: glyphComplexity(sample, unitsPerEm),
     features: collectGlyphFeatures(sample, unitsPerEm, bodyCenterY),
   }))
 
+  const sizeTrend = buildSizeTrend(glyphFeatures)
+
+  // 統計分布建立在 detrend 後的值上，z-score 才不會懲罰「該小的字小」
   const valuesByFeature = new Map<string, number[]>()
   for (const entry of glyphFeatures) {
     for (const feature of entry.features) {
       const values = valuesByFeature.get(feature.key) ?? []
-      values.push(feature.value)
+      values.push(detrendValue(feature, entry.complexity, sizeTrend))
       valuesByFeature.set(feature.key, values)
     }
   }
@@ -296,7 +376,8 @@ export const computeRadarFromSamples = (
       if (!stat) {
         continue
       }
-      const zScore = radarZScore(feature.value, stat)
+      const adjusted = detrendValue(feature, entry.complexity, sizeTrend)
+      const zScore = radarZScore(adjusted, stat)
       const excess = Math.abs(zScore) - RADAR_REASON_Z
       if (excess > 0) {
         score += excess * excess
@@ -307,6 +388,11 @@ export const computeRadarFromSamples = (
           format: feature.format,
           value: feature.value,
           median: stat.median,
+          // 期望值 = 此字複雜度下的迴歸預測（raw 與 detrend 的差補回中位）
+          expected:
+            adjusted !== feature.value
+              ? stat.median + (feature.value - adjusted)
+              : undefined,
           zScore,
         })
       }
@@ -348,6 +434,7 @@ export const computeRadarFromSamples = (
   return {
     sampleCount,
     featureStats,
+    sizeTrend,
     dimensionScores,
     overallScore,
     suspects,
@@ -369,4 +456,6 @@ export const formatRadarValue = (
 }
 
 export const formatRadarReason = (reason: RadarReason) =>
-  `${reason.label} ${formatRadarValue(reason.value, reason.format)}（中位 ${formatRadarValue(reason.median, reason.format)}，z ${reason.zScore.toFixed(1)}）`
+  reason.expected !== undefined
+    ? `${reason.label} ${formatRadarValue(reason.value, reason.format)}（同複雜度期望 ${formatRadarValue(reason.expected, reason.format)}，z ${reason.zScore.toFixed(1)}）`
+    : `${reason.label} ${formatRadarValue(reason.value, reason.format)}（中位 ${formatRadarValue(reason.median, reason.format)}，z ${reason.zScore.toFixed(1)}）`
