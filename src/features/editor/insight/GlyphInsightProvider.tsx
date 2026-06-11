@@ -36,7 +36,7 @@ export function GlyphInsightProvider({ children }: { children: ReactNode }) {
   const activeGlyphId =
     editorGlyphIds[editorActiveGlyphIndex] ?? selectedGlyphId ?? null
 
-  const [showBands, setShowBands] = useState(false)
+  const [showBands, setShowBands] = useState(true)
 
   // 母體基準刻意落後編輯 2 秒：尺不該跟著正在改的筆跳動
   const baselineFontData = useDebouncedValue(fontData, POPULATION_REFRESH_MS)

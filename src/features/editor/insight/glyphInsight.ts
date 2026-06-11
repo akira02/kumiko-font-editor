@@ -25,7 +25,7 @@ export const idleGlyphInsight: GlyphInsightValue = {
   sample: null,
   evaluation: null,
   baseline: null,
-  showBands: false,
+  showBands: true,
   setShowBands: () => {},
 }
 
