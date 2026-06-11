@@ -86,6 +86,9 @@ export const getGlyphwikiComposition = async (character: string) => {
   return map.get(character) ?? null
 }
 
+/** 整張組成表（快取共用）。供需要全量掃描的消費者（如語意結構分類）使用。 */
+export const getGlyphwikiCompositionMap = () => getCompositionMap()
+
 const unionBoxes = (boxes: GlyphwikiPartBox[]): GlyphwikiPartBox => ({
   x1: Math.min(...boxes.map((box) => box.x1)),
   y1: Math.min(...boxes.map((box) => box.y1)),
