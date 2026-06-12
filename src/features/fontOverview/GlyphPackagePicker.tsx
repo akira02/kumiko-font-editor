@@ -6,6 +6,7 @@ import {
   GridItem,
   HStack,
   Link,
+  Progress,
   SimpleGrid,
   Stack,
   Text,
@@ -19,16 +20,23 @@ import {
   type DefaultGlyphPackage,
   type GlyphPackageGroup,
 } from 'src/features/fontOverview/defaultGlyphPackages'
+import {
+  buildGlyphLookupMap,
+  computeCharsetCoverage,
+  type CharsetCoverage,
+} from 'src/lib/charsetCoverage'
+import type { GlyphData } from 'src/store'
 import { useTranslation } from 'react-i18next'
 
 interface GlyphPackagePickerProps {
-  existingGlyphIds: Set<string>
+  glyphMap: Record<string, GlyphData>
   onSelectionChange: (selection: GlyphPackageSelection) => void
 }
 
 export interface GlyphPackageSelection {
   glyphNames: string[]
-  existingCount: number
+  drawnCount: number
+  emptyGlyphNames: string[]
   missingGlyphNames: string[]
   packages: DefaultGlyphPackage[]
 }
@@ -68,21 +76,28 @@ const getPackagesBySection = (packages: DefaultGlyphPackage[]) => {
 
 interface PackageCardProps {
   glyphPackage: DefaultGlyphPackage
+  coverage: CharsetCoverage
   isSelected: boolean
   onToggle: () => void
 }
 
-function PackageCard({ glyphPackage, isSelected, onToggle }: PackageCardProps) {
+function PackageCard({
+  glyphPackage,
+  coverage,
+  isSelected,
+  onToggle,
+}: PackageCardProps) {
   const { t } = useTranslation()
 
   const selectedBg = 'field.ink'
   const selectedColor = 'field.yellow.300'
   const mutedColor = isSelected ? 'field.panelMuted' : 'field.muted'
+  const percent = Math.floor(coverage.drawnRatio * 100)
 
   return (
     <Button
       h="auto"
-      minH="116px"
+      minH="148px"
       justifyContent="center"
       alignItems="center"
       whiteSpace="normal"
@@ -127,10 +142,25 @@ function PackageCard({ glyphPackage, isSelected, onToggle }: PackageCardProps) {
         <Text fontSize="xs" color={mutedColor} fontWeight="normal">
           {glyphPackage.description}
         </Text>
-        <Text fontSize="xs" color={mutedColor} fontFamily="mono">
-          {glyphPackage.glyphNames.length.toLocaleString()}{' '}
-          {t('fontOverview.glyphs')}
-        </Text>
+        <Stack spacing={1} w="100%">
+          <HStack justify="space-between" fontSize="xs" fontFamily="mono">
+            <Text color={mutedColor}>{percent}%</Text>
+            <Text color={mutedColor}>
+              {coverage.drawnCount.toLocaleString()} /{' '}
+              {coverage.total.toLocaleString()}
+            </Text>
+          </HStack>
+          <Progress
+            value={percent}
+            size="xs"
+            borderRadius="full"
+            colorScheme={percent >= 100 ? 'green' : 'yellow'}
+          />
+          <Text fontSize="xs" color={mutedColor} fontFamily="mono">
+            {t('fontOverview.coverageMissing')}{' '}
+            {coverage.missingGlyphNames.length.toLocaleString()}
+          </Text>
+        </Stack>
       </Stack>
     </Button>
   )
@@ -202,6 +232,7 @@ function PackageGroupSource({ groupId }: PackageGroupSourceProps) {
 interface PackageCardSectionProps {
   section: string
   sectionPackages: DefaultGlyphPackage[]
+  coverageByPackageId: Map<string, CharsetCoverage>
   selectedPackageIds: Set<string>
   onTogglePackage: (glyphPackage: DefaultGlyphPackage) => void
 }
@@ -209,6 +240,7 @@ interface PackageCardSectionProps {
 function PackageCardSection({
   section,
   sectionPackages,
+  coverageByPackageId,
   selectedPackageIds,
   onTogglePackage,
 }: PackageCardSectionProps) {
@@ -223,14 +255,21 @@ function PackageCardSection({
         {section}
       </Text>
       <SimpleGrid columns={{ base: 2, md: 3, lg: 4 }} spacing={2}>
-        {sectionPackages.map((glyphPackage) => (
-          <PackageCard
-            key={glyphPackage.id}
-            glyphPackage={glyphPackage}
-            isSelected={selectedPackageIds.has(glyphPackage.id)}
-            onToggle={() => onTogglePackage(glyphPackage)}
-          />
-        ))}
+        {sectionPackages.map((glyphPackage) => {
+          const coverage = coverageByPackageId.get(glyphPackage.id)
+          if (!coverage) {
+            return null
+          }
+          return (
+            <PackageCard
+              key={glyphPackage.id}
+              glyphPackage={glyphPackage}
+              coverage={coverage}
+              isSelected={selectedPackageIds.has(glyphPackage.id)}
+              onToggle={() => onTogglePackage(glyphPackage)}
+            />
+          )
+        })}
       </SimpleGrid>
     </Stack>
   )
@@ -238,12 +277,14 @@ function PackageCardSection({
 
 interface PackageCardsAreaProps {
   packages: DefaultGlyphPackage[]
+  coverageByPackageId: Map<string, CharsetCoverage>
   selectedPackageIds: Set<string>
   onTogglePackage: (glyphPackage: DefaultGlyphPackage) => void
 }
 
 function PackageCardsArea({
   packages,
+  coverageByPackageId,
   selectedPackageIds,
   onTogglePackage,
 }: PackageCardsAreaProps) {
@@ -254,6 +295,7 @@ function PackageCardsArea({
           key={section}
           section={section}
           sectionPackages={sectionPackages}
+          coverageByPackageId={coverageByPackageId}
           selectedPackageIds={selectedPackageIds}
           onTogglePackage={onTogglePackage}
         />
@@ -338,6 +380,7 @@ export function GlyphPackageSelectionSummary({
   selection,
 }: GlyphPackageSelectionSummaryProps) {
   const { t } = useTranslation()
+  const missingGlyphList = selection.missingGlyphNames.join(', ')
 
   return (
     <Box minW={0}>
@@ -347,22 +390,41 @@ export function GlyphPackageSelectionSummary({
         <Box as="span" fontWeight={700} mx={1}>
           {selection.glyphNames.length.toLocaleString()}
         </Box>
-        {t('fontOverview.glyphExists')}
+        {t('fontOverview.glyphs')} / {t('fontOverview.coverageDrawn')}
         <Box as="span" fontWeight={700} mx={1}>
-          {selection.existingCount.toLocaleString()}
+          {selection.drawnCount.toLocaleString()}
         </Box>
-        {t('fontOverview.glyphWillBeAdded')}
+        / {t('fontOverview.coverageEmpty')}
+        <Box as="span" fontWeight={700} mx={1}>
+          {selection.emptyGlyphNames.length.toLocaleString()}
+        </Box>
+        / {t('fontOverview.coverageMissing')}
         <Box as="span" fontWeight={800} mx={1}>
           {selection.missingGlyphNames.length.toLocaleString()}
         </Box>
-        {t('fontOverview.glyph')}
       </Text>
+      {selection.missingGlyphNames.length > 0 ? (
+        <Box mt={2} maxH="72px" overflow="auto" pr={2}>
+          <Text
+            fontSize="xs"
+            color="field.muted"
+            fontFamily="mono"
+            fontWeight="900"
+            mb={1}
+          >
+            {t('fontOverview.glyphsWillBeAddedList')}
+          </Text>
+          <Text fontSize="xs" color="field.steel" fontFamily="mono">
+            {missingGlyphList}
+          </Text>
+        </Box>
+      ) : null}
     </Box>
   )
 }
 
 export function GlyphPackagePicker({
-  existingGlyphIds,
+  glyphMap,
   onSelectionChange,
 }: GlyphPackagePickerProps) {
   const [selectedPackageIds, setSelectedPackageIds] = useState<Set<string>>(
@@ -380,6 +442,17 @@ export function GlyphPackagePicker({
       ),
     []
   )
+  const glyphLookup = useMemo(() => buildGlyphLookupMap(glyphMap), [glyphMap])
+  const coverageByPackageId = useMemo(
+    () =>
+      new Map(
+        defaultGlyphPackages.map((glyphPackage) => [
+          glyphPackage.id,
+          computeCharsetCoverage(glyphPackage, glyphLookup),
+        ])
+      ),
+    [glyphLookup]
+  )
   const selectedPackages = useMemo(
     () =>
       defaultGlyphPackages.filter((glyphPackage) =>
@@ -391,23 +464,31 @@ export function GlyphPackagePicker({
     () => getPackageGlyphNames(selectedPackages),
     [selectedPackages]
   )
-  const missingGlyphNames = useMemo(
+  const selectedCoverage = useMemo(
     () =>
-      Array.from(selectedGlyphNames).filter(
-        (glyphName) => !existingGlyphIds.has(glyphName)
+      computeCharsetCoverage(
+        {
+          id: 'selected',
+          label: 'Selected',
+          group: 'selected',
+          section: 'selected',
+          glyphNames: Array.from(selectedGlyphNames),
+        },
+        glyphLookup
       ),
-    [existingGlyphIds, selectedGlyphNames]
+    [glyphLookup, selectedGlyphNames]
   )
   useEffect(() => {
     onSelectionChange({
       glyphNames: Array.from(selectedGlyphNames),
-      existingCount: selectedGlyphNames.size - missingGlyphNames.length,
-      missingGlyphNames,
+      drawnCount: selectedCoverage.drawnCount,
+      emptyGlyphNames: selectedCoverage.emptyGlyphNames,
+      missingGlyphNames: selectedCoverage.missingGlyphNames,
       packages: selectedPackages,
     })
   }, [
-    missingGlyphNames,
     onSelectionChange,
+    selectedCoverage,
     selectedGlyphNames,
     selectedPackages,
   ])
@@ -492,6 +573,7 @@ export function GlyphPackagePicker({
           >
             <PackageCardsArea
               packages={activeGroupPackages}
+              coverageByPackageId={coverageByPackageId}
               selectedPackageIds={selectedPackageIds}
               onTogglePackage={togglePackage}
             />

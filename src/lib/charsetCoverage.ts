@@ -1,4 +1,8 @@
 import type { GlyphData } from 'src/store'
+import {
+  hasDrawableGlyphContent,
+  isKnownBlankGlyph,
+} from 'src/lib/glyphBlankness'
 
 export interface CharsetCoverageInput {
   id: string
@@ -21,7 +25,7 @@ export interface CharsetCoverage {
 }
 
 const isGlyphDrawn = (glyph: GlyphData) =>
-  glyph.paths.length > 0 || glyph.componentRefs.length > 0
+  hasDrawableGlyphContent(glyph) || isKnownBlankGlyph(glyph)
 
 const addLookupKeys = (keys: string[], glyphName: string) => {
   keys.push(glyphName.toLowerCase())

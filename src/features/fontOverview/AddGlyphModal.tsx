@@ -15,20 +15,20 @@ import {
   Text,
   Textarea,
 } from '@chakra-ui/react'
-import { useMemo, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { SlidingTabList } from 'src/features/common/SlidingTabList'
 import {
   GlyphPackageSelectionSummary,
   GlyphPackagePicker,
   type GlyphPackageSelection,
 } from 'src/features/fontOverview/GlyphPackagePicker'
-import { getExistingGlyphLookupKeys } from 'src/features/fontOverview/glyphLookup'
 import type { GlyphData } from 'src/store'
 import { useTranslation } from 'react-i18next'
 
 const emptyPackageSelection: GlyphPackageSelection = {
   glyphNames: [],
-  existingCount: 0,
+  drawnCount: 0,
+  emptyGlyphNames: [],
   missingGlyphNames: [],
   packages: [],
 }
@@ -58,10 +58,6 @@ export function AddGlyphModal({
   const [activeTabIndex, setActiveTabIndex] = useState(0)
   const [packageSelection, setPackageSelection] =
     useState<GlyphPackageSelection>(emptyPackageSelection)
-  const existingGlyphIds = useMemo(
-    () => getExistingGlyphLookupKeys(glyphMap),
-    [glyphMap]
-  )
 
   return (
     <Modal
@@ -107,7 +103,7 @@ export function AddGlyphModal({
             <TabPanels h="100%">
               <TabPanel p={0} h="100%" overflow="auto">
                 <GlyphPackagePicker
-                  existingGlyphIds={existingGlyphIds}
+                  glyphMap={glyphMap}
                   onSelectionChange={setPackageSelection}
                 />
               </TabPanel>

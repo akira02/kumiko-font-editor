@@ -199,6 +199,7 @@
     "glyphInputHint": "Separate glyph names with spaces or line breaks. Recipes add the target glyph on the right side of the equals sign first.",
     "glyphOverview": "Glyph overview",
     "glyphs": "glyphs",
+    "glyphsWillBeAddedList": "Will be added",
     "glyphWillBeAdded": "glyphs will be added",
     "jf7000Package": "JF7000 essential character set",
     "kumikoFontEditor": "Kumiko Font Editor",
