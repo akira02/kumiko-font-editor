@@ -719,6 +719,11 @@ const buildFontDataFromUfoGlyphs = (
       'com.kumiko.fontEditor.localizedNames'
     ] as NonNullable<FontData['fontInfo']>['localizedNames']
   }
+  const postscriptNames =
+    metadata.lib?.['public.postscriptNames'] &&
+    typeof metadata.lib['public.postscriptNames'] === 'object'
+      ? (metadata.lib['public.postscriptNames'] as Record<string, string>)
+      : {}
   return {
     glyphs: Object.fromEntries(
       glyphRecords.map((record) => {
@@ -756,6 +761,7 @@ const buildFontDataFromUfoGlyphs = (
             name,
             activeLayerId: metadata.layers[0]?.layerId ?? 'public.default',
             unicode: record.unicodes[0] ?? null,
+            production: postscriptNames[glyphId] ?? null,
             export: true,
             paths,
             components,

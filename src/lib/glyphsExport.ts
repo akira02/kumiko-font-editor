@@ -253,7 +253,8 @@ const createPatchedGlyphRecord = (
     export: glyph.export === false ? 0 : 1,
     category: glyph.category ?? undefined,
     subCategory: glyph.subCategory ?? undefined,
-    production: glyph.production ?? undefined,
+    // Keep the source production name when the in-memory glyph has none.
+    production: glyph.production ?? rawGlyph?.production,
   }
 
   const rawLayers = Array.isArray(rawGlyph?.layers)
