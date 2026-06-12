@@ -497,30 +497,43 @@ export const settingsFromLib = (
 export const buildUfoLibFromFontData = (
   fontData: FontData,
   baseLib: Record<string, unknown> | null | undefined = {}
-) => ({
-  ...(baseLib ?? {}),
-  ...(fontData.axes ? { [KUMIKO_AXES_LIB_KEY]: fontData.axes } : {}),
-  ...(fontData.sources ? { [KUMIKO_SOURCES_LIB_KEY]: fontData.sources } : {}),
-  ...(fontData.exportInstances
-    ? { [KUMIKO_EXPORT_INSTANCES_LIB_KEY]: fontData.exportInstances }
-    : {}),
-  ...(fontData.statusDefinitions
-    ? { [FONTRA_STATUS_DEFINITIONS_KEY]: fontData.statusDefinitions }
-    : {}),
-  ...(fontData.settings
-    ? {
-        [KUMIKO_SETTINGS_LIB_KEY]: fontData.settings,
-        [KUMIKO_NOTES_LIB_KEY]: fontData.settings.notes ?? '',
-      }
-    : {}),
-  ...(fontData.fontInfo?.openTypeNameRecords
-    ? {
-        [KUMIKO_OPENTYPE_NAME_RECORDS_LIB_KEY]:
-          fontData.fontInfo.openTypeNameRecords,
-      }
-    : {}),
-  ...(fontData.fontInfo?.localizedNames
-    ? { [KUMIKO_LOCALIZED_NAMES_LIB_KEY]: fontData.fontInfo.localizedNames }
-    : {}),
-  'public.glyphOrder': Object.keys(fontData.glyphs),
-})
+) => {
+  // public.postscriptNames maps the working glyph name (the UFO glyph name,
+  // = glyph.id) to its production name; only emit when they differ.
+  const postscriptNames = Object.fromEntries(
+    Object.values(fontData.glyphs)
+      .filter((glyph) => glyph.production && glyph.production !== glyph.id)
+      .map((glyph) => [glyph.id, glyph.production])
+  )
+
+  return {
+    ...(baseLib ?? {}),
+    ...(fontData.axes ? { [KUMIKO_AXES_LIB_KEY]: fontData.axes } : {}),
+    ...(fontData.sources ? { [KUMIKO_SOURCES_LIB_KEY]: fontData.sources } : {}),
+    ...(fontData.exportInstances
+      ? { [KUMIKO_EXPORT_INSTANCES_LIB_KEY]: fontData.exportInstances }
+      : {}),
+    ...(fontData.statusDefinitions
+      ? { [FONTRA_STATUS_DEFINITIONS_KEY]: fontData.statusDefinitions }
+      : {}),
+    ...(fontData.settings
+      ? {
+          [KUMIKO_SETTINGS_LIB_KEY]: fontData.settings,
+          [KUMIKO_NOTES_LIB_KEY]: fontData.settings.notes ?? '',
+        }
+      : {}),
+    ...(fontData.fontInfo?.openTypeNameRecords
+      ? {
+          [KUMIKO_OPENTYPE_NAME_RECORDS_LIB_KEY]:
+            fontData.fontInfo.openTypeNameRecords,
+        }
+      : {}),
+    ...(fontData.fontInfo?.localizedNames
+      ? { [KUMIKO_LOCALIZED_NAMES_LIB_KEY]: fontData.fontInfo.localizedNames }
+      : {}),
+    ...(Object.keys(postscriptNames).length > 0
+      ? { 'public.postscriptNames': postscriptNames }
+      : {}),
+    'public.glyphOrder': Object.keys(fontData.glyphs),
+  }
+}

@@ -220,7 +220,8 @@ export const patchGlyphText = (
   glyphRecord.export = glyph.export === false ? 0 : 1
   glyphRecord.category = glyph.category ?? undefined
   glyphRecord.subCategory = glyph.subCategory ?? undefined
-  glyphRecord.production = glyph.production ?? undefined
+  // Keep the source production name when the in-memory glyph has none.
+  glyphRecord.production = glyph.production ?? glyphRecord.production
 
   const layers = Array.isArray(glyphRecord.layers)
     ? (glyphRecord.layers as Array<Record<string, unknown>>)
