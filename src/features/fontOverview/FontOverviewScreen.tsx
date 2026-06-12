@@ -19,7 +19,6 @@ import {
 import { saveDraftSnapshot } from 'src/lib/draftSave'
 import { useStore } from 'src/store'
 import { AddGlyphModal } from 'src/features/fontOverview/AddGlyphModal'
-import { CharsetCoverageModal } from 'src/features/fontOverview/CharsetCoverageModal'
 import { OverviewContent } from 'src/features/fontOverview/OverviewContent'
 import { OverviewRightPanel } from 'src/features/fontOverview/OverviewRightPanel'
 import { OverviewSidebar } from 'src/features/fontOverview/OverviewSidebar'
@@ -28,13 +27,13 @@ import {
   getExistingGlyphLookupKeys,
   hasGlyphCandidate,
 } from 'src/features/fontOverview/glyphLookup'
+import { isEmptyGlyphToEdit } from 'src/lib/glyphBlankness'
 import { useTranslation } from 'react-i18next'
 
 export function FontOverviewScreen() {
   const { t } = useTranslation()
   const toast = useToast()
   const [isAddingGlyphs, setIsAddingGlyphs] = useState(false)
-  const [isCoverageOpen, setIsCoverageOpen] = useState(false)
   const [glyphInputValue, setGlyphInputValue] = useState('')
   const [showOnlyEmptyGlyphs, setShowOnlyEmptyGlyphs] = useState(false)
   const currentSearchQuery = useStore((state) => state.currentSearchQuery)
@@ -80,10 +79,7 @@ export function FontOverviewScreen() {
   const overviewGlyphs = useMemo(
     () =>
       showOnlyEmptyGlyphs
-        ? filteredGlyphList.filter(
-            (glyph) =>
-              glyph.paths.length === 0 && glyph.componentRefs.length === 0
-          )
+        ? filteredGlyphList.filter(isEmptyGlyphToEdit)
         : filteredGlyphList,
     [filteredGlyphList, showOnlyEmptyGlyphs]
   )
@@ -253,12 +249,6 @@ export function FontOverviewScreen() {
 
   const handleAddGlyphNames = (glyphNames: string[]) => {
     handleAddGlyphs(glyphNames.join('\n'))
-  }
-
-  const handleAddMissingGlyphNames = (glyphNames: string[]) => {
-    handleAddGlyphs(glyphNames.join('\n'))
-    setIsCoverageOpen(false)
-    setShowOnlyEmptyGlyphs(true)
   }
 
   const handleCloseProject = useCallback(async () => {
@@ -510,7 +500,6 @@ export function FontOverviewScreen() {
             onSearchQueryChange={setSearchQuery}
             onSectionSelect={handleSectionSelect}
             onShowOnlyEmptyGlyphsChange={setShowOnlyEmptyGlyphs}
-            onOpenCoverage={() => setIsCoverageOpen(true)}
           />
         </GridItem>
 
@@ -548,13 +537,6 @@ export function FontOverviewScreen() {
         onInputChange={setGlyphInputValue}
         onSubmitGlyphNames={handleAddGlyphNames}
         onSubmitManualInput={() => handleAddGlyphs()}
-      />
-
-      <CharsetCoverageModal
-        glyphMap={glyphMap}
-        isOpen={isCoverageOpen}
-        onClose={() => setIsCoverageOpen(false)}
-        onAddGlyphNames={handleAddMissingGlyphNames}
       />
     </>
   )

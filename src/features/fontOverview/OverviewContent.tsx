@@ -169,8 +169,11 @@ export function OverviewContent({
           </Box>
           <Button
             size="sm"
-            variant="outline"
             flexShrink={0}
+            variant="solid"
+            fontWeight="900"
+            _hover={{ bg: 'field.yellow.200' }}
+            _active={{ bg: 'field.yellow.400' }}
             onClick={onOpenAddGlyphModal}
           >
             {t('fontOverview.addGlyphButton')}

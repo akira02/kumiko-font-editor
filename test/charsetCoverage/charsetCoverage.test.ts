@@ -9,12 +9,13 @@ const makeGlyph = (input: {
   id: string
   unicode?: string | null
   drawn?: boolean
+  width?: number
 }): GlyphData =>
   ({
     id: input.id,
     name: input.id,
     unicode: input.unicode ?? null,
-    metrics: { width: 1000, lsb: 0, rsb: 0 },
+    metrics: { width: input.width ?? 1000, lsb: 0, rsb: 0 },
     paths: input.drawn ? [{ id: 'p1', nodes: [], closed: true }] : [],
     components: [],
     componentRefs: [],
@@ -97,5 +98,48 @@ describe('computeCharsetCoverage', () => {
       lookup
     )
     expect(coverage.drawnCount).toBe(1)
+  })
+
+  it('treats known blank glyphs as drawn', () => {
+    const lookup = buildGlyphLookupMap(
+      toGlyphMap([makeGlyph({ id: 'space', unicode: '0020', drawn: false })])
+    )
+    const coverage = computeCharsetCoverage(
+      {
+        id: 'test',
+        label: 'Test',
+        group: 'latin',
+        section: 'Basic',
+        glyphNames: ['space'],
+      },
+      lookup
+    )
+    expect(coverage.drawnCount).toBe(1)
+    expect(coverage.emptyGlyphNames).toEqual([])
+  })
+
+  it('treats known blank glyphs as drawn even without advance width', () => {
+    const lookup = buildGlyphLookupMap(
+      toGlyphMap([
+        makeGlyph({
+          id: 'space',
+          unicode: '0020',
+          drawn: false,
+          width: 0,
+        }),
+      ])
+    )
+    const coverage = computeCharsetCoverage(
+      {
+        id: 'test',
+        label: 'Test',
+        group: 'latin',
+        section: 'Basic',
+        glyphNames: ['space'],
+      },
+      lookup
+    )
+    expect(coverage.drawnCount).toBe(1)
+    expect(coverage.emptyGlyphNames).toEqual([])
   })
 })

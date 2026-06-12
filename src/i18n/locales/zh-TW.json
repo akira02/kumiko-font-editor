@@ -199,6 +199,7 @@
     "glyphInputHint": "glyph names 請用空白或換行分隔。Recipe 會先新增等號右側的目標 glyph。",
     "glyphOverview": "字符總覽",
     "glyphs": "glyphs",
+    "glyphsWillBeAddedList": "預計新增",
     "glyphWillBeAdded": "字符 ，預計新增",
     "jf7000Package": "jf7000 當務字集",
     "kumikoFontEditor": "Kumiko Font Editor",
