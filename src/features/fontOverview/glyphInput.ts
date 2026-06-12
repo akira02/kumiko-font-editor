@@ -1,57 +1,14 @@
+import type { GlyphNameInfo } from 'src/lib/glyphNameInfo'
+
 export interface GlyphAdditionCandidate {
   id: string
   name: string
   unicode: string | null
+  production: string | null
   recipe?: string
 }
 
 const MAX_RANGE_GLYPHS = 5000
-
-const NAMED_GLYPH_UNICODE: Record<string, string> = {
-  space: '0020',
-  exclam: '0021',
-  quotedbl: '0022',
-  numbersign: '0023',
-  dollar: '0024',
-  percent: '0025',
-  ampersand: '0026',
-  quotesingle: '0027',
-  parenleft: '0028',
-  parenright: '0029',
-  asterisk: '002A',
-  plus: '002B',
-  comma: '002C',
-  hyphen: '002D',
-  period: '002E',
-  slash: '002F',
-  zero: '0030',
-  one: '0031',
-  two: '0032',
-  three: '0033',
-  four: '0034',
-  five: '0035',
-  six: '0036',
-  seven: '0037',
-  eight: '0038',
-  nine: '0039',
-  colon: '003A',
-  semicolon: '003B',
-  less: '003C',
-  equal: '003D',
-  greater: '003E',
-  question: '003F',
-  at: '0040',
-  bracketleft: '005B',
-  backslash: '005C',
-  bracketright: '005D',
-  asciicircum: '005E',
-  underscore: '005F',
-  grave: '0060',
-  braceleft: '007B',
-  bar: '007C',
-  braceright: '007D',
-  asciitilde: '007E',
-}
 
 const formatUnicodeHex = (codePoint: number) =>
   codePoint <= 0xffff
@@ -73,22 +30,31 @@ const buildGlyphIdFromChar = (character: string) => {
     : `u${formatUnicodeHex(codePoint)}`
 }
 
-const getUnicodeFromGlyphName = (glyphName: string) => {
+// Resolve a glyph name to its Unicode and production name. uniXXXX/single-char
+// names are derivable; everything else (leftArrow, verticalbar) needs the
+// GlyphData lookup map, which the caller loads via getGlyphNameInfoMap.
+const resolveGlyphInfo = (
+  glyphName: string,
+  infoMap?: Map<string, GlyphNameInfo>
+): GlyphNameInfo => {
   if (glyphName.length === 1) {
-    return formatUnicodeHex(glyphName.codePointAt(0) ?? 0)
+    return {
+      unicode: formatUnicodeHex(glyphName.codePointAt(0) ?? 0),
+      production: null,
+    }
   }
 
   const uniMatch = glyphName.match(/^uni([0-9a-fA-F]{4,6})$/)
   if (uniMatch?.[1]) {
-    return uniMatch[1].toUpperCase()
+    return { unicode: uniMatch[1].toUpperCase(), production: null }
   }
 
   const uMatch = glyphName.match(/^u([0-9a-fA-F]{5,6})$/)
   if (uMatch?.[1]) {
-    return uMatch[1].toUpperCase()
+    return { unicode: uMatch[1].toUpperCase(), production: null }
   }
 
-  return NAMED_GLYPH_UNICODE[glyphName] ?? null
+  return infoMap?.get(glyphName) ?? { unicode: null, production: null }
 }
 
 const isGlyphName = (token: string) =>
@@ -96,13 +62,18 @@ const isGlyphName = (token: string) =>
 
 const createGlyphNameCandidate = (
   glyphName: string,
+  infoMap?: Map<string, GlyphNameInfo>,
   recipe?: string
-): GlyphAdditionCandidate => ({
-  id: glyphName,
-  name: glyphName,
-  unicode: getUnicodeFromGlyphName(glyphName),
-  ...(recipe ? { recipe } : {}),
-})
+): GlyphAdditionCandidate => {
+  const info = resolveGlyphInfo(glyphName, infoMap)
+  return {
+    id: glyphName,
+    name: glyphName,
+    unicode: info.unicode,
+    production: info.production,
+    ...(recipe ? { recipe } : {}),
+  }
+}
 
 const createCharacterCandidates = (token: string) =>
   Array.from(token).flatMap((character): GlyphAdditionCandidate[] => {
@@ -117,6 +88,7 @@ const createCharacterCandidates = (token: string) =>
         id,
         name: character,
         unicode: formatUnicodeHex(codePoint),
+        production: null,
       },
     ]
   })
@@ -149,7 +121,7 @@ const parseUnicodeRange = (token: string) => {
   })
 }
 
-const parseRecipe = (token: string) => {
+const parseRecipe = (token: string, infoMap?: Map<string, GlyphNameInfo>) => {
   const [source, target, extra] = token.split('=')
   if (!source || !target || extra !== undefined || !isGlyphName(target)) {
     return null
@@ -163,33 +135,39 @@ const parseRecipe = (token: string) => {
     return null
   }
 
-  return [createGlyphNameCandidate(target, source)]
+  return [createGlyphNameCandidate(target, infoMap, source)]
 }
 
-const parseGlyphToken = (token: string): GlyphAdditionCandidate[] => {
+const parseGlyphToken = (
+  token: string,
+  infoMap?: Map<string, GlyphNameInfo>
+): GlyphAdditionCandidate[] => {
   const rangeCandidates = parseUnicodeRange(token)
   if (rangeCandidates) {
     return rangeCandidates
   }
 
-  const recipeCandidates = parseRecipe(token)
+  const recipeCandidates = parseRecipe(token, infoMap)
   if (recipeCandidates) {
     return recipeCandidates
   }
 
   if (isGlyphName(token)) {
-    return [createGlyphNameCandidate(token)]
+    return [createGlyphNameCandidate(token, infoMap)]
   }
 
   return createCharacterCandidates(token)
 }
 
-export const parseGlyphAdditionInput = (input: string) => {
+export const parseGlyphAdditionInput = (
+  input: string,
+  infoMap?: Map<string, GlyphNameInfo>
+) => {
   const results: GlyphAdditionCandidate[] = []
   const seen = new Set<string>()
 
   for (const token of input.split(/\s+/).filter(Boolean)) {
-    for (const candidate of parseGlyphToken(token)) {
+    for (const candidate of parseGlyphToken(token, infoMap)) {
       if (seen.has(candidate.id)) {
         continue
       }

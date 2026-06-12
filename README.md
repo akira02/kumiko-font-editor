@@ -107,6 +107,18 @@ GITHUB_OAUTH_SCOPE=public_repo read:user user:email
 - Canvas rendering 放在 `src/canvas/`；editor 互動工具放在 `src/features/editor/tools/`；React component 不應直接塞進 `src/canvas/`。
 - 全域狀態集中在 `src/store/`；feature 內若只是整理資料給 UI，優先用 feature-local hook。
 
+## 資料管線腳本
+
+`scripts/` 下的腳本把外部資料來源轉成 `public/` 內供 runtime fetch 的 TSV 檔。來源皆會不定期更新，需手動重跑同步：
+
+| 指令                         | 來源                                                                                           | 輸出                                                                               |
+| ---------------------------- | ---------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `pnpm data:glyphdata`        | Glyphs [GlyphData.xml](https://github.com/schriftgestalt/GlyphsInfo)（自動下載，BSD 3-Clause） | `public/glyphsdata/glyphdata.txt`：glyph name / altName → unicode、production name |
+| `pnpm data:ids`              | BabelStone [IDS.TXT](https://www.babelstone.co.uk/CJK/IDS.TXT)（自動下載）                     | `public/ids/ids_babelstone.txt`                                                    |
+| `pnpm data:glyphwiki <dump>` | GlyphWiki dump（需先自行下載 `dump_newest_only.txt`）                                          | `public/glyphwiki/composition.txt`、`variants.txt`                                 |
+
+`glyphdata.txt` 用來把 jf 等 Glyphs 字集清單的 nice name（如 `leftArrow`）正確對應到 Unicode 與匯出用的 production name（`arrowleft`）；CJK 漢字不在該表內，由 `uniXXXX` 慣例演算法解析。詳見 `docs/glyph-naming.md`（規劃中）。
+
 ## 下一步
 
 - 將 GitHub token 改成更完整的 server-side session storage，而不只依賴 signed cookie。

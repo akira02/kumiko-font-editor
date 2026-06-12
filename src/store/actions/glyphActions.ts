@@ -77,6 +77,7 @@ export const buildGlyphActions = (set: ImmerSet) => ({
       id: string
       name: string
       unicode: string | null
+      production?: string | null
       width?: number
     }>
   ) => {
@@ -101,6 +102,7 @@ export const buildGlyphActions = (set: ImmerSet) => ({
           id: glyphInput.id,
           name: glyphInput.name,
           unicode: glyphInput.unicode,
+          production: glyphInput.production ?? null,
           paths: [],
           components: [],
           componentRefs: [],
