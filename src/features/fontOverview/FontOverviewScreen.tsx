@@ -23,6 +23,7 @@ import { OverviewContent } from 'src/features/fontOverview/OverviewContent'
 import { OverviewRightPanel } from 'src/features/fontOverview/OverviewRightPanel'
 import { OverviewSidebar } from 'src/features/fontOverview/OverviewSidebar'
 import { parseGlyphAdditionInput } from 'src/features/fontOverview/glyphInput'
+import { getGlyphNameInfoMap } from 'src/lib/glyphNameInfo'
 import {
   getExistingGlyphLookupKeys,
   hasGlyphCandidate,
@@ -197,8 +198,10 @@ export function FontOverviewScreen() {
     [glyphMap]
   )
 
-  const handleAddGlyphs = (inputValue = glyphInputValue) => {
-    const candidates = parseGlyphAdditionInput(inputValue)
+  const handleAddGlyphs = async (inputValue = glyphInputValue) => {
+    // Fall back to regex-only resolution if the lookup table fails to load.
+    const infoMap = await getGlyphNameInfoMap().catch(() => undefined)
+    const candidates = parseGlyphAdditionInput(inputValue, infoMap)
     if (candidates.length === 0) {
       toast({
         title: t('fontOverview.noGlyphsToAdd'),

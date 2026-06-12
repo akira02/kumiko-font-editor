@@ -314,6 +314,7 @@ export interface GlobalState {
       id: string
       name: string
       unicode: string | null
+      production?: string | null
       width?: number
     }>
   ) => string[]
