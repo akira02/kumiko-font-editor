@@ -34,6 +34,11 @@ export const buildGlyphActions = (set: ImmerSet) => ({
       }
 
       delete state.fontData.glyphs[glyphId]
+      if (state.fontData.glyphOrder) {
+        state.fontData.glyphOrder = state.fontData.glyphOrder.filter(
+          (id) => id !== glyphId
+        )
+      }
       state.editorGlyphIds = state.editorGlyphIds.filter((id) => id !== glyphId)
       syncEditorTextFromGlyphIds(state)
       state.editorTextCursorIndex = clampEditorCursorIndex(

@@ -433,8 +433,9 @@ export const exportFontAsBinary = (
       appendShapeToPath(path, shape)
     })
     return new opentype.Glyph({
-      // post table uses the production name (arrowleft), not the nice name.
-      name: glyph.production ?? glyph.name ?? glyph.id,
+      // Glyph identity must match the working name the FEA pipeline references;
+      // production names reach the post table via UFO public.postscriptNames.
+      name: glyph.id,
       unicode: glyph.unicode ? Number.parseInt(glyph.unicode, 16) : undefined,
       advanceWidth: glyph.metrics.width,
       path,

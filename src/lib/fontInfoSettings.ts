@@ -506,6 +506,17 @@ export const buildUfoLibFromFontData = (
       .map((glyph) => [glyph.id, glyph.production])
   )
 
+  // Honor the intended glyph order, dropping ids with no glyph and appending
+  // any glyph missing from glyphOrder so the list stays complete.
+  const orderedIds = (fontData.glyphOrder ?? []).filter(
+    (id) => id in fontData.glyphs
+  )
+  const seen = new Set(orderedIds)
+  const glyphOrder = [
+    ...orderedIds,
+    ...Object.keys(fontData.glyphs).filter((id) => !seen.has(id)),
+  ]
+
   return {
     ...(baseLib ?? {}),
     ...(fontData.axes ? { [KUMIKO_AXES_LIB_KEY]: fontData.axes } : {}),
@@ -534,6 +545,6 @@ export const buildUfoLibFromFontData = (
     ...(Object.keys(postscriptNames).length > 0
       ? { 'public.postscriptNames': postscriptNames }
       : {}),
-    'public.glyphOrder': Object.keys(fontData.glyphs),
+    'public.glyphOrder': glyphOrder,
   }
 }

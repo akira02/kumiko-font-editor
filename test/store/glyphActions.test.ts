@@ -38,4 +38,21 @@ describe('glyph actions', () => {
     expect(addedGlyphIds).toEqual(['.notdef'])
     expect(useStore.getState().fontData?.glyphOrder).toEqual(['A', '.notdef'])
   })
+
+  it('removes a deleted glyph from glyphOrder', () => {
+    const fontData: FontData = {
+      glyphOrder: ['A', 'B', 'C'],
+      glyphs: {
+        A: makeGlyph('A', '0041'),
+        B: makeGlyph('B', '0042'),
+        C: makeGlyph('C', '0043'),
+      },
+    }
+    useStore.getState().loadProjectState('project-a', 'Project A', fontData)
+
+    useStore.getState().deleteGlyph('B')
+
+    expect(useStore.getState().fontData?.glyphOrder).toEqual(['A', 'C'])
+    expect(useStore.getState().fontData?.glyphs.B).toBeUndefined()
+  })
 })

@@ -180,9 +180,18 @@ const parsePlistElement = (element: Element): unknown => {
   return element.textContent ?? ''
 }
 
+// DOMParser does not throw on malformed XML; it returns a document with a
+// <parsererror> element. Surface that instead of silently parsing garbage.
+const parseXmlDocument = (text: string, context: string) => {
+  const document = new DOMParser().parseFromString(text, 'application/xml')
+  if (document.querySelector('parsererror')) {
+    throw new Error(`Malformed XML: ${context}`)
+  }
+  return document
+}
+
 const parseXmlPlist = (text: string): Record<string, unknown> | unknown[] => {
-  const parser = new DOMParser()
-  const document = parser.parseFromString(text, 'application/xml')
+  const document = parseXmlDocument(text, 'plist')
   const root = document.documentElement
   const plistChild = childrenOf(root)[0] ?? root
   return parsePlistElement(plistChild) as Record<string, unknown> | unknown[]
@@ -286,8 +295,7 @@ export const parseGlifText = (
   UfoGlyphRecord,
   'projectId' | 'ufoId' | 'layerId' | 'dirty' | 'dirtyIndex' | 'updatedAt'
 > => {
-  const parser = new DOMParser()
-  const document = parser.parseFromString(text, 'application/xml')
+  const document = parseXmlDocument(text, fileName)
   const glyphElement = document.querySelector('glyph')
   if (!glyphElement) {
     throw new Error(`Invalid GLIF: ${fileName}`)

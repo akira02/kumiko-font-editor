@@ -43,3 +43,38 @@ describe('buildUfoLibFromFontData public.postscriptNames', () => {
     expect('public.postscriptNames' in lib).toBe(false)
   })
 })
+
+describe('buildUfoLibFromFontData public.glyphOrder', () => {
+  const makeFontDataWithOrder = (
+    glyphs: GlyphData[],
+    glyphOrder?: string[]
+  ): FontData =>
+    ({
+      glyphs: Object.fromEntries(glyphs.map((glyph) => [glyph.id, glyph])),
+      ...(glyphOrder ? { glyphOrder } : {}),
+    }) as unknown as FontData
+
+  it('honors glyphOrder and appends glyphs missing from it', () => {
+    const lib = buildUfoLibFromFontData(
+      makeFontDataWithOrder(
+        [makeGlyph('A', null), makeGlyph('B', null), makeGlyph('C', null)],
+        ['B', 'A']
+      )
+    )
+    expect(lib['public.glyphOrder']).toEqual(['B', 'A', 'C'])
+  })
+
+  it('drops ids in glyphOrder that have no glyph', () => {
+    const lib = buildUfoLibFromFontData(
+      makeFontDataWithOrder([makeGlyph('A', null)], ['A', 'ghost'])
+    )
+    expect(lib['public.glyphOrder']).toEqual(['A'])
+  })
+
+  it('falls back to glyph keys when glyphOrder is absent', () => {
+    const lib = buildUfoLibFromFontData(
+      makeFontDataWithOrder([makeGlyph('A', null), makeGlyph('B', null)])
+    )
+    expect(lib['public.glyphOrder']).toEqual(['A', 'B'])
+  })
+})
