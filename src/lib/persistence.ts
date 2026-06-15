@@ -169,6 +169,39 @@ export const saveProject = async (draft: ProjectDraft) => {
   })
 }
 
+export const renameProject = async (id: string, title: string) => {
+  const database = await openDatabase()
+  return new Promise<ProjectSummary | null>((resolve, reject) => {
+    const transaction = database.transaction(
+      [STORE_NAME, PROJECT_SUMMARIES_STORE],
+      'readwrite'
+    )
+    const draftStore = transaction.objectStore(STORE_NAME)
+    const summaryStore = transaction.objectStore(PROJECT_SUMMARIES_STORE)
+    let updatedSummary: ProjectSummary | null = null
+
+    const draftRequest = draftStore.get(id)
+    draftRequest.onsuccess = () => {
+      const draft = draftRequest.result as ProjectDraft | undefined
+      if (draft) {
+        draftStore.put({ ...draft, title })
+      }
+    }
+
+    const summaryRequest = summaryStore.get(id)
+    summaryRequest.onsuccess = () => {
+      const summary = summaryRequest.result as ProjectSummary | undefined
+      if (summary) {
+        updatedSummary = { ...summary, title }
+        summaryStore.put(updatedSummary)
+      }
+    }
+
+    transaction.oncomplete = () => resolve(updatedSummary)
+    transaction.onerror = () => reject(transaction.error)
+  })
+}
+
 export const getAllProjects = async () => {
   const database = await openDatabase()
   await ensureProjectSummaries(database)

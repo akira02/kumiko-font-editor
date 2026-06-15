@@ -354,6 +354,7 @@ export interface GlyphPreviewShape {
 export interface GlyphPreviewData {
   width: number
   viewBox: string
+  flipY: number
   shapes: GlyphPreviewShape[]
 }
 
@@ -362,9 +363,12 @@ const glyphPreviewCache = new WeakMap<
   WeakMap<GlyphData, GlyphPreviewData>
 >()
 
+// Frame tuned for a 1000-UPM design space; scaled by the font's actual UPM.
+const PREVIEW_UNITS_PER_EM = 1000
 const PREVIEW_PADDING_X = 80
 const PREVIEW_ASCENDER = 900
 const PREVIEW_DESCENDER = -220
+const PREVIEW_FLIP_BASELINE = 800
 
 const buildPathSvg = (glyph: GlyphData) => {
   const contours = glyph.paths.map((path) => ({
@@ -437,7 +441,8 @@ const buildGlyphPreviewShapes = (
 
 export const buildGlyphPreviewData = (
   glyph: GlyphData,
-  glyphMap: Record<string, GlyphData>
+  glyphMap: Record<string, GlyphData>,
+  unitsPerEm: number = PREVIEW_UNITS_PER_EM
 ): GlyphPreviewData => {
   let glyphMapCache = glyphPreviewCache.get(glyphMap)
   if (!glyphMapCache) {
@@ -450,13 +455,21 @@ export const buildGlyphPreviewData = (
     return cachedPreview
   }
 
-  const width = Math.max(glyph.metrics.width || 0, 240)
+  // Scale the design-space frame so glyphs from any UPM fit the viewBox.
+  const scale = (unitsPerEm || PREVIEW_UNITS_PER_EM) / PREVIEW_UNITS_PER_EM
+  const paddingX = PREVIEW_PADDING_X * scale
+  const ascender = PREVIEW_ASCENDER * scale
+  const descender = PREVIEW_DESCENDER * scale
+  const headroom = 100 * scale
+
+  const width = Math.max(glyph.metrics.width || 0, 240 * scale)
   const shapes = buildGlyphPreviewShapes(glyph, glyphMap)
-  const viewBox = `${-PREVIEW_PADDING_X} ${PREVIEW_DESCENDER} ${width + PREVIEW_PADDING_X * 2} ${PREVIEW_ASCENDER - PREVIEW_DESCENDER + 100}`
+  const viewBox = `${-paddingX} ${descender} ${width + paddingX * 2} ${ascender - descender + headroom}`
 
   const preview = {
     width,
     viewBox,
+    flipY: PREVIEW_FLIP_BASELINE * scale,
     shapes,
   }
   glyphMapCache.set(glyph, preview)

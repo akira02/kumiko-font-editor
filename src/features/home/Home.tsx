@@ -23,6 +23,7 @@ export function Home() {
     showGitHubRefInput,
     handleCancelPendingGitHubImport,
     handleConfirmPendingGitHubImport,
+    handleRenameProject,
     handleDeleteProject,
     handleLocalDragEnter,
     handleLocalDragLeave,
@@ -110,6 +111,7 @@ export function Home() {
 
           <RecentProjectsList
             projects={projects}
+            onRenameProject={handleRenameProject}
             onDeleteProject={handleDeleteProject}
             onOpenProject={handleOpenProject}
           />

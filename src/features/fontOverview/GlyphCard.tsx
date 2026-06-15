@@ -4,7 +4,7 @@ import {
   buildGlyphPreviewData,
   getGlyphDisplayCharacter,
 } from 'src/lib/glyphOverview'
-import type { GlyphData } from 'src/store'
+import { useStore, type GlyphData } from 'src/store'
 
 const GlyphPreview = memo(function GlyphPreview({
   glyph,
@@ -13,9 +13,10 @@ const GlyphPreview = memo(function GlyphPreview({
   glyph: GlyphData
   glyphMap: Record<string, GlyphData>
 }) {
+  const unitsPerEm = useStore((state) => state.fontData?.unitsPerEm)
   const preview = useMemo(
-    () => buildGlyphPreviewData(glyph, glyphMap),
-    [glyph, glyphMap]
+    () => buildGlyphPreviewData(glyph, glyphMap, unitsPerEm),
+    [glyph, glyphMap, unitsPerEm]
   )
   const displayCharacter =
     getGlyphDisplayCharacter(glyph) ?? glyph.name ?? glyph
@@ -45,8 +46,9 @@ const GlyphPreview = memo(function GlyphPreview({
       width="100%"
       height="100%"
       preserveAspectRatio="xMidYMid meet"
+      overflow="hidden"
     >
-      <g transform="matrix(1 0 0 -1 0 800)">
+      <g transform={`matrix(1 0 0 -1 0 ${preview.flipY})`}>
         {preview.shapes.map((shape, index) => (
           <path
             key={`${glyph.id}-shape-${index}`}

@@ -3,6 +3,7 @@ import {
   deleteKumikoProject,
   listProjectSummaries,
   loadProjectDraft,
+  renameKumikoProject,
 } from 'src/lib/projectRepository'
 import type { KumikoProjectSummary } from 'src/lib/projectTypes'
 import { loadUfoProjectIntoFontData } from 'src/lib/fontAdapters/ufo'
@@ -66,6 +67,18 @@ export const useProjectList = () => {
     []
   )
 
+  const renameProject = useCallback(
+    async (projectId: string, title: string) => {
+      await renameKumikoProject(projectId, title)
+      setProjects((current) =>
+        current.map((project) =>
+          project.id === projectId ? { ...project, title } : project
+        )
+      )
+    },
+    []
+  )
+
   const deleteProject = useCallback(async (projectId: string) => {
     await deleteKumikoProject(projectId)
     setProjects((current) =>
@@ -77,6 +90,7 @@ export const useProjectList = () => {
     projects,
     upsertProjectSummary,
     openProject,
+    renameProject,
     deleteProject,
   }
 }

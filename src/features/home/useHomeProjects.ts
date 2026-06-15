@@ -18,8 +18,13 @@ export function useHomeProjects() {
   const hydratePersistedLocalChanges = useStore(
     (state) => state.hydratePersistedLocalChanges
   )
-  const { projects, upsertProjectSummary, openProject, deleteProject } =
-    useProjectList()
+  const {
+    projects,
+    upsertProjectSummary,
+    openProject,
+    renameProject,
+    deleteProject,
+  } = useProjectList()
 
   const restorePersistedUfoChanges = useCallback(
     async (projectId: string) => {
@@ -79,6 +84,19 @@ export function useHomeProjects() {
     await loadImportedProject(loadedProject)
   }
 
+  const handleRenameProject = async (id: string, title: string) => {
+    const trimmed = title.trim()
+    if (!trimmed) {
+      return
+    }
+    try {
+      await renameProject(id, trimmed)
+    } catch (err) {
+      console.error(err)
+      alert('重新命名失敗')
+    }
+  }
+
   const handleDeleteProject = async (id: string, event: React.MouseEvent) => {
     event.stopPropagation()
     if (window.confirm('確定要永久刪除此字體專案草稿嗎？此動作無法復原。')) {
@@ -95,6 +113,7 @@ export function useHomeProjects() {
     ...githubImport,
     ...localImport,
     projects,
+    handleRenameProject,
     handleDeleteProject,
     handleOpenProject,
   }

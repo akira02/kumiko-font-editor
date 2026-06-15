@@ -40,6 +40,19 @@ export const saveUfoProject = async (record: UfoProjectRecord) => {
   await transactionDone(transaction)
 }
 
+export const renameUfoProject = async (projectId: string, title: string) => {
+  const database = await openDatabase()
+  const transaction = database.transaction(UFO_PROJECTS_STORE, 'readwrite')
+  const store = transaction.objectStore(UFO_PROJECTS_STORE)
+  const record = (await requestToPromise(store.get(projectId))) as
+    | UfoProjectRecord
+    | undefined
+  if (record) {
+    store.put({ ...record, title })
+  }
+  await transactionDone(transaction)
+}
+
 export const loadUfoProject = async (projectId: string) => {
   const database = await openDatabase()
   const transaction = database.transaction(UFO_PROJECTS_STORE, 'readonly')
