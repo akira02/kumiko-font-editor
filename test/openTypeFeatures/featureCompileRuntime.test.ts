@@ -1,0 +1,169 @@
+import { beforeAll, describe, expect, it } from 'vitest'
+import { loadPyodide, type PyodideAPI } from 'pyodide'
+import opentype from 'opentype.js'
+
+import { FONTTOOLS_COMPILER_PYTHON } from 'src/lib/openTypeFeatures/fontToolsCompilerPython'
+
+// Exercises the real fontTools FEA compiler the worker runs
+// (FONTTOOLS_COMPILER_PYTHON + kumiko_compile_fea), driven through pyodide in
+// Node instead of the browser Worker. This is the only path that verifies
+// OpenType features actually land in the exported binary.
+//
+// First run downloads the fonttools wheel from the pyodide CDN (needs network)
+// and caches it in node_modules/pyodide; later runs are offline. The pyodide
+// boot + wheel load is why beforeAll uses a long timeout.
+
+const TEST_INSPECT_PYTHON = `
+from fontTools.ttLib import TTFont
+
+def kumiko_test_inspect(path):
+    font = TTFont(path)
+    feature_tags = []
+    if "GSUB" in font and font["GSUB"].table.FeatureList:
+        feature_tags = sorted(
+            {record.FeatureTag for record in font["GSUB"].table.FeatureList.FeatureRecord}
+        )
+    return {"tables": sorted(font.keys()), "features": feature_tags}
+`
+
+const FEATURE_TEXT = `feature ss01 {
+    sub A by B;
+} ss01;
+`
+
+const rectPath = (x: number, w: number) => {
+  const path = new opentype.Path()
+  path.moveTo(x, 0)
+  path.lineTo(x + w, 0)
+  path.lineTo(x + w, 700)
+  path.lineTo(x, 700)
+  path.close()
+  return path
+}
+
+// A minimal CFF font with glyphs A/B and no layout tables.
+const buildPlainFont = (): ArrayBuffer => {
+  const glyphs = [
+    new opentype.Glyph({
+      name: '.notdef',
+      advanceWidth: 600,
+      path: new opentype.Path(),
+    }),
+    new opentype.Glyph({
+      name: 'A',
+      unicode: 0x41,
+      advanceWidth: 600,
+      path: rectPath(50, 500),
+    }),
+    new opentype.Glyph({
+      name: 'B',
+      unicode: 0x42,
+      advanceWidth: 600,
+      path: rectPath(80, 440),
+    }),
+  ]
+  const font = new opentype.Font({
+    familyName: 'KumikoCompileTest',
+    styleName: 'Regular',
+    unitsPerEm: 1000,
+    ascender: 800,
+    descender: -200,
+    glyphs,
+  })
+  return font.toArrayBuffer()
+}
+
+const inspect = (pyodide: PyodideAPI, path: string) => {
+  const proxy = pyodide.runPython(
+    `kumiko_test_inspect(${JSON.stringify(path)})`
+  ) as {
+    toJs: (o?: { dict_converter?: typeof Object.fromEntries }) => unknown
+    destroy?: () => void
+  }
+  try {
+    return proxy.toJs({ dict_converter: Object.fromEntries }) as {
+      tables: string[]
+      features: string[]
+    }
+  } finally {
+    proxy.destroy?.()
+  }
+}
+
+describe('fontTools FEA compile runtime', () => {
+  let pyodide: PyodideAPI
+
+  beforeAll(async () => {
+    pyodide = await loadPyodide()
+    await pyodide.loadPackage('fonttools')
+    pyodide.runPython(FONTTOOLS_COMPILER_PYTHON)
+    pyodide.runPython(TEST_INSPECT_PYTHON)
+  }, 180000)
+
+  it('compiles a GSUB feature into the binary', () => {
+    const inputPath = '/tmp/in.otf'
+    const feaPath = '/tmp/feat.fea'
+    const outputPath = '/tmp/out.otf'
+    pyodide.FS.writeFile(inputPath, new Uint8Array(buildPlainFont()))
+    pyodide.FS.writeFile(feaPath, FEATURE_TEXT)
+
+    // Sanity: the source font has no GSUB to begin with.
+    const before = inspect(pyodide, inputPath)
+    expect(before.tables).not.toContain('GSUB')
+
+    const result = pyodide.runPython(
+      `kumiko_compile_fea(${JSON.stringify(inputPath)}, ${JSON.stringify(
+        feaPath
+      )}, ${JSON.stringify(outputPath)}, None, None)`
+    ) as {
+      toJs: (o?: { dict_converter?: typeof Object.fromEntries }) => unknown
+      destroy?: () => void
+    }
+    const compiled = result.toJs({ dict_converter: Object.fromEntries }) as {
+      ok: boolean
+      message: string
+    }
+    result.destroy?.()
+    expect(compiled.ok, compiled.message).toBe(true)
+
+    // The compiled binary now carries a GSUB table with the ss01 feature.
+    const after = inspect(pyodide, outputPath)
+    expect(after.tables).toContain('GSUB')
+    expect(after.features).toContain('ss01')
+
+    // And the output is still a valid, parseable font.
+    const outBytes = pyodide.FS.readFile(outputPath) as Uint8Array
+    const reparsed = opentype.parse(
+      outBytes.buffer.slice(
+        outBytes.byteOffset,
+        outBytes.byteOffset + outBytes.byteLength
+      )
+    )
+    expect(reparsed.glyphs.length).toBe(3)
+  })
+
+  it('reports a diagnostic for invalid FEA instead of throwing', () => {
+    const inputPath = '/tmp/in2.otf'
+    const feaPath = '/tmp/bad.fea'
+    const outputPath = '/tmp/out2.otf'
+    pyodide.FS.writeFile(inputPath, new Uint8Array(buildPlainFont()))
+    // References a glyph that does not exist in the font.
+    pyodide.FS.writeFile(feaPath, 'feature ss01 { sub A by ZZZ; } ss01;\n')
+
+    const result = pyodide.runPython(
+      `kumiko_compile_fea(${JSON.stringify(inputPath)}, ${JSON.stringify(
+        feaPath
+      )}, ${JSON.stringify(outputPath)}, None, None)`
+    ) as {
+      toJs: (o?: { dict_converter?: typeof Object.fromEntries }) => unknown
+      destroy?: () => void
+    }
+    const compiled = result.toJs({ dict_converter: Object.fromEntries }) as {
+      ok: boolean
+      message: string
+    }
+    result.destroy?.()
+    expect(compiled.ok).toBe(false)
+    expect(compiled.message.length).toBeGreaterThan(0)
+  })
+})
