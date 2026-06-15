@@ -92,6 +92,7 @@ GITHUB_OAUTH_SCOPE=public_repo read:user user:email
 - `src/hooks/`: 跨 feature 可共用的 React hooks。
 - `src/icons/`: 專案內共用 icon component。
 - `src/font/`: 字形路徑資料結構與 font-specific helper。
+  - `src/font/fontra-ported/`: 自 fontra 逐檔移植的純演算法模組（曲線擬合、variable font 插值等），見該資料夾 README 與 `docs/fontra-parity.md`。
 - `src/assets/`: 前端靜態資源。
 
 ### 後端與公開資源
@@ -120,6 +121,10 @@ GITHUB_OAUTH_SCOPE=public_repo read:user user:email
 `glyphdata.txt` 用來把 jf 等 Glyphs 字集清單的 nice name（如 `leftArrow`）正確對應到 Unicode 與匯出用的 production name（`arrowleft`）；CJK 漢字不在該表內，由 `uniXXXX` 慣例演算法解析。詳見 [docs/glyph-naming.md](docs/glyph-naming.md)。
 
 更多設計決策與架構筆記見 [docs/](docs/README.md)。
+
+## 與 fontra 的關係
+
+Kumiko 參考許多 [fontra](https://github.com/googlefonts/fontra) 的設計，但技術棧分歧（盡可能保持純前端 React vs. Python WebSocket backend），無法直接 fork。跟進策略分三層：UFO/designspace 檔案層互通、純演算法逐檔移植到 `src/font/fontra-ported/`、UI 與 backend 只追蹤不跟進。完整策略、目前對齊的 fontra baseline SHA 與 re-sync 流程見 [docs/fontra-parity.md](docs/fontra-parity.md)。
 
 ## 下一步
 

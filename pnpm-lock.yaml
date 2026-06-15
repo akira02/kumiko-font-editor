@@ -23,6 +23,9 @@ importers:
       '@tanstack/react-query':
         specifier: ^5.99.2
         version: 5.100.9(react@19.2.5)
+      bezier-js:
+        specifier: 6.1.4
+        version: 6.1.4
       fflate:
         specifier: ^0.8.2
         version: 0.8.2
@@ -790,6 +793,9 @@ packages:
     resolution: {integrity: sha512-zEs/ufmZoUd7WftKpKyXaT6RFxpQ5Qm9xytKRHvJfxFV9DFJkZph9RvJ1LcOUi0Z1ZVijMte65JbILeV+8QQEA==}
     engines: {node: '>=6.0.0'}
     hasBin: true
+
+  bezier-js@6.1.4:
+    resolution: {integrity: sha512-PA0FW9ZpcHbojUCMu28z9Vg/fNkwTj5YhusSAjHHDfHDGLxJ6YUKrAN2vk1fP2MMOxVw4Oko16FMlRGVBGqLKg==}
 
   brace-expansion@1.1.14:
     resolution: {integrity: sha512-MWPGfDxnyzKU7rNOW9SP/c50vi3xrmrua/+6hfPbCS2ABNWfx24vPidzvC7krjU/RTo235sV776ymlsMtGKj8g==}
@@ -2555,6 +2561,8 @@ snapshots:
   balanced-match@4.0.4: {}
 
   baseline-browser-mapping@2.10.27: {}
+
+  bezier-js@6.1.4: {}
 
   brace-expansion@1.1.14:
     dependencies:

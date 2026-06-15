@@ -20,4 +20,13 @@ export default defineConfig([
       globals: globals.browser,
     },
   },
+  {
+    // Code ported verbatim from fontra keeps its original dynamic typing;
+    // see src/font/fontra-ported/README.md and docs/fontra-parity.md
+    files: ['src/font/fontra-ported/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
+      'prefer-const': 'off',
+    },
+  },
 ])
