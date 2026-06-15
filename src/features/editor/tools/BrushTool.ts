@@ -1,4 +1,4 @@
-// Brush tool - freehand polyline drawing
+// Brush tool - freehand drawing, smoothed into cubic Béziers
 
 import {
   BaseTool,
@@ -6,6 +6,10 @@ import {
   type ToolEvent,
 } from 'src/features/editor/tools/BaseTool'
 import { useStore, type PathData, type PathNode } from 'src/store'
+import { fitCurve } from 'src/font/fitCurve'
+
+// Squared distance tolerance (font units) for the freehand curve fit.
+const FIT_TOLERANCE = 10
 
 export class BrushTool extends BaseTool {
   identifier = 'brush'
@@ -47,12 +51,29 @@ export class BrushTool extends BaseTool {
     }
 
     const pathId = this.generateId('path')
-    const nodes: PathNode[] = points.map((point) => ({
+    const node = (point: { x: number; y: number }, type: PathNode['type']) => ({
       id: this.generateId('node'),
       x: Math.round(point.x),
       y: Math.round(point.y),
-      type: 'corner',
-    }))
+      type,
+    })
+
+    const segments = fitCurve(points, FIT_TOLERANCE * FIT_TOLERANCE)
+    const nodes: PathNode[] = []
+    if (segments.length) {
+      nodes.push(node(segments[0].points[0], 'corner'))
+      segments.forEach((segment, index) => {
+        const [, control1, control2, end] = segment.points
+        // Joins between segments are tangent-continuous, so mark them smooth;
+        // the two outer endpoints stay corners.
+        const isLast = index === segments.length - 1
+        nodes.push(node(control1, 'offcurve'))
+        nodes.push(node(control2, 'offcurve'))
+        nodes.push(node(end, isLast ? 'corner' : 'smooth'))
+      })
+    } else {
+      nodes.push(node(points[0], 'corner'))
+    }
 
     const path: PathData = {
       id: pathId,
