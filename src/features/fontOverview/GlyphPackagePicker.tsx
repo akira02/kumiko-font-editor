@@ -372,6 +372,27 @@ function SummaryFormula({ packages }: SummaryFormulaProps) {
   )
 }
 
+export const glyphNameToDisplayCharacter = (glyphName: string) => {
+  const unicodeMatch =
+    glyphName.match(/^uni([0-9a-f]{4})$/i) ??
+    glyphName.match(/^u([0-9a-f]{5,6})$/i)
+
+  if (!unicodeMatch) {
+    return glyphName
+  }
+
+  const codePoint = Number.parseInt(unicodeMatch[1], 16)
+  if (!Number.isFinite(codePoint) || codePoint > 0x10ffff) {
+    return glyphName
+  }
+
+  try {
+    return String.fromCodePoint(codePoint)
+  } catch {
+    return glyphName
+  }
+}
+
 interface GlyphPackageSelectionSummaryProps {
   selection: GlyphPackageSelection
 }
@@ -380,7 +401,6 @@ export function GlyphPackageSelectionSummary({
   selection,
 }: GlyphPackageSelectionSummaryProps) {
   const { t } = useTranslation()
-  const missingGlyphList = selection.missingGlyphNames.join(', ')
 
   return (
     <Box minW={0}>
@@ -403,22 +423,6 @@ export function GlyphPackageSelectionSummary({
           {selection.missingGlyphNames.length.toLocaleString()}
         </Box>
       </Text>
-      {selection.missingGlyphNames.length > 0 ? (
-        <Box mt={2} maxH="72px" overflow="auto" pr={2}>
-          <Text
-            fontSize="xs"
-            color="field.muted"
-            fontFamily="mono"
-            fontWeight="900"
-            mb={1}
-          >
-            {t('fontOverview.glyphsWillBeAddedList')}
-          </Text>
-          <Text fontSize="xs" color="field.steel" fontFamily="mono">
-            {missingGlyphList}
-          </Text>
-        </Box>
-      ) : null}
     </Box>
   )
 }
