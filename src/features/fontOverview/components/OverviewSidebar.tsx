@@ -10,7 +10,7 @@ import {
   VStack,
 } from '@chakra-ui/react'
 import type { GlyphOverviewTreeNode } from 'src/lib/glyphOverview'
-import { OverviewTreeNav } from 'src/features/fontOverview/OverviewTreeNav'
+import { OverviewTreeNav } from 'src/features/fontOverview/components/OverviewTreeNav'
 import { useTranslation } from 'react-i18next'
 
 interface OverviewSidebarProps {

@@ -6,9 +6,25 @@ export interface GlyphAdditionCandidate {
   unicode: string | null
   production: string | null
   recipe?: string
+  width?: number
 }
 
 const MAX_RANGE_GLYPHS = 5000
+
+const CJK_FULLWIDTH_RANGES: Array<[number, number]> = [
+  [0x1100, 0x11ff],
+  [0x2e80, 0xa4cf],
+  [0xac00, 0xd7af],
+  [0xf900, 0xfaff],
+  [0xfe10, 0xfe6f],
+  [0xff00, 0xffef],
+  [0x20000, 0x3134f],
+]
+
+export const isCjkDefaultFullWidthCodePoint = (codePoint: number) =>
+  CJK_FULLWIDTH_RANGES.some(
+    ([start, end]) => codePoint >= start && codePoint <= end
+  )
 
 const formatUnicodeHex = (codePoint: number) =>
   codePoint <= 0xffff

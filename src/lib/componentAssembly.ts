@@ -156,21 +156,16 @@ export interface AlignTransform {
   offsetY: number
 }
 
-// Translation only: the part keeps its drawn size and stroke weights
-// (donor ranking already prefers parts that fit the target proportions),
-// centered on the target region.
-export const computeCenterPlacement = (
-  source: Rect,
-  target: Rect
+// Translation only: the part keeps its drawn size and stroke weights, while
+// preserving where it sits inside its original GlyphWiki part box.
+export const computePartBoxPlacement = (
+  sourcePartBox: Rect,
+  targetPartBox: Rect
 ): AlignTransform => ({
   scaleX: 1,
   scaleY: 1,
-  offsetX: Math.round(
-    (target.xMin + target.xMax) / 2 - (source.xMin + source.xMax) / 2
-  ),
-  offsetY: Math.round(
-    (target.yMin + target.yMax) / 2 - (source.yMin + source.yMax) / 2
-  ),
+  offsetX: Math.round(targetPartBox.xMin - sourcePartBox.xMin),
+  offsetY: Math.round(targetPartBox.yMax - sourcePartBox.yMax),
 })
 
 let transformIdCounter = 0

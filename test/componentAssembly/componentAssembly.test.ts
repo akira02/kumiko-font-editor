@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  computeCenterPlacement,
+  computePartBoxPlacement,
   extractPartPaths,
   getFontVerticalBox,
   getPathsBounds,
@@ -50,20 +50,25 @@ describe('mapGlyphwikiBoxToFontUnits', () => {
   })
 })
 
-describe('computeCenterPlacement / transformPaths', () => {
-  it('centers paths on the target rect without scaling', () => {
+describe('computePartBoxPlacement / transformPaths', () => {
+  it('preserves a part position inside its GlyphWiki box without scaling', () => {
     const paths = [makeRectPath(100, 100, 300, 500)]
-    const target = { xMin: 50, yMin: 0, xMax: 150, yMax: 200 }
-    const transform = computeCenterPlacement(getPathsBounds(paths)!, target)
+    const sourcePartBox = { xMin: 50, yMin: 0, xMax: 450, yMax: 800 }
+    const targetPartBox = { xMin: 500, yMin: -120, xMax: 900, yMax: 680 }
+    const transform = computePartBoxPlacement(sourcePartBox, targetPartBox)
     expect(transform.scaleX).toBe(1)
     expect(transform.scaleY).toBe(1)
     const moved = transformPaths(paths, transform)
     const bounds = getPathsBounds(moved)!
-    // Size preserved, centers aligned.
+    // Size and the source offset from the part box top-left are preserved.
     expect(bounds.xMax - bounds.xMin).toBe(200)
     expect(bounds.yMax - bounds.yMin).toBe(400)
-    expect((bounds.xMin + bounds.xMax) / 2).toBe(100)
-    expect((bounds.yMin + bounds.yMax) / 2).toBe(100)
+    expect(bounds.xMin - targetPartBox.xMin).toBe(
+      paths[0]!.nodes[0]!.x - sourcePartBox.xMin
+    )
+    expect(targetPartBox.yMax - bounds.yMax).toBe(
+      sourcePartBox.yMax - getPathsBounds(paths)!.yMax
+    )
   })
 
   it('regenerates path and node ids', () => {

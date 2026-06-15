@@ -5,7 +5,7 @@ import { useFontExport } from 'src/features/common/fontExport/useFontExport'
 import { GitHubCommitModal } from 'src/features/common/glyphInspector/GitHubCommitModal'
 import { GlyphSummaryCard } from 'src/features/common/glyphInspector/GlyphSummaryCard'
 import { useRightPanelModel } from 'src/features/common/glyphInspector/useRightPanelModel'
-import { SelectedGlyphsCard } from 'src/features/fontOverview/SelectedGlyphsCard'
+import { SelectedGlyphsCard } from 'src/features/fontOverview/components/SelectedGlyphsCard'
 import { FontSettingsModal } from 'src/features/common/projectControl/FontSettingsModal'
 import { ProjectControlActions } from 'src/features/common/projectControl/ProjectControlActions'
 import {

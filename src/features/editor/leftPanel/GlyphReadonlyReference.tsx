@@ -2,9 +2,8 @@ import { Box, Text } from '@chakra-ui/react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { VarPackedPath } from 'src/font/VarPackedPath'
 import {
-  computeCenterPlacement,
+  computePartBoxPlacement,
   getFontVerticalBox,
-  getPathsBounds,
   groupPathsByPartBoxes,
   mapGlyphwikiBoxToFontUnits,
   transformPaths,
@@ -35,6 +34,7 @@ interface PreviewPart {
   id: string
   path2d: Path2D
   pathsToInsert: PathData[]
+  sourcePartRect?: Rect
 }
 
 const generateId = (prefix: string) =>
@@ -337,6 +337,7 @@ export function GlyphReadonlyReference({
                   buildVarPackedPathForPaths(groupPaths).toSVGPath()
                 ),
                 pathsToInsert: groupPaths.map(clonePath),
+                sourcePartRect: partRects[index],
               },
             ]
           : []
@@ -437,17 +438,16 @@ export function GlyphReadonlyReference({
     return null
   }
 
-  // Fit the hovered part into the target placement so it lands at the
-  // right position and proportions in the edited glyph.
+  // Move the hovered part by its GlyphWiki placement box so the part keeps
+  // the same visual offset it had inside the donor character.
   const buildInsertablePaths = useCallback(
     (part: PreviewPart) => {
-      const bounds = getPathsBounds(part.pathsToInsert)
-      if (!bounds || !targetRect) {
+      if (!part.sourcePartRect || !targetRect) {
         return part.pathsToInsert.map(clonePath)
       }
       return transformPaths(
         part.pathsToInsert,
-        computeCenterPlacement(bounds, targetRect)
+        computePartBoxPlacement(part.sourcePartRect, targetRect)
       )
     },
     [targetRect]

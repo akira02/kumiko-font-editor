@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { parseGlyphAdditionInput } from 'src/features/fontOverview/glyphInput'
+import {
+  isCjkDefaultFullWidthCodePoint,
+  parseGlyphAdditionInput,
+} from 'src/features/fontOverview/utils/glyphInput'
 import {
   buildGlyphNameInfoMap,
   parseGlyphDataLine,
@@ -67,5 +70,16 @@ describe('parseGlyphAdditionInput with GlyphData lookup', () => {
       unicode: null,
       production: null,
     })
+  })
+})
+
+describe('isCjkDefaultFullWidthCodePoint', () => {
+  it('classifies CJK ideographs and fullwidth forms as full-width defaults', () => {
+    expect(isCjkDefaultFullWidthCodePoint(0x4e00)).toBe(true)
+    expect(isCjkDefaultFullWidthCodePoint(0xff21)).toBe(true)
+  })
+
+  it('does not classify Latin letters as full-width defaults', () => {
+    expect(isCjkDefaultFullWidthCodePoint(0x0041)).toBe(false)
   })
 })

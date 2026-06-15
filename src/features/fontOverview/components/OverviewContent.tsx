@@ -14,11 +14,11 @@ import {
   type ListRange,
   type VirtuosoGridHandle,
 } from 'react-virtuoso'
-import { GlyphCard } from 'src/features/fontOverview/GlyphCard'
+import { GlyphCard } from 'src/features/fontOverview/components/GlyphCard'
 import {
   OverviewGridItem,
   OverviewGridList,
-} from 'src/features/fontOverview/OverviewGridComponents'
+} from 'src/features/fontOverview/components/OverviewGridComponents'
 import type { GlyphData } from 'src/store'
 import { useTranslation } from 'react-i18next'
 

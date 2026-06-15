@@ -19,7 +19,7 @@ import {
   defaultGlyphPackages,
   type DefaultGlyphPackage,
   type GlyphPackageGroup,
-} from 'src/features/fontOverview/defaultGlyphPackages'
+} from 'src/features/fontOverview/data/defaultGlyphPackages'
 import {
   buildGlyphLookupMap,
   computeCharsetCoverage,
