@@ -2,7 +2,7 @@ import type { ResolvedGlyph } from 'src/features/common/qualityCheck/resolvedGly
 import {
   getComponentMatrix,
   type ComponentMatrix,
-} from 'src/lib/componentTransform'
+} from 'src/lib/components/componentTransform'
 import {
   computeInkMoments,
   flattenContour,

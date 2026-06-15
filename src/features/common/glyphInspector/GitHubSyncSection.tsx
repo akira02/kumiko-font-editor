@@ -13,7 +13,7 @@ import type {
   GlyphSyncEntry,
   ProjectSyncReport,
   SyncConflictResolution,
-} from 'src/lib/githubSync'
+} from 'src/lib/github/sync'
 
 export interface GitHubSyncSectionProps {
   isLoading: boolean

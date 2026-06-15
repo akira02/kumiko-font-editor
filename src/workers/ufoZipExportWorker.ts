@@ -5,14 +5,14 @@ import {
   serializeGlifRecord,
   serializeXmlPlist,
   pickDefaultLayer,
-} from 'src/lib/fontAdapters/ufo'
+} from 'src/lib/fontFormats/adapters/ufo'
 import {
   listUfoGlyphsInLayer,
   listUfoMetadataForProject,
   loadUfoProject,
   updateUfoGlyphExportState,
-} from 'src/lib/ufoPersistence'
-import type { UfoGlyphPrimaryKey } from 'src/lib/ufoTypes'
+} from 'src/lib/fontFormats/ufoPersistence'
+import type { UfoGlyphPrimaryKey } from 'src/lib/fontFormats/ufoTypes'
 
 interface ZipExportRequest {
   type: 'zip-export'

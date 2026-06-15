@@ -1,9 +1,9 @@
 import type {
   ProjectRoundTripFormat,
   ProjectSourceFormat,
-} from 'src/lib/projectFormats'
+} from 'src/lib/project/projectFormats'
 import type { PathBooleanOperation } from 'src/lib/pathBooleanOperations'
-import type { GlyphEditTimes } from 'src/lib/glyphEditTimes'
+import type { GlyphEditTimes } from 'src/lib/glyph/glyphEditTimes'
 import type {
   AlternateBehaviorDraft,
   CombinationBehaviorDraft,

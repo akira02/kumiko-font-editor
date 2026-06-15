@@ -1,6 +1,6 @@
 import { Box, Button, HStack, Text, VStack } from '@chakra-ui/react'
 import { GlyphReadonlyReference } from 'src/features/editor/leftPanel/GlyphReadonlyReference'
-import type { Rect } from 'src/lib/componentAssembly'
+import type { Rect } from 'src/lib/components/componentAssembly'
 import type { GlyphData } from 'src/store'
 import { useTranslation } from 'react-i18next'
 

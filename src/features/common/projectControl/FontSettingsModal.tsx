@@ -33,7 +33,7 @@ import {
   toOpenTypeDraft,
   toSourceDrafts,
 } from 'src/features/common/projectControl/fontSettings/model'
-import { defaultFontAxes } from 'src/lib/fontInfoSettings'
+import { defaultFontAxes } from 'src/lib/fontFormats/fontInfoSettings'
 import {
   createEmptyOpenTypeFeaturesState,
   createFontFingerprint,

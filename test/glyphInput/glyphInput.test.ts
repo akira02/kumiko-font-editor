@@ -6,7 +6,7 @@ import {
 import {
   buildGlyphNameInfoMap,
   parseGlyphDataLine,
-} from 'src/lib/glyphNameInfo'
+} from 'src/lib/glyph/glyphNameInfo'
 
 const infoMap = buildGlyphNameInfoMap(
   [

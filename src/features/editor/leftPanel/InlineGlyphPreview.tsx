@@ -1,6 +1,6 @@
 import { Box } from '@chakra-ui/react'
 import { useMemo } from 'react'
-import { buildGlyphPreviewData } from 'src/lib/glyphOverview'
+import { buildGlyphPreviewData } from 'src/lib/glyph/glyphOverview'
 import { useStore, type GlyphData } from 'src/store'
 
 // Flip baseline tuned for a 1000-UPM design space; scaled by the font's UPM.

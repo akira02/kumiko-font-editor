@@ -1,4 +1,4 @@
-import { buildGlyphPreviewData } from 'src/lib/glyphOverview'
+import { buildGlyphPreviewData } from 'src/lib/glyph/glyphOverview'
 import type { FontData, GlyphData } from 'src/store'
 import { computeGlyphInk } from 'src/features/common/qualityCheck/glyphInk'
 import {

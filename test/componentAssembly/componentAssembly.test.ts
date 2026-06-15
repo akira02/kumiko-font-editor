@@ -8,7 +8,7 @@ import {
   mapGlyphwikiBoxToFontUnits,
   scorePartFit,
   transformPaths,
-} from 'src/lib/componentAssembly'
+} from 'src/lib/components/componentAssembly'
 import type { PathData } from 'src/store'
 
 const makeRectPath = (

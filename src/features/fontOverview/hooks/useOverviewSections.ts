@@ -3,9 +3,9 @@ import { useTranslation } from 'react-i18next'
 import {
   flattenGlyphOverviewTree,
   getGlyphOverviewTree,
-} from 'src/lib/glyphOverview'
-import type { GlyphEditTimes } from 'src/lib/glyphEditTimes'
-import { isEmptyGlyphToEdit } from 'src/lib/glyphBlankness'
+} from 'src/lib/glyph/glyphOverview'
+import type { GlyphEditTimes } from 'src/lib/glyph/glyphEditTimes'
+import { isEmptyGlyphToEdit } from 'src/lib/glyph/glyphBlankness'
 import type { GlyphData } from 'src/store'
 
 interface UseOverviewSectionsOptions {

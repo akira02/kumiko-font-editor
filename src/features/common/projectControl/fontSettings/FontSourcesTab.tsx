@@ -10,7 +10,7 @@ import {
   Text,
 } from '@chakra-ui/react'
 import type { FontData } from 'src/store'
-import { defaultFontSource } from 'src/lib/fontInfoSettings'
+import { defaultFontSource } from 'src/lib/fontFormats/fontInfoSettings'
 import { NumberField } from 'src/features/common/projectControl/fontSettings/fields'
 import {
   makeId,

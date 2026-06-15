@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { serializeGlyphsFileToBlob } from 'src/lib/glyphsExport'
-import type { GlyphsDocument } from 'src/lib/glyphsDocument'
+import { serializeGlyphsFileToBlob } from 'src/lib/fontFormats/glyphsExport'
+import type { GlyphsDocument } from 'src/lib/fontFormats/glyphsDocument'
 import type { FontData, GlyphData } from 'src/store'
 
 const glyph = (id: string, name: string, unicode: string | null): GlyphData =>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { gitBlobShaFromText } from 'src/lib/githubSync/gitBlobSha'
+import { gitBlobShaFromText } from 'src/lib/github/sync/gitBlobSha'
 
 describe('gitBlobShaFromText', () => {
   it('matches git hash-object for ascii content', async () => {

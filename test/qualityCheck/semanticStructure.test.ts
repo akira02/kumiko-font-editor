@@ -3,7 +3,7 @@ import { buildEnclosureCharacterSet } from 'src/features/common/qualityCheck/sem
 import {
   parseCompositionLine,
   type GlyphwikiPartPlacement,
-} from 'src/lib/glyphwikiComposition'
+} from 'src/lib/glyph/glyphwikiComposition'
 
 const buildMap = (lines: string[]) => {
   const map = new Map<string, GlyphwikiPartPlacement[]>()

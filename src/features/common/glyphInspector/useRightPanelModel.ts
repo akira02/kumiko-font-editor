@@ -1,10 +1,10 @@
 import { useToast } from '@chakra-ui/react'
 import { useMemo } from 'react'
-import { saveDraftSnapshot } from 'src/lib/draftSave'
+import { saveDraftSnapshot } from 'src/lib/project/draftSave'
 import {
   getArchivedGlyphLayerEntries,
   getProjectArchiveMetadata,
-} from 'src/lib/projectArchive'
+} from 'src/lib/project/projectArchive'
 import {
   getEffectiveNodeType,
   getGlyphLayer,

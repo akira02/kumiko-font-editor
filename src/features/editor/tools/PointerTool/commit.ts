@@ -1,4 +1,4 @@
-import type { PositionedGlyph } from 'src/canvas/SceneView'
+import type { PositionedGlyph } from 'src/sceneView/SceneView'
 import type { SceneControllerInterface } from 'src/features/editor/tools/BaseTool'
 import { getLinkedSmoothHandlePosition } from 'src/features/editor/tools/PointerTool/handles'
 import type { PointerDragState } from 'src/features/editor/tools/PointerTool/state'

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { importLocalProjectFiles } from 'src/features/home/projectImport'
 import type { LoadedKumikoProject } from 'src/features/home/useProjectList'
-import type { KumikoProjectSummary } from 'src/lib/projectTypes'
+import type { KumikoProjectSummary } from 'src/lib/project/projectTypes'
 
 const getErrorMessage = (error: unknown) =>
   error instanceof Error ? error.message : '未知錯誤'

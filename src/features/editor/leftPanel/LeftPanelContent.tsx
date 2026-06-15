@@ -3,7 +3,7 @@ import { useMemo } from 'react'
 import {
   getFontVerticalBox,
   mapGlyphwikiBoxToFontUnits,
-} from 'src/lib/componentAssembly'
+} from 'src/lib/components/componentAssembly'
 import { useStore, type GlyphData } from 'src/store'
 import { ComponentSearchSection } from 'src/features/editor/leftPanel/ComponentSearchSection'
 import { GlyphPreviewCard } from 'src/features/editor/leftPanel/GlyphPreviewCard'

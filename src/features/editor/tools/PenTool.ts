@@ -3,7 +3,7 @@ import {
   type EventStream,
   type ToolEvent,
 } from 'src/features/editor/tools/BaseTool'
-import type { PathHitInfo } from 'src/canvas/SceneView'
+import type { PathHitInfo } from 'src/sceneView/SceneView'
 import {
   useStore,
   type NodeType,

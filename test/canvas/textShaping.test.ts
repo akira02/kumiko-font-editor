@@ -3,7 +3,7 @@ import {
   createEmptyOpenTypeFeaturesState,
   upsertCombinationBehavior,
 } from 'src/lib/openTypeFeatures'
-import { shapeGlyphRuns } from 'src/features/editor/canvas/workspace/textShaping'
+import { shapeGlyphRuns } from 'src/features/editor/canvas/workspace/layout/textShaping'
 import type { FontData } from 'src/store'
 
 describe('text shaping layout', () => {

@@ -1,12 +1,12 @@
 // 場景控制器 - 管理編輯狀態和互動
 
-import type { CanvasController } from 'src/canvas/CanvasController'
-import type { PathHitInfo, Point, SceneModel } from 'src/canvas/SceneView'
+import type { CanvasController } from 'src/sceneView/CanvasController'
+import type { PathHitInfo, Point, SceneModel } from 'src/sceneView/SceneView'
 import {
   getOnCurveContourPointSelection,
   parsePointSelection,
   pointSelectionKey,
-} from 'src/lib/glyphSelection'
+} from 'src/lib/glyph/glyphSelection'
 import { PointerTool } from 'src/features/editor/tools/PointerTool'
 import { PenTool } from 'src/features/editor/tools/PenTool'
 import { BrushTool } from 'src/features/editor/tools/BrushTool'

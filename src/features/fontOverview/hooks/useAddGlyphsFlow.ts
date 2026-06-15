@@ -9,7 +9,7 @@ import {
   getExistingGlyphLookupKeys,
   hasGlyphCandidate,
 } from 'src/features/fontOverview/utils/glyphLookup'
-import { getGlyphNameInfoMap } from 'src/lib/glyphNameInfo'
+import { getGlyphNameInfoMap } from 'src/lib/glyph/glyphNameInfo'
 import { useStore, type FontData, type GlyphData } from 'src/store'
 
 interface UseAddGlyphsFlowOptions {

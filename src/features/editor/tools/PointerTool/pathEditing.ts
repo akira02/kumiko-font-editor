@@ -1,4 +1,4 @@
-import type { Point } from 'src/canvas/SceneView'
+import type { Point } from 'src/sceneView/SceneView'
 import { findAttachedHandleIndices } from 'src/features/editor/tools/PointerTool/selection'
 import { getGridSnapStep } from 'src/features/editor/tools/PointerTool/snap'
 

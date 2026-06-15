@@ -9,14 +9,14 @@ import { join } from 'node:path'
 import { unzipSync, strFromU8 } from 'fflate'
 import { describe, expect, it } from 'vitest'
 
-import { exportFontDataAsUfoZip } from 'src/lib/fontUfoZipExport'
+import { exportFontDataAsUfoZip } from 'src/lib/fontFormats/fontUfoZipExport'
 import {
   importUfoWorkspaceEntries,
   parseGlifText,
   serializeGlifRecord,
   type UfoWorkspaceEntry,
-} from 'src/lib/ufoFormat'
-import type { UfoGlyphRecord } from 'src/lib/ufoTypes'
+} from 'src/lib/fontFormats/ufoFormat'
+import type { UfoGlyphRecord } from 'src/lib/fontFormats/ufoTypes'
 import type { FontData } from 'src/store'
 
 // OpenSourceFont-Light.ufo (OFL) — see test/fixtures/ufo/OFL.txt.

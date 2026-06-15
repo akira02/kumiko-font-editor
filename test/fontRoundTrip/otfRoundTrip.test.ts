@@ -6,7 +6,7 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import {
   exportFontAsBinary,
   importBinaryFontFile,
-} from 'src/lib/fontBinaryFormat'
+} from 'src/lib/fontFormats/fontBinaryFormat'
 import type { FontData, GlyphData } from 'src/store'
 
 // Public Sans Regular (CFF/OTF, OFL) — see test/fixtures/otf/OFL.txt.

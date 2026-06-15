@@ -13,7 +13,7 @@ import {
   getGlyphDisplayCharacter,
   getGlyphOverviewStats,
   getGlyphScriptLabel,
-} from 'src/lib/glyphOverview'
+} from 'src/lib/glyph/glyphOverview'
 import type { GlyphData, GlyphLayerData, WorkspaceView } from 'src/store'
 import { useTranslation } from 'react-i18next'
 import { PageSearch } from 'iconoir-react'

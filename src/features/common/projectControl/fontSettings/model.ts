@@ -4,7 +4,7 @@ import {
   generalFontInfoFields,
   openTypeFontInfoSettings,
   type FontInfoGeneralKey,
-} from 'src/lib/fontInfoSettings'
+} from 'src/lib/fontFormats/fontInfoSettings'
 import type {
   FontData,
   FontExportInstance,

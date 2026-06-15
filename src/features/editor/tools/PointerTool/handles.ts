@@ -1,4 +1,4 @@
-import type { Point } from 'src/canvas/SceneView'
+import type { Point } from 'src/sceneView/SceneView'
 import type { HitTestResult } from 'src/features/editor/tools/SceneController'
 import {
   findContourBounds,

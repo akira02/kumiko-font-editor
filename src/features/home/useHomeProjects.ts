@@ -1,10 +1,13 @@
 import { useCallback, useMemo } from 'react'
-import { UFO_LOCAL_DELETED_GLYPHS_KEY } from 'src/lib/draftSave'
+import { UFO_LOCAL_DELETED_GLYPHS_KEY } from 'src/lib/project/draftSave'
 import {
   sanitizeGlyphEditTimes,
   UFO_GLYPH_EDIT_TIMES_KEY,
-} from 'src/lib/glyphEditTimes'
-import { listDirtyUfoGlyphs, loadUfoUiValue } from 'src/lib/ufoPersistence'
+} from 'src/lib/glyph/glyphEditTimes'
+import {
+  listDirtyUfoGlyphs,
+  loadUfoUiValue,
+} from 'src/lib/fontFormats/ufoPersistence'
 import { useStore } from 'src/store'
 import { useGitHubImport } from 'src/features/home/useGitHubImport'
 import { useLocalImport } from 'src/features/home/useLocalImport'

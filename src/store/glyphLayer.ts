@@ -2,7 +2,7 @@ import {
   getArchivedGlyphLayer,
   getHotGlyphLayerSnapshot,
   getGlyphLayerSnapshot,
-} from 'src/lib/projectArchive'
+} from 'src/lib/project/projectArchive'
 import type { GlyphData } from 'src/store/types'
 
 export const getGlyphLayer = (

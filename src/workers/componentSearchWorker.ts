@@ -1,7 +1,7 @@
 import {
   canonicalizeComponent,
   getGlyphwikiVariantMap,
-} from 'src/lib/glyphwikiVariants'
+} from 'src/lib/glyph/glyphwikiVariants'
 
 interface ProjectGlyphSummary {
   id: string

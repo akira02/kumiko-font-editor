@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import {
   startGitHubOAuthLogin,
   type GitHubForkStatus,
-} from 'src/lib/githubAuth'
+} from 'src/lib/github/githubAuth'
 import {
   applyCompareToForkStatus,
   fetchCachedGitHubCompareStatus,
@@ -17,9 +17,12 @@ import {
   useLoginGitHubMutation,
   useLogoutGitHubMutation,
   useMergeGitHubUpstreamMutation,
-} from 'src/lib/githubQueries'
-import { markGitHubCommitSynced, prepareGitHubCommit } from 'src/lib/githubPr'
-import { syncHotFontDataToUfoRecords } from 'src/lib/fontAdapters/ufo'
+} from 'src/lib/github/githubQueries'
+import {
+  markGitHubCommitSynced,
+  prepareGitHubCommit,
+} from 'src/lib/github/githubPr'
+import { syncHotFontDataToUfoRecords } from 'src/lib/fontFormats/adapters/ufo'
 import type { FontData } from 'src/store'
 import {
   buildSuggestedGitHubBranchName,

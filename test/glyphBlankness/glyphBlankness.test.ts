@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { isEmptyGlyphToEdit, isKnownBlankGlyph } from 'src/lib/glyphBlankness'
+import {
+  isEmptyGlyphToEdit,
+  isKnownBlankGlyph,
+} from 'src/lib/glyph/glyphBlankness'
 import type { GlyphData } from 'src/store'
 
 const makeGlyph = (input: {

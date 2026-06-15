@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   getComponentMatrix,
   isIdentityComponentMatrix,
-} from 'src/lib/componentTransform'
+} from 'src/lib/components/componentTransform'
 import type { GlyphComponentRef } from 'src/store/types'
 
 const ref = (overrides: Partial<GlyphComponentRef>): GlyphComponentRef =>

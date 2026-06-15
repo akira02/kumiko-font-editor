@@ -1,7 +1,7 @@
 import {
   getGlyphwikiCompositionMap,
   type GlyphwikiPartPlacement,
-} from 'src/lib/glyphwikiComposition'
+} from 'src/lib/glyph/glyphwikiComposition'
 
 /**
  * 語意結構分類：從 GlyphWiki 組成資料判斷「全包圍/門框」字。

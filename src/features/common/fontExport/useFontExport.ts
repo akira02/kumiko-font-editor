@@ -1,8 +1,8 @@
 import { useToast } from '@chakra-ui/react'
 import { zipSync } from 'fflate'
 import { useState } from 'react'
-import { exportFontAsBinary } from 'src/lib/fontAdapters/binary'
-import { exportFontDataAsUfoZip } from 'src/lib/fontUfoZipExport'
+import { exportFontAsBinary } from 'src/lib/fontFormats/adapters/binary'
+import { exportFontDataAsUfoZip } from 'src/lib/fontFormats/fontUfoZipExport'
 import {
   createCompilerRuntimeStatus,
   deriveOpenTypeExportWarnings,
@@ -11,9 +11,9 @@ import {
   needsOpenTypeFeatureCompilationForBinaryExport,
   validateFeatures,
 } from 'src/lib/openTypeFeatures'
-import { getProjectArchiveMetadata } from 'src/lib/projectArchive'
-import { syncHotFontDataToUfoRecords } from 'src/lib/fontAdapters/ufo'
-import { exportUfoAsZipBlob } from 'src/lib/ufoZipExportClient'
+import { getProjectArchiveMetadata } from 'src/lib/project/projectArchive'
+import { syncHotFontDataToUfoRecords } from 'src/lib/fontFormats/adapters/ufo'
+import { exportUfoAsZipBlob } from 'src/lib/fontFormats/ufoZipExportClient'
 import { useStore } from 'src/store'
 import type { FontExportFormat } from 'src/features/common/fontExport/ExportFontModal'
 

@@ -1,4 +1,4 @@
-import type { StructureGuideModel } from 'src/canvas'
+import type { StructureGuideModel } from 'src/sceneView'
 import type { GlyphGeometrySample } from 'src/features/common/qualityCheck/glyphSampling'
 import {
   STRUCTURE_SIDES,

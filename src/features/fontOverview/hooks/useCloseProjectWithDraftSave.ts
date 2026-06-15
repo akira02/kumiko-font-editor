@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '@chakra-ui/react'
-import { saveDraftSnapshot } from 'src/lib/draftSave'
+import { saveDraftSnapshot } from 'src/lib/project/draftSave'
 import { useStore } from 'src/store'
 
 export function useCloseProjectWithDraftSave() {

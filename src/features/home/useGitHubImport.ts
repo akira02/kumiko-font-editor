@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
-import { importGitHubUfoRepo } from 'src/lib/githubImport'
-import type { KumikoProjectSummary } from 'src/lib/projectTypes'
+import { importGitHubUfoRepo } from 'src/lib/github/githubImport'
+import type { KumikoProjectSummary } from 'src/lib/project/projectTypes'
 import {
   clearGitHubUrlParams,
   getGitHubRepoUrl,

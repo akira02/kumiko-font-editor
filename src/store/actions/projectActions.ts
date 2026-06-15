@@ -8,13 +8,13 @@ import {
   getArchivedGlyphLayer,
   getProjectArchiveFirstMasterId,
   ingestProjectData,
-} from 'src/lib/projectArchive'
+} from 'src/lib/project/projectArchive'
 import type {
   ProjectSourceFormat,
   ProjectRoundTripFormat,
-} from 'src/lib/projectFormats'
-import type { GlyphEditTimes } from 'src/lib/glyphEditTimes'
-import { getProjectGlyphEditTimes } from 'src/lib/glyphEditTimes'
+} from 'src/lib/project/projectFormats'
+import type { GlyphEditTimes } from 'src/lib/glyph/glyphEditTimes'
+import { getProjectGlyphEditTimes } from 'src/lib/glyph/glyphEditTimes'
 import { syncEditorTextFromGlyphIds } from 'src/store/editorLine'
 import { syncFilteredGlyphList } from 'src/store/glyphSearch'
 import { syncGlyphTopLevelFromLayer } from 'src/store/glyphLayer'

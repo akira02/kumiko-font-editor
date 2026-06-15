@@ -1,10 +1,10 @@
-import { importBinaryFontFile } from 'src/lib/fontAdapters/binary'
-import { saveProjectDraft } from 'src/lib/projectRepository'
-import type { KumikoProjectSummary } from 'src/lib/projectTypes'
+import { importBinaryFontFile } from 'src/lib/fontFormats/adapters/binary'
+import { saveProjectDraft } from 'src/lib/project/projectRepository'
+import type { KumikoProjectSummary } from 'src/lib/project/projectTypes'
 import {
   importUfoWorkspace,
   type ImportedUfoWorkspace,
-} from 'src/lib/fontAdapters/ufo'
+} from 'src/lib/fontFormats/adapters/ufo'
 import type { FontData } from 'src/store'
 
 export interface ImportedKumikoProject {

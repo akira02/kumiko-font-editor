@@ -8,7 +8,7 @@ import {
   VStack,
 } from '@chakra-ui/react'
 import { useState } from 'react'
-import type { KumikoProjectSummary } from 'src/lib/projectTypes'
+import type { KumikoProjectSummary } from 'src/lib/project/projectTypes'
 import type { ProjectOpenHandler } from 'src/features/home/types'
 import { useTranslation } from 'react-i18next'
 

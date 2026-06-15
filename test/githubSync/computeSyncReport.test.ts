@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest'
 import {
   buildSyncReport,
   computeGlyphSyncEntries,
-} from 'src/lib/githubSync/computeSyncReport'
-import type { RemoteTreeSnapshot } from 'src/lib/githubSync/types'
-import type { UfoGlyphRecord } from 'src/lib/ufoTypes'
+} from 'src/lib/github/sync/computeSyncReport'
+import type { RemoteTreeSnapshot } from 'src/lib/github/sync/types'
+import type { UfoGlyphRecord } from 'src/lib/fontFormats/ufoTypes'
 
 const GLYPH_DIR = 'Kumiko.ufo/glyphs'
 

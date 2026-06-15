@@ -5,11 +5,11 @@ import {
   type EventStream,
   type ToolEvent,
 } from 'src/features/editor/tools/BaseTool'
-import type { PathHitInfo, Point } from 'src/canvas/SceneView'
+import type { PathHitInfo, Point } from 'src/sceneView/SceneView'
 import {
   getIndexedPointSelectionInRect,
   pointSelectionKey,
-} from 'src/lib/glyphSelection'
+} from 'src/lib/glyph/glyphSelection'
 import type { HitTestResult } from 'src/features/editor/tools/SceneController'
 import { useStore } from 'src/store'
 import {

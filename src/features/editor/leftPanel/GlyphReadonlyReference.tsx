@@ -8,13 +8,13 @@ import {
   mapGlyphwikiBoxToFontUnits,
   transformPaths,
   type Rect,
-} from 'src/lib/componentAssembly'
-import { getGlyphCharacter } from 'src/lib/glyphRelations'
-import { getComponentMatrix } from 'src/lib/componentTransform'
+} from 'src/lib/components/componentAssembly'
+import { getGlyphCharacter } from 'src/lib/glyph/glyphRelations'
+import { getComponentMatrix } from 'src/lib/components/componentTransform'
 import {
   getGlyphwikiComposition,
   type GlyphwikiPartPlacement,
-} from 'src/lib/glyphwikiComposition'
+} from 'src/lib/glyph/glyphwikiComposition'
 import {
   useStore,
   type GlyphData,

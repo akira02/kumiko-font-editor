@@ -1,5 +1,5 @@
 import { Badge, Box, Button, HStack, Link, Stack, Text } from '@chakra-ui/react'
-import type { GitHubRepoSummary } from 'src/lib/githubAuth'
+import type { GitHubRepoSummary } from 'src/lib/github/githubAuth'
 import { useTranslation } from 'react-i18next'
 
 interface GitHubRepoCardProps {

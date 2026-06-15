@@ -9,7 +9,7 @@ import {
 } from '@chakra-ui/react'
 import { NavArrowDown, NavArrowRight } from 'iconoir-react'
 import { useState } from 'react'
-import type { GlyphOverviewTreeNode } from 'src/lib/glyphOverview'
+import type { GlyphOverviewTreeNode } from 'src/lib/glyph/glyphOverview'
 
 interface OverviewTreeNavProps {
   nodes: GlyphOverviewTreeNode[]

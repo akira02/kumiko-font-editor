@@ -19,7 +19,7 @@ import {
   Stack,
   Text,
 } from '@chakra-ui/react'
-import type { GitHubForkStatus, GitHubViewer } from 'src/lib/githubAuth'
+import type { GitHubForkStatus, GitHubViewer } from 'src/lib/github/githubAuth'
 import { GitHubRepoCard } from 'src/features/common/glyphInspector/GitHubRepoCard'
 import {
   GitHubSyncSection,

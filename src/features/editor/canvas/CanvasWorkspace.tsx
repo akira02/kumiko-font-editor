@@ -7,24 +7,24 @@ import {
   visualizationLayerDefinitions,
   type Rect,
   type SceneModel,
-} from 'src/canvas'
+} from 'src/sceneView'
 import { SceneController } from 'src/features/editor/tools'
 import { useGlyphInsight } from 'src/features/editor/insight/glyphInsight'
 import { buildStructureGuideModel } from 'src/features/editor/insight/structureGuideModel'
 import { useStore, useTemporalStore } from 'src/store'
-import { CanvasContextMenu } from 'src/features/editor/canvas/workspace/CanvasContextMenu'
-import { CanvasWorkspaceOverlay } from 'src/features/editor/canvas/workspace/CanvasWorkspaceOverlay'
-import { HiddenTextInput } from 'src/features/editor/canvas/workspace/HiddenTextInput'
+import { CanvasContextMenu } from 'src/features/editor/canvas/workspace/components/CanvasContextMenu'
+import { CanvasWorkspaceOverlay } from 'src/features/editor/canvas/workspace/components/CanvasWorkspaceOverlay'
+import { HiddenTextInput } from 'src/features/editor/canvas/workspace/components/HiddenTextInput'
 import {
   buildPositionedGlyphs,
   getGlyphFrameAtPoint,
   type LayerGeometryCacheEntry,
-} from 'src/features/editor/canvas/workspace/positionedGlyphs'
+} from 'src/features/editor/canvas/workspace/layout/positionedGlyphs'
 import {
   buildGlyphIdByCharacter,
   charIndexToCodeUnitIndex,
   codeUnitIndexToCharIndex,
-} from 'src/features/editor/canvas/workspace/textInput'
+} from 'src/features/editor/canvas/workspace/layout/textInput'
 import type { ToolId } from 'src/features/editor/canvas/workspace/types'
 import { useCanvasClipboard } from 'src/features/editor/canvas/useCanvasClipboard'
 import { useCanvasKeyboardShortcuts } from 'src/features/editor/canvas/useCanvasKeyboardShortcuts'

@@ -2,7 +2,7 @@ import type { GlyphData } from 'src/store'
 import {
   hasDrawableGlyphContent,
   isKnownBlankGlyph,
-} from 'src/lib/glyphBlankness'
+} from 'src/lib/glyph/glyphBlankness'
 
 export interface CharsetCoverageInput {
   id: string

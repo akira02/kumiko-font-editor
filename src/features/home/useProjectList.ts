@@ -4,9 +4,9 @@ import {
   listProjectSummaries,
   loadProjectDraft,
   renameKumikoProject,
-} from 'src/lib/projectRepository'
-import type { KumikoProjectSummary } from 'src/lib/projectTypes'
-import { loadUfoProjectIntoFontData } from 'src/lib/fontAdapters/ufo'
+} from 'src/lib/project/projectRepository'
+import type { KumikoProjectSummary } from 'src/lib/project/projectTypes'
+import { loadUfoProjectIntoFontData } from 'src/lib/fontFormats/adapters/ufo'
 import type { FontData } from 'src/store'
 
 export interface LoadedKumikoProject {
