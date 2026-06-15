@@ -86,7 +86,7 @@ const UFO_CREATOR = 'org.kumiko.fonteditor'
 
 const normalizePath = (value: string) => value.replace(/\\/g, '/')
 
-const isRelevantUfoTextFile = (relativePath: string) => {
+export const isRelevantUfoTextFile = (relativePath: string) => {
   const normalized = normalizePath(relativePath).toLowerCase()
   if (!normalized.includes('.ufo/')) {
     return false
@@ -273,7 +273,11 @@ const inferOffcurveType = (
       cursor += 1
     }
 
-    const nextOnCurve = normalized[cursor]
+    // A trailing off-curve run in a closed contour wraps to the first
+    // on-curve point, so fall back to it when the forward scan finds none.
+    const nextOnCurve =
+      normalized[cursor] ??
+      normalized.find((point) => point.type && point.type !== 'offcurve')
     const offcurveType = nextOnCurve?.type === 'qcurve' ? 'qcurve' : 'offcurve'
     while (
       index < normalized.length &&
@@ -808,6 +812,7 @@ const buildFontDataFromUfoGlyphs = (
     exportInstances: exportInstancesFromLib(metadata.lib) ?? [],
     statusDefinitions: statusDefinitionsFromLib(metadata.lib) ?? [],
     settings: settingsFromLib(metadata.lib, axes),
+    glyphOrder: metadata.glyphOrder,
     unitsPerEm: getUnitsPerEm(metadata.fontinfo),
     lineMetricsHorizontalLayout: buildLineMetrics(metadata.fontinfo),
     openTypeFeatures: createEmptyOpenTypeFeaturesState(),
@@ -1338,11 +1343,39 @@ ${contour.points
 
   const outlineChildren = [contourXml, componentXml].filter(Boolean).join('\n')
 
+  const imageXml = record.image
+    ? `  <image ${[
+        `fileName="${escapeXml(record.image.fileName)}"`,
+        ...(record.image.xScale !== undefined
+          ? [`xScale="${record.image.xScale}"`]
+          : []),
+        ...(record.image.xyScale !== undefined
+          ? [`xyScale="${record.image.xyScale}"`]
+          : []),
+        ...(record.image.yxScale !== undefined
+          ? [`yxScale="${record.image.yxScale}"`]
+          : []),
+        ...(record.image.yScale !== undefined
+          ? [`yScale="${record.image.yScale}"`]
+          : []),
+        ...(record.image.xOffset !== undefined
+          ? [`xOffset="${record.image.xOffset}"`]
+          : []),
+        ...(record.image.yOffset !== undefined
+          ? [`yOffset="${record.image.yOffset}"`]
+          : []),
+        ...(record.image.color
+          ? [`color="${escapeXml(record.image.color)}"`]
+          : []),
+      ].join(' ')}/>`
+    : ''
+
   return `<?xml version="1.0" encoding="UTF-8"?>
 <glyph name="${escapeXml(record.glyphName)}" format="2">
 ${record.advance.width !== null ? `  <advance width="${record.advance.width}"/>` : ''}
 ${record.unicodes.map((unicode) => `  <unicode hex="${unicode}"/>`).join('\n')}
 ${record.note ? `  <note>${escapeXml(record.note)}</note>` : ''}
+${imageXml}
 ${record.guidelines
   .map((guide) => {
     const attrs = [

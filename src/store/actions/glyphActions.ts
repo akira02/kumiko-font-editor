@@ -20,7 +20,11 @@ import {
 } from 'src/store/editorLine'
 import { syncFilteredGlyphList } from 'src/store/glyphSearch'
 import { syncGlyphTopLevelFromLayer } from 'src/store/glyphLayer'
-import { markGlyphDirty } from 'src/store/dirtyState'
+import {
+  markGlyphAdded,
+  markGlyphDeleted,
+  markGlyphDirty,
+} from 'src/store/dirtyState'
 
 type ImmerSet = Parameters<
   StateCreator<GlobalState, [['zustand/immer', never]], []>
@@ -61,19 +65,7 @@ export const buildGlyphActions = (set: ImmerSet) => ({
       }
       state.selectedNodeIds = []
       state.selectedSegment = null
-      state.isDirty = true
-      state.hasLocalChanges = true
-      state.dirtyGlyphIds = state.dirtyGlyphIds.filter((id) => id !== glyphId)
-      state.localDirtyGlyphIds = state.localDirtyGlyphIds.filter(
-        (id) => id !== glyphId
-      )
-      if (!state.deletedGlyphIds.includes(glyphId)) {
-        state.deletedGlyphIds.push(glyphId)
-      }
-      if (!state.localDeletedGlyphIds.includes(glyphId)) {
-        state.localDeletedGlyphIds.push(glyphId)
-      }
-      delete state.glyphEditTimes[glyphId]
+      markGlyphDeleted(state, glyphId)
       syncFilteredGlyphList(state)
     }),
 
@@ -130,23 +122,8 @@ export const buildGlyphActions = (set: ImmerSet) => ({
         return
       }
 
-      state.isDirty = true
-      state.hasLocalChanges = true
-      const editedAt = Date.now()
       for (const glyphId of addedGlyphIds) {
-        state.glyphEditTimes[glyphId] = editedAt
-        if (!state.dirtyGlyphIds.includes(glyphId)) {
-          state.dirtyGlyphIds.push(glyphId)
-        }
-        if (!state.localDirtyGlyphIds.includes(glyphId)) {
-          state.localDirtyGlyphIds.push(glyphId)
-        }
-        state.deletedGlyphIds = state.deletedGlyphIds.filter(
-          (deletedId) => deletedId !== glyphId
-        )
-        state.localDeletedGlyphIds = state.localDeletedGlyphIds.filter(
-          (deletedId) => deletedId !== glyphId
-        )
+        markGlyphAdded(state, glyphId)
       }
       syncFilteredGlyphList(state)
       state.selectedGlyphId = addedGlyphIds[0] ?? state.selectedGlyphId

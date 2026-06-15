@@ -1,5 +1,5 @@
 import { parseOpenStep } from 'src/lib/openstepParser'
-import { serializeOpenStepValue } from 'src/lib/glyphsExport'
+import { applyLayerEdits, serializeOpenStepValue } from 'src/lib/glyphsExport'
 import type { GlyphsDocument } from 'src/lib/glyphsDocument'
 import type { GlyphData } from 'src/store'
 
@@ -124,16 +124,6 @@ const getGlyphLookupKeys = (glyph: GlyphData) => {
   }
   return [...keys]
 }
-
-const formatPointTuple = (x: number, y: number) =>
-  `{${Math.round(x)}, ${Math.round(y)}}`
-
-const formatTransformTuple = (
-  scaleX: number,
-  scaleY: number,
-  x: number,
-  y: number
-) => `{${scaleX}, 0, 0, ${scaleY}, ${Math.round(x)}, ${Math.round(y)}}`
 
 const findGlyphArrayRange = (source: string) => {
   const match = /glyphs\s*=/.exec(source)
@@ -284,59 +274,7 @@ export const patchGlyphText = (
         return null
       }
       const layerRecord = { ...(layerMap.get(layerId) ?? {}) }
-      layerRecord.layerId = glyphLayer.id
-      layerRecord.associatedMasterId =
-        glyphLayer.associatedMasterId ?? glyphLayer.id
-      layerRecord.name = glyphLayer.name
-      layerRecord.width = Math.round(glyphLayer.metrics.width)
-      layerRecord.paths = glyphLayer.paths.map((path) => ({
-        closed: path.closed ? 1 : 0,
-        nodes: path.nodes.map((node, index) => {
-          if (node.type === 'offcurve') {
-            return `${Math.round(node.x)} ${Math.round(node.y)} OFFCURVE`
-          }
-          if (node.type === 'qcurve') {
-            return `${Math.round(node.x)} ${Math.round(node.y)} QCURVE`
-          }
-          const previous = path.nodes[index - 1]
-          const previous2 = path.nodes[index - 2]
-          const keyword =
-            previous?.type === 'offcurve' ||
-            previous?.type === 'qcurve' ||
-            previous2?.type === 'offcurve' ||
-            previous2?.type === 'qcurve'
-              ? 'CURVE'
-              : 'LINE'
-          return `${Math.round(node.x)} ${Math.round(node.y)} ${keyword}${node.type === 'smooth' ? ' SMOOTH' : ''}`
-        }),
-      }))
-      layerRecord.components = glyphLayer.componentRefs.map((component) => ({
-        name: component.glyphId,
-        ...(component.scaleX === 1 &&
-        component.scaleY === 1 &&
-        component.rotation === 0 &&
-        component.x === 0 &&
-        component.y === 0
-          ? {}
-          : {
-              transform: formatTransformTuple(
-                component.scaleX,
-                component.scaleY,
-                component.x,
-                component.y
-              ),
-            }),
-      }))
-      layerRecord.anchors = glyphLayer.anchors.map((anchor) => ({
-        name: anchor.name,
-        position: formatPointTuple(anchor.x, anchor.y),
-      }))
-      layerRecord.guides = glyphLayer.guidelines.map((guide) => ({
-        position: formatPointTuple(guide.x, guide.y),
-        angle: guide.angle,
-        locked: guide.locked ? 1 : 0,
-        ...(guide.name ? { name: guide.name } : {}),
-      }))
+      applyLayerEdits(layerRecord, glyphLayer)
       return layerRecord
     })
     .filter(Boolean)

@@ -55,4 +55,32 @@ describe('glyph actions', () => {
     expect(useStore.getState().fontData?.glyphOrder).toEqual(['A', 'C'])
     expect(useStore.getState().fontData?.glyphs.B).toBeUndefined()
   })
+
+  it('moves a deleted glyph from dirty to deleted tracking', () => {
+    const fontData: FontData = {
+      glyphOrder: ['A'],
+      glyphs: { A: makeGlyph('A', '0041') },
+    }
+    useStore.getState().loadProjectState('project-a', 'Project A', fontData)
+    useStore.setState({ dirtyGlyphIds: ['A'], localDirtyGlyphIds: ['A'] })
+
+    useStore.getState().deleteGlyph('A')
+
+    expect(useStore.getState().dirtyGlyphIds).not.toContain('A')
+    expect(useStore.getState().deletedGlyphIds).toContain('A')
+  })
+
+  it('re-adding a deleted glyph clears it from deleted tracking', () => {
+    const fontData: FontData = {
+      glyphOrder: ['A'],
+      glyphs: { A: makeGlyph('A', '0041') },
+    }
+    useStore.getState().loadProjectState('project-a', 'Project A', fontData)
+    useStore.getState().deleteGlyph('A')
+
+    useStore.getState().addGlyphs([{ id: 'A', name: 'A', unicode: '0041' }])
+
+    expect(useStore.getState().deletedGlyphIds).not.toContain('A')
+    expect(useStore.getState().dirtyGlyphIds).toContain('A')
+  })
 })

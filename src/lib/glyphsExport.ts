@@ -159,7 +159,7 @@ const serializeLayerGuides = (layer: GlyphLayerData) =>
     ...(guide.name ? { name: guide.name } : {}),
   }))
 
-const applyLayerEdits = (
+export const applyLayerEdits = (
   targetLayer: Record<string, unknown>,
   layer: GlyphLayerData
 ) => {

@@ -1,6 +1,7 @@
 import { unzipSync } from 'fflate'
 import {
   importUfoWorkspaceEntries,
+  isRelevantUfoTextFile,
   type UfoWorkspaceEntry,
 } from 'src/lib/fontAdapters/ufo'
 import type { UfoGithubSource } from 'src/lib/ufoTypes'
@@ -69,16 +70,7 @@ const collectUfoEntriesFromZip = (zipBuffer: Uint8Array) => {
         ? normalizedPath.slice(archiveRoot.length + 1)
         : normalizedPath
 
-    if (!relativePath.toLowerCase().includes('.ufo/')) {
-      continue
-    }
-
-    const normalizedLower = relativePath.toLowerCase()
-    if (
-      !normalizedLower.endsWith('.glif') &&
-      !normalizedLower.endsWith('.plist') &&
-      !normalizedLower.endsWith('.fea')
-    ) {
+    if (!isRelevantUfoTextFile(relativePath)) {
       continue
     }
 
