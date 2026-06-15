@@ -7,3 +7,4 @@
 - [品質檢查模組架構](quality-check-architecture.md) — qualityCheck 分層、ResolvedGlyph 解耦、worker 邊界、編輯頁 insight
 - [Glyph 命名與名稱對應](glyph-naming.md) — Glyphs nice name vs production name、GlyphData.xml 管線、為何 AGL 不夠用
 - [與 fontra 的相容與跟進策略](fontra-parity.md) — UFO 互通、演算法層移植、baseline SHA 與 re-sync 流程
+- [Variable Font 支援：設計與實作計畫](variable-fonts.md) — 插值資料流、現況盤點、分階段計畫與 fontra 對應檔案
