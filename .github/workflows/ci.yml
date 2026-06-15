@@ -32,5 +32,10 @@ jobs:
       - name: Lint
         run: pnpm lint
 
+      - name: Test
+        # The fontTools compile test downloads the fonttools wheel from the
+        # pyodide CDN on first run; GitHub runners have network so this works.
+        run: pnpm test
+
       - name: Build
         run: pnpm build
