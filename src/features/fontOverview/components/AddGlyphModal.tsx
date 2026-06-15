@@ -20,9 +20,9 @@ import { SlidingTabList } from 'src/features/common/SlidingTabList'
 import {
   GlyphPackageSelectionSummary,
   GlyphPackagePicker,
-  glyphNameToDisplayCharacter,
   type GlyphPackageSelection,
 } from 'src/features/fontOverview/components/GlyphPackagePicker'
+import { glyphNameToDisplayCharacter } from 'src/features/fontOverview/utils/glyphPackageDisplay'
 import type { GlyphData } from 'src/store'
 import { useTranslation } from 'react-i18next'
 
