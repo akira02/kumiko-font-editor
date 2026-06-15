@@ -2,62 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { extractBinaryFeatures } from 'src/lib/openTypeFeatures/extractBinaryFeatures'
 import { readSfntTableDirectory } from 'src/lib/openTypeFeatures/binaryReader'
 import { parseLayoutTableInventory } from 'src/lib/openTypeFeatures/layoutTableInventory'
-
-interface TableFixture {
-  tag: string
-  data: Uint8Array
-}
-
-const TRUE_TYPE_SCALER = [0x00, 0x01, 0x00, 0x00]
-
-const align4 = (value: number) => Math.ceil(value / 4) * 4
-
-const writeTag = (view: DataView, offset: number, tag: string) => {
-  for (let index = 0; index < 4; index += 1) {
-    view.setUint8(offset + index, tag.charCodeAt(index))
-  }
-}
-
-const writeUint16 = (view: DataView, offset: number, value: number) => {
-  view.setUint16(offset, value, false)
-}
-
-const writeUint32 = (view: DataView, offset: number, value: number) => {
-  view.setUint32(offset, value, false)
-}
-
-const makeBytes = (length: number, write: (view: DataView) => void) => {
-  const bytes = new Uint8Array(length)
-  write(new DataView(bytes.buffer))
-  return bytes
-}
-
-const makeSfnt = (tables: TableFixture[]) => {
-  const directoryLength = 12 + tables.length * 16
-  const tableOffsets: number[] = []
-  let cursor = align4(directoryLength)
-
-  for (const table of tables) {
-    tableOffsets.push(cursor)
-    cursor = align4(cursor + table.data.byteLength)
-  }
-
-  const bytes = new Uint8Array(cursor)
-  const view = new DataView(bytes.buffer)
-  TRUE_TYPE_SCALER.forEach((byte, index) => view.setUint8(index, byte))
-  writeUint16(view, 4, tables.length)
-
-  tables.forEach((table, index) => {
-    const recordOffset = 12 + index * 16
-    writeTag(view, recordOffset, table.tag)
-    writeUint32(view, recordOffset + 4, 0)
-    writeUint32(view, recordOffset + 8, tableOffsets[index])
-    writeUint32(view, recordOffset + 12, table.data.byteLength)
-    bytes.set(table.data, tableOffsets[index])
-  })
-
-  return bytes.buffer
-}
+import {
+  makeBytes,
+  makeSfnt,
+  writeTag,
+  writeUint16,
+  writeUint32,
+} from './helpers/binaryTableFixtures'
 
 const makeMinimalGsubTable = () =>
   makeBytes(58, (view) => {

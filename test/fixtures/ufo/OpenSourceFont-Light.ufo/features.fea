@@ -1,0 +1,57 @@
+# OpenType features for Open Source Font - Light Master
+# GPOS kerning with Light-specific values (tighter spacing)
+
+languagesystem DFLT dflt;
+languagesystem latn dflt;
+
+feature kern {
+    # A combinations - tighter values for light weight
+    pos A V -80;
+    pos A W -60;
+    pos A T -60;
+    pos A Y -70;
+    pos A O -20;
+    pos A C -20;
+    pos A G -20;
+    pos A Q -20;
+
+    # V combinations
+    pos V A -80;
+    pos V O -20;
+    pos V C -20;
+    pos V G -20;
+
+    # W combinations
+    pos W A -60;
+    pos W O -15;
+
+    # T combinations
+    pos T A -60;
+    pos T O -40;
+    pos T C -40;
+
+    # L combinations
+    pos L T -60;
+    pos L V -60;
+    pos L W -50;
+    pos L Y -60;
+
+    # Y combinations
+    pos Y A -70;
+    pos Y O -40;
+    pos Y C -40;
+
+    # O combinations
+    pos O A -20;
+    pos O V -20;
+    pos O T -40;
+    pos O X -20;
+    pos O Y -40;
+
+    # P combinations
+    pos P A -40;
+
+    # F combinations
+    pos F A -40;
+    pos F O -20;
+} kern;

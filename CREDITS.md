@@ -23,3 +23,13 @@ Andrew West (BabelStone), converted by `scripts/build-ids-data.mjs`.
 The author states that the IDS data is a collection of facts not eligible
 for copyright protection, and explicitly permits unrestricted personal and
 commercial use.
+
+4. [Public Sans](https://github.com/uswds/public-sans) (`test/fixtures/otf/PublicSans-Regular.otf`)
+
+Used only as a fixture for the OTF import/export round-trip test.
+Licensed under the SIL Open Font License 1.1 (see `test/fixtures/otf/OFL.txt`).
+
+5. [Open Source Font (these characteristics)](https://github.com/eliheuer/open-source-font-with-these-characteristics) (`test/fixtures/ufo/OpenSourceFont-Light.ufo`)
+
+A minimal demonstration UFO used only as a fixture for the UFO round-trip test.
+Licensed under the SIL Open Font License 1.1 (see `test/fixtures/ufo/OFL.txt`).

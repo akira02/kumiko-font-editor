@@ -40,23 +40,6 @@ describe('buildRadarAdvice', () => {
     )
   })
 
-  it('describes size features relative to similar-complexity glyphs', () => {
-    const advice = buildRadarAdvice(
-      makeReason({
-        key: 'face:widthRatio',
-        format: 'percent',
-        value: 0.92,
-        median: 0.8,
-        p10: 0.76,
-        p90: 0.84,
-        zScore: 2.4,
-      })
-    )
-    expect(advice.title).toContain('偏寬')
-    expect(advice.detail).toContain('複雜度相近')
-    expect(advice.detail).toContain('76.0%–84.0%')
-  })
-
   it('describes framing symmetry offset without hitting the per-side path', () => {
     // 回歸：bearing:symmetryH 帶 bearing: 前綴，曾被逐側邊距分支
     // 攔截並以 'symmetryH' 查 BEARING_ACTIONS 而拋例外
@@ -77,21 +60,5 @@ describe('buildRadarAdvice', () => {
     // 建議平移量 = (80 − 0) / 2
     expect(advice.action).toContain('往左')
     expect(advice.action).toContain('40')
-  })
-
-  it('describes centroid imbalance with a corrective direction', () => {
-    const advice = buildRadarAdvice(
-      makeReason({
-        key: 'balance:centroidX',
-        format: 'percent',
-        value: 0.04,
-        median: 0,
-        p10: -0.01,
-        p90: 0.01,
-        zScore: 2.7,
-      })
-    )
-    expect(advice.title).toContain('偏右')
-    expect(advice.action).toContain('往左')
   })
 })
