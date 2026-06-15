@@ -280,7 +280,7 @@ export function FontOverviewScreen() {
         glyphEditTimes,
         selectedLayerId,
       })
-      markDraftSaved()
+      markDraftSaved(dirtyGlyphIds, deletedGlyphIds)
       closeProjectState()
     } catch (error) {
       console.warn('Save before closing project failed.', error)

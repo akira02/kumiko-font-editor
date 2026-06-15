@@ -226,7 +226,7 @@ export function useRightPanelModel() {
         glyphEditTimes,
         selectedLayerId,
       })
-      markDraftSaved()
+      markDraftSaved(dirtyGlyphIds, deletedGlyphIds)
       toast({
         title: '已儲存',
         description: '目前變更已寫入本機專案。',

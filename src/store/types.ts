@@ -423,7 +423,7 @@ export interface GlobalState {
     glyphEditTimes?: GlyphEditTimes
   ) => void
   closeProjectState: () => void
-  markDraftSaved: () => void
+  markDraftSaved: (savedDirtyIds?: string[], savedDeletedIds?: string[]) => void
   markLocalSaved: () => void
   updateFontInfo: (update: { fontInfo: FontInfo; unitsPerEm?: number }) => void
   updateFontSettings: (fontDataUpdate: Partial<FontData>) => void

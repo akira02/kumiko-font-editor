@@ -40,7 +40,7 @@ export function useAutoDraftSave() {
         selectedLayerId,
       })
         .then(() => {
-          markDraftSaved()
+          markDraftSaved(dirtyGlyphIds, deletedGlyphIds)
         })
         .catch((error) => {
           console.warn('Auto draft save failed.', error)

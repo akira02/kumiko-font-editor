@@ -140,11 +140,26 @@ export const buildProjectActions = (
       clearTemporal()
     }),
 
-  markDraftSaved: () =>
+  // Pass the ids that were actually persisted so edits made during an async
+  // save are not cleared; omit both to clear everything (full save/commit).
+  markDraftSaved: (savedDirtyIds?: string[], savedDeletedIds?: string[]) =>
     set((state) => {
-      state.isDirty = false
-      state.dirtyGlyphIds = []
-      state.deletedGlyphIds = []
+      if (!savedDirtyIds && !savedDeletedIds) {
+        state.isDirty = false
+        state.dirtyGlyphIds = []
+        state.deletedGlyphIds = []
+        return
+      }
+      const savedDirty = new Set(savedDirtyIds ?? [])
+      const savedDeleted = new Set(savedDeletedIds ?? [])
+      state.dirtyGlyphIds = state.dirtyGlyphIds.filter(
+        (id) => !savedDirty.has(id)
+      )
+      state.deletedGlyphIds = state.deletedGlyphIds.filter(
+        (id) => !savedDeleted.has(id)
+      )
+      state.isDirty =
+        state.dirtyGlyphIds.length > 0 || state.deletedGlyphIds.length > 0
     }),
 
   markLocalSaved: () =>
