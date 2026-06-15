@@ -1,3 +1,4 @@
+import { Bezier } from 'bezier-js'
 import {
   BaseTool,
   type EventStream,
@@ -631,27 +632,8 @@ export class PenTool extends BaseTool {
     points: Array<{ x: number; y: number }>,
     target: { x: number; y: number }
   ) {
-    const steps = points.length === 3 ? 48 : 64
-    let bestT = 0.5
-    let bestDistance = Number.POSITIVE_INFINITY
-
-    for (let index = 0; index <= steps; index += 1) {
-      const t = index / steps
-      const sample =
-        points.length === 3
-          ? quadraticAt(points[0], points[1], points[2], t)
-          : cubicAt(points[0], points[1], points[2], points[3], t)
-      const sampleDistance = Math.hypot(
-        sample.x - target.x,
-        sample.y - target.y
-      )
-      if (sampleDistance < bestDistance) {
-        bestDistance = sampleDistance
-        bestT = t
-      }
-    }
-
-    return bestT
+    // Exact nearest-point parameter via bezier-js, instead of fixed sampling.
+    return new Bezier(...points).project(target).t ?? 0.5
   }
 
   private buildSegmentNodes(
@@ -840,40 +822,5 @@ async function* asyncEventIterator(
       break
     }
     yield event
-  }
-}
-
-function quadraticAt(
-  p0: { x: number; y: number },
-  p1: { x: number; y: number },
-  p2: { x: number; y: number },
-  t: number
-) {
-  const mt = 1 - t
-  return {
-    x: mt * mt * p0.x + 2 * mt * t * p1.x + t * t * p2.x,
-    y: mt * mt * p0.y + 2 * mt * t * p1.y + t * t * p2.y,
-  }
-}
-
-function cubicAt(
-  p0: { x: number; y: number },
-  p1: { x: number; y: number },
-  p2: { x: number; y: number },
-  p3: { x: number; y: number },
-  t: number
-) {
-  const mt = 1 - t
-  return {
-    x:
-      mt * mt * mt * p0.x +
-      3 * mt * mt * t * p1.x +
-      3 * mt * t * t * p2.x +
-      t * t * t * p3.x,
-    y:
-      mt * mt * mt * p0.y +
-      3 * mt * mt * t * p1.y +
-      3 * mt * t * t * p2.y +
-      t * t * t * p3.y,
   }
 }
