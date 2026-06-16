@@ -182,6 +182,8 @@ export function useCanvasKeyboardShortcuts({
         selectToolByKey(event, 'shape-ellipse')
       } else if (event.key === 'k' || event.key === 'K') {
         selectToolByKey(event, 'knife')
+      } else if (event.key === 'm' || event.key === 'M') {
+        selectToolByKey(event, 'ruler')
       } else if (event.key === 'h' || event.key === 'H') {
         selectToolByKey(event, 'hand')
       } else if (event.key === 't' || event.key === 'T') {

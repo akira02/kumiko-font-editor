@@ -963,6 +963,7 @@ function fillStartDirectionNode(
   const baseDistance = size * 0.38
   const halfBase = size * 0.48
 
+  context.beginPath()
   context.moveTo(pt.x + ux * tipDistance, pt.y + uy * tipDistance)
   context.lineTo(
     pt.x - ux * baseDistance + px * halfBase,

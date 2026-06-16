@@ -52,6 +52,12 @@ export interface SceneModel {
     intersections: Array<{ x: number; y: number }>
   }
   alignmentGuides?: Array<{ x1: number; y1: number; x2: number; y2: number }>
+  // Power-ruler measuring line, glyph-local font units. Intersections and
+  // distances are recomputed each frame from the current glyph.
+  powerRuler?: {
+    basePoint: { x: number; y: number }
+    directionVector: { x: number; y: number }
+  }
   selectionTransformBounds?: {
     xMin: number
     yMin: number

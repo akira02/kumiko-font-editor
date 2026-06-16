@@ -15,6 +15,7 @@ import { HandTool } from 'src/features/editor/tools/HandTool'
 import { TextTool } from 'src/features/editor/tools/TextTool'
 import { EllipseTool, RectangleTool } from 'src/features/editor/tools/ShapeTool'
 import { KnifeTool } from 'src/features/editor/tools/KnifeTool'
+import { PowerRulerTool } from 'src/features/editor/tools/PowerRulerTool'
 import type { BaseTool, ToolEvent } from 'src/features/editor/tools/BaseTool'
 
 export interface SceneControllerOptions {
@@ -123,6 +124,10 @@ export class SceneController {
     this.tools.set(
       'knife',
       new KnifeTool(this.canvasController, this, this.sceneModel)
+    )
+    this.tools.set(
+      'ruler',
+      new PowerRulerTool(this.canvasController, this, this.sceneModel)
     )
     this.tools.set(
       'hand',

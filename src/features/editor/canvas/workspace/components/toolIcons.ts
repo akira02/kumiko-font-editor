@@ -7,6 +7,7 @@ import {
   Square,
   Text,
   Circle,
+  Ruler,
 } from 'iconoir-react'
 import type { ToolId } from 'src/features/editor/canvas/workspace/types'
 
@@ -19,6 +20,7 @@ export const TOOL_ICONS: Record<ToolId, ToolIcon> = {
   'shape-rect': Square,
   'shape-ellipse': Circle,
   knife: Scissor,
+  ruler: Ruler,
   text: Text,
   hand: DragHandGesture,
 }

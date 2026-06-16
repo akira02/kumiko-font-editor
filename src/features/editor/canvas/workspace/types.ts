@@ -5,6 +5,7 @@ export type ToolId =
   | 'shape-rect'
   | 'shape-ellipse'
   | 'knife'
+  | 'ruler'
   | 'hand'
   | 'text'
 
@@ -15,6 +16,7 @@ export const AVAILABLE_TOOLS = [
   { id: 'shape-rect', label: 'Rectangle', shortcut: 'R', status: 'ready' },
   { id: 'shape-ellipse', label: 'Ellipse', shortcut: 'O', status: 'ready' },
   { id: 'knife', label: 'Knife', shortcut: 'K', status: 'ready' },
+  { id: 'ruler', label: 'Ruler', shortcut: 'M', status: 'ready' },
   { id: 'text', label: 'Text', shortcut: 'T', status: 'ready' },
   { id: 'hand', label: 'Hand', shortcut: 'H', status: 'ready' },
 ] as const
