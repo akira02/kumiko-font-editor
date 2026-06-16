@@ -22,7 +22,7 @@ export const exportGlyphsWithWorker = (input: {
 }) =>
   new Promise<Blob>((resolve, reject) => {
     const worker = new Worker(
-      new URL('../workers/glyphsExportWorker.ts', import.meta.url),
+      new URL('../../workers/glyphsExportWorker.ts', import.meta.url),
       {
         type: 'module',
       }

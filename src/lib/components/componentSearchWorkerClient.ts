@@ -29,7 +29,7 @@ let workerInstance: Worker | null = null
 const getWorker = () => {
   if (!workerInstance) {
     workerInstance = new Worker(
-      new URL('../workers/componentSearchWorker.ts', import.meta.url),
+      new URL('../../workers/componentSearchWorker.ts', import.meta.url),
       {
         type: 'module',
       }

@@ -39,7 +39,7 @@ let workerInstance: Worker | null = null
 const getWorker = () => {
   if (!workerInstance) {
     workerInstance = new Worker(
-      new URL('../../../workers/qualityAnalysisWorker.ts', import.meta.url),
+      new URL('../../../../workers/qualityAnalysisWorker.ts', import.meta.url),
       { type: 'module' }
     )
   }

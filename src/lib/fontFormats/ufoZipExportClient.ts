@@ -20,7 +20,7 @@ export const exportUfoAsZipBlob = async (input: {
 }): Promise<ZipExportBlobResult> => {
   return new Promise<ZipExportBlobResult>((resolve, reject) => {
     const worker = new Worker(
-      new URL('../workers/ufoZipExportWorker.ts', import.meta.url),
+      new URL('../../workers/ufoZipExportWorker.ts', import.meta.url),
       { type: 'module' }
     )
 
