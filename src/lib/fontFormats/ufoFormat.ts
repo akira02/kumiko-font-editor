@@ -7,6 +7,7 @@ import type {
 } from 'src/store'
 import type { ProjectSourceFormat } from 'src/lib/project/projectFormats'
 import { hashString } from 'src/lib/hash'
+import { userNameToFileName } from 'src/lib/fontFormats/ufoFileNames'
 import { getComponentMatrix } from 'src/lib/components/componentTransform'
 import { gitBlobShaFromText } from 'src/lib/github/sync/gitBlobSha'
 import {
@@ -1218,6 +1219,9 @@ export const syncHotFontDataToUfoRecords = async (input: {
   const timestamp = Date.now()
   const metadata = await loadUfoMetadata(input.projectId, input.activeUfoId)
   const nextContents = { ...(metadata?.contents ?? {}) }
+  const existingFileNames = new Set(
+    Object.values(nextContents).map((fileName) => fileName.toLowerCase())
+  )
   const nextGlyphOrder = [...(metadata?.glyphOrder ?? [])]
   const deletedKeys: Array<[string, string, string, string]> = []
   const deletedFilePaths: string[] = []
@@ -1267,9 +1271,13 @@ export const syncHotFontDataToUfoRecords = async (input: {
         glyph.id
       )
     )
-    const nextFileName = existingRecord?.fileName ?? `${glyph.id}.glif`
+    const nextFileName =
+      existingRecord?.fileName ??
+      nextContents[glyph.id] ??
+      userNameToFileName(glyph.id, existingFileNames, '.glif')
     if (!nextContents[glyph.id]) {
       nextContents[glyph.id] = nextFileName
+      existingFileNames.add(nextFileName.toLowerCase())
     }
     if (!nextGlyphOrder.includes(glyph.id)) {
       nextGlyphOrder.push(glyph.id)
@@ -1339,7 +1347,9 @@ export const syncHotFontDataToUfoRecords = async (input: {
     if (!glyph) {
       continue
     }
-    const fileName = nextContents[glyph.id] ?? `${glyph.id}.glif`
+    const fileName =
+      nextContents[glyph.id] ??
+      userNameToFileName(glyph.id, existingFileNames, '.glif')
     const glyphBackupIds = new Set<string>()
 
     for (const [layerId, layer] of Object.entries(glyph.layers ?? {})) {
