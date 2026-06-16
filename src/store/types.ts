@@ -290,6 +290,8 @@ export interface GlobalState {
   referenceFontName: string | null
   referenceFontVisible: boolean
   referenceFontChar: string | null
+  // Non-active glyph layers shown as a faint backdrop behind the editing layer.
+  visibleBackdropLayerIds: string[]
   selectedNodeIds: string[]
   selectedSegment: SelectedSegmentState | null
   workspaceView: WorkspaceView
@@ -356,6 +358,7 @@ export interface GlobalState {
   setReferenceFontName: (name: string | null) => void
   setReferenceFontVisible: (visible: boolean) => void
   setReferenceFontChar: (char: string | null) => void
+  toggleBackdropLayer: (layerId: string) => void
   updateViewport: (zoom: number, panX: number, panY: number) => void
   updateNodePosition: (
     glyphId: string,

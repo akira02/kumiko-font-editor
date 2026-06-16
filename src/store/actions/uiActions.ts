@@ -52,6 +52,14 @@ export const buildUiActions = (set: ImmerSet) => ({
       state.referenceFontChar = char
     }),
 
+  toggleBackdropLayer: (layerId: string) =>
+    set((state) => {
+      const ids = state.visibleBackdropLayerIds
+      state.visibleBackdropLayerIds = ids.includes(layerId)
+        ? ids.filter((id) => id !== layerId)
+        : [...ids, layerId]
+    }),
+
   addGlyphToEditor: (id: string) =>
     set((state) => {
       if (!state.fontData?.glyphs[id]) {

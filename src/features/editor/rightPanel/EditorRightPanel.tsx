@@ -19,6 +19,7 @@ import { ProjectControlActions } from 'src/features/common/projectControl/Projec
 import { FontQualityCheckModal } from 'src/features/common/qualityCheck/QualityCheckModal'
 import { GlyphInsightCard } from 'src/features/editor/rightPanel/components/GlyphInsightCard'
 import { MetricsCard } from 'src/features/editor/rightPanel/components/MetricsCard'
+import { LayerListCard } from 'src/features/editor/rightPanel/components/LayerListCard'
 import { NodeInspectorCard } from 'src/features/editor/rightPanel/components/NodeInspectorCard'
 import { ReferenceFontCard } from 'src/features/editor/rightPanel/components/ReferenceFontCard'
 import { TransformCard } from 'src/features/editor/rightPanel/components/TransformCard'
@@ -98,9 +99,18 @@ export function EditorRightPanel() {
                     isDirty={panel.isDirty}
                     selectedLayerId={panel.selectedLayerId}
                     workspaceView={panel.workspaceView}
+                    showLayerSelect={false}
                     onDeleteGlyph={panel.handleDeleteGlyph}
                     onEnterEditor={() => panel.setWorkspaceView('editor')}
                     onLayerChange={panel.setSelectedLayerId}
+                  />
+
+                  <LayerListCard
+                    availableLayers={panel.availableLayers}
+                    activeLayerId={
+                      panel.activeLayer?.id ?? panel.selectedLayerId ?? null
+                    }
+                    onSelectLayer={panel.setSelectedLayerId}
                   />
 
                   <NodeInspectorCard

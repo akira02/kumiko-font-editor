@@ -66,6 +66,8 @@ export interface SceneModel {
   // Single reference-font character rendered behind the editing glyph
   // (glyph-local, font units). See lib/referenceFont.
   referencePath?: Path2D
+  // Non-active glyph layers shown faintly behind the editing layer.
+  backdropPaths?: Path2D[]
   textCursor?: { x: number; yMin: number; yMax: number }
   initialClickedPointIndex?: number
   canEdit?: boolean

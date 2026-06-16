@@ -25,6 +25,8 @@ interface GlyphSummaryCardProps {
   isDirty: boolean
   selectedLayerId: string | null
   workspaceView: WorkspaceView
+  // The editor uses a dedicated LayerListCard instead of this inline select.
+  showLayerSelect?: boolean
   onDeleteGlyph: () => void
   onEnterEditor: () => void
   onOpenQualityCheck?: () => void
@@ -38,6 +40,7 @@ export function GlyphSummaryCard({
   isDirty,
   selectedLayerId,
   workspaceView,
+  showLayerSelect = true,
   onDeleteGlyph,
   onEnterEditor,
   onOpenQualityCheck,
@@ -100,7 +103,7 @@ export function GlyphSummaryCard({
             {isDirty ? '未儲存' : '已儲存'}
           </Tag>
         </Stack>
-        {availableLayers.length > 0 && (
+        {showLayerSelect && availableLayers.length > 0 && (
           <Box>
             <Text fontSize="xs" color="field.muted" mb={1} fontFamily="mono">
               {t('glyphInspector.layerMaster')}

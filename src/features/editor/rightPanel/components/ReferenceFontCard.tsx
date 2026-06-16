@@ -5,7 +5,6 @@ import {
   Heading,
   Input,
   Stack,
-  Switch,
   Text,
 } from '@chakra-ui/react'
 import { useRef, useState } from 'react'
@@ -22,7 +21,6 @@ export function ReferenceFontCard() {
   const [error, setError] = useState<string | null>(null)
 
   const referenceFontName = useStore((state) => state.referenceFontName)
-  const referenceFontVisible = useStore((state) => state.referenceFontVisible)
   const referenceFontChar = useStore((state) => state.referenceFontChar)
   const setReferenceFontName = useStore((state) => state.setReferenceFontName)
   const setReferenceFontVisible = useStore(
@@ -92,35 +90,20 @@ export function ReferenceFontCard() {
         ) : null}
 
         {referenceFontName ? (
-          <>
-            <HStack justify="space-between">
-              <Text fontSize="xs" fontWeight="700">
-                {t('editor.referenceFontVisible')}
-              </Text>
-              <Switch
-                size="sm"
-                isChecked={referenceFontVisible}
-                onChange={(event) =>
-                  setReferenceFontVisible(event.target.checked)
-                }
-              />
-            </HStack>
-
-            <Box>
-              <Text fontSize="xs" color="field.muted" mb={1}>
-                {t('editor.referenceFontCharOverride')}
-              </Text>
-              <Input
-                size="sm"
-                maxLength={2}
-                value={referenceFontChar ?? ''}
-                onChange={(event) =>
-                  setReferenceFontChar(event.target.value || null)
-                }
-                placeholder={t('editor.referenceFontCharOverridePlaceholder')}
-              />
-            </Box>
-          </>
+          <Box>
+            <Text fontSize="xs" color="field.muted" mb={1}>
+              {t('editor.referenceFontCharOverride')}
+            </Text>
+            <Input
+              size="sm"
+              maxLength={2}
+              value={referenceFontChar ?? ''}
+              onChange={(event) =>
+                setReferenceFontChar(event.target.value || null)
+              }
+              placeholder={t('editor.referenceFontCharOverridePlaceholder')}
+            />
+          </Box>
         ) : null}
       </Stack>
     </Box>

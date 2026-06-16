@@ -11,7 +11,7 @@ import {
 import { SceneController } from 'src/features/editor/tools'
 import { useGlyphInsight } from 'src/features/editor/insight/glyphInsight'
 import { buildStructureGuideModel } from 'src/features/editor/insight/structureGuideModel'
-import { useStore, useTemporalStore } from 'src/store'
+import { useStore, useTemporalStore, getGlyphLayer } from 'src/store'
 import { CanvasContextMenu } from 'src/features/editor/canvas/workspace/components/CanvasContextMenu'
 import { CanvasWorkspaceOverlay } from 'src/features/editor/canvas/workspace/components/CanvasWorkspaceOverlay'
 import { HiddenTextInput } from 'src/features/editor/canvas/workspace/components/HiddenTextInput'
@@ -110,6 +110,9 @@ export function CanvasWorkspace() {
   const referenceFontName = useStore((state) => state.referenceFontName)
   const referenceFontVisible = useStore((state) => state.referenceFontVisible)
   const referenceFontChar = useStore((state) => state.referenceFontChar)
+  const visibleBackdropLayerIds = useStore(
+    (state) => state.visibleBackdropLayerIds
+  )
   const updateNodePositions = useStore((state) => state.updateNodePositions)
   const activeEditorGlyphId =
     editorGlyphIds[editorActiveGlyphIndex] ?? selectedGlyphId ?? null
@@ -510,6 +513,35 @@ export function CanvasWorkspace() {
     referenceFontName,
     referenceFontVisible,
   ])
+
+  useEffect(() => {
+    const sceneController = sceneControllerRef.current
+    const controller = canvasControllerRef.current
+    if (!sceneController || !controller) {
+      return
+    }
+
+    const glyph = activeEditorGlyphId
+      ? fontData?.glyphs[activeEditorGlyphId]
+      : null
+    const activeLayerId = glyph
+      ? (selectedLayerId ?? glyph.activeLayerId ?? null)
+      : null
+    const paths: Path2D[] = []
+    if (glyph) {
+      for (const layerId of visibleBackdropLayerIds) {
+        if (layerId === activeLayerId) {
+          continue
+        }
+        const layer = getGlyphLayer(glyph, layerId)
+        if (layer?.paths?.length) {
+          paths.push(buildPath2DFromPaths(layer.paths))
+        }
+      }
+    }
+    sceneController.sceneModel.backdropPaths = paths.length ? paths : undefined
+    controller.requestUpdate()
+  }, [activeEditorGlyphId, fontData, selectedLayerId, visibleBackdropLayerIds])
 
   useEffect(() => {
     const sceneController = sceneControllerRef.current

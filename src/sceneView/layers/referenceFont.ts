@@ -29,3 +29,29 @@ registerVisualizationLayerDefinition({
     context.fill(model.referencePath)
   },
 })
+
+// Faint outlines of non-active glyph layers, drawn behind the editing layer.
+registerVisualizationLayerDefinition({
+  identifier: 'main.layer.backdrop',
+  name: 'Layer Backdrop',
+  selectionFunc: glyphSelector('editing'),
+  zIndex: 120,
+  colors: { strokeColor: '#80808066' },
+  colorsDarkMode: { strokeColor: '#b0b0b066' },
+  screenParameters: { strokeWidth: 1 },
+  draw: (
+    canvasController: CanvasController,
+    _positionedGlyph: PositionedGlyph,
+    parameters: Record<string, number | number[] | string>,
+    model: SceneModel
+  ) => {
+    if (!model.backdropPaths?.length) return
+    const context = canvasController.context
+    context.strokeStyle = parameters.strokeColor as string
+    context.lineWidth =
+      (parameters.strokeWidth as number) / canvasController.magnification
+    for (const path of model.backdropPaths) {
+      context.stroke(path)
+    }
+  },
+})

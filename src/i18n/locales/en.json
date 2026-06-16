@@ -90,6 +90,8 @@
     "path": "Path",
     "pathOps": "Path ops",
     "quick": "Quick",
+    "layers": "Layers",
+    "layerEditing": "Editing",
     "reconnectControlPoints": "Reconnect control points",
     "referenceFont": "Reference font",
     "referenceFontCharOverride": "Character override",

@@ -90,6 +90,8 @@
     "path": "Path",
     "pathOps": "Path ops",
     "quick": "Quick",
+    "layers": "圖層",
+    "layerEditing": "編輯中",
     "reconnectControlPoints": "重新連接控制點",
     "referenceFont": "參考字",
     "referenceFontCharOverride": "指定字符",
