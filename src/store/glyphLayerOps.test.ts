@@ -92,7 +92,7 @@ describe('glyphLayerOps', () => {
   })
 
   it('promoteBackupToMaster swaps backup into hot, keeping old hot as a backup', () => {
-    let glyph = createBackupLayer(makeGlyph(), 'Backup 1')
+    const glyph = createBackupLayer(makeGlyph(), 'Backup 1')
     glyph.layers!['Backup 1'].paths = [
       {
         id: 'p9',
