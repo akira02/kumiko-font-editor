@@ -107,6 +107,7 @@
     "segmentAlreadyCurve": "這段已經是曲線，不需要再轉換。",
     "selectedHandleNoNodeType": "目前選到的是控制把手。把手本身沒有方形／圓形節點類型。",
     "selectGlyphFirst": "先選擇一個字符。",
+    "setStartPoint": "設定起點",
     "skewX": "Skew X",
     "skewY": "Skew Y",
     "smooth": "平滑",

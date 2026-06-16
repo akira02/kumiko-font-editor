@@ -105,6 +105,7 @@ export function CanvasWorkspace() {
     (state) => state.reconnectSelectedNodes
   )
   const reversePaths = useStore((state) => state.reversePaths)
+  const setStartPoint = useStore((state) => state.setStartPoint)
   const updateNodePositions = useStore((state) => state.updateNodePositions)
   const activeEditorGlyphId =
     editorGlyphIds[editorActiveGlyphIndex] ?? selectedGlyphId ?? null
@@ -718,6 +719,7 @@ export function CanvasWorkspace() {
           position={contextMenu}
           reconnectSelectedNodes={reconnectSelectedNodes}
           reversePaths={reversePaths}
+          setStartPoint={setStartPoint}
           selectedLayerId={selectedLayerId}
           selectedNodeIds={selectedNodeIds}
           selectedSegment={selectedSegment}

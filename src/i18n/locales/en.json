@@ -107,6 +107,7 @@
     "segmentAlreadyCurve": "This segment is already a curve.",
     "selectedHandleNoNodeType": "The current selection is a control handle. Handles do not have square or round node types.",
     "selectGlyphFirst": "Select a glyph first.",
+    "setStartPoint": "Set start point",
     "skewX": "Skew X",
     "skewY": "Skew Y",
     "smooth": "Smooth",

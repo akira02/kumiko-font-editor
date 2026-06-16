@@ -16,6 +16,7 @@ interface CanvasContextMenuProps {
   position: { x: number; y: number }
   reconnectSelectedNodes: (glyphId: string, selectedNodeIds: string[]) => void
   reversePaths: (glyphId: string, pathIds: string[]) => void
+  setStartPoint: (glyphId: string, pathId: string, nodeId: string) => void
   selectedLayerId: string | null
   selectedNodeIds: string[]
   selectedSegment: SelectedSegmentState | null
@@ -32,6 +33,7 @@ export function CanvasContextMenu({
   position,
   reconnectSelectedNodes,
   reversePaths,
+  setStartPoint,
   selectedLayerId,
   selectedNodeIds,
   selectedSegment,
@@ -50,6 +52,38 @@ export function CanvasContextMenu({
       }),
     [activeEditorGlyphId, fontData, selectedLayerId, selectedNodeIds]
   )
+
+  const startPointTarget = useMemo(
+    () =>
+      getSelectedStartPointTarget({
+        activeEditorGlyphId,
+        fontData,
+        selectedLayerId,
+        selectedNodeIds,
+      }),
+    [activeEditorGlyphId, fontData, selectedLayerId, selectedNodeIds]
+  )
+
+  const handleSetStartPoint = useCallback(() => {
+    if (!activeEditorGlyphId || !startPointTarget) {
+      onClose()
+      return
+    }
+
+    setStartPoint(
+      activeEditorGlyphId,
+      startPointTarget.pathId,
+      startPointTarget.nodeId
+    )
+    onClose()
+    onRequestCanvasUpdate()
+  }, [
+    activeEditorGlyphId,
+    onClose,
+    onRequestCanvasUpdate,
+    setStartPoint,
+    startPointTarget,
+  ])
 
   const handleReconnectSelectedNodes = useCallback(() => {
     if (!activeEditorGlyphId || selectedNodeIds.length < 2) {
@@ -139,6 +173,12 @@ export function CanvasContextMenu({
         onClick={handleReverseSelectedPaths}
       >
         {t('editor.reverseSelectedContourDirection')}
+      </ContextMenuButton>
+      <ContextMenuButton
+        isDisabled={!startPointTarget}
+        onClick={handleSetStartPoint}
+      >
+        {t('editor.setStartPoint')}
       </ContextMenuButton>
       <ContextMenuButton
         isDisabled={selectedNodeIds.length < 2}
@@ -231,4 +271,50 @@ function getSelectedReversiblePathIds({
     }
     return [path.id]
   })
+}
+
+// A single on-curve node on a closed contour that is not already its start.
+function getSelectedStartPointTarget({
+  activeEditorGlyphId,
+  fontData,
+  selectedLayerId,
+  selectedNodeIds,
+}: {
+  activeEditorGlyphId: string | null
+  fontData: FontData | null
+  selectedLayerId: string | null
+  selectedNodeIds: string[]
+}): { pathId: string; nodeId: string } | null {
+  if (!fontData || !activeEditorGlyphId || selectedNodeIds.length !== 1) {
+    return null
+  }
+
+  const glyph = fontData.glyphs[activeEditorGlyphId]
+  const activeLayer = glyph ? getGlyphLayer(glyph, selectedLayerId) : null
+  if (!activeLayer) {
+    return null
+  }
+
+  const [pathId, nodeId] = selectedNodeIds[0].split(':')
+  if (!pathId || !nodeId) {
+    return null
+  }
+
+  const path = activeLayer.paths.find((candidate) => candidate.id === pathId)
+  if (!path || !path.closed) {
+    return null
+  }
+
+  const index = path.nodes.findIndex((node) => node.id === nodeId)
+  if (index <= 0) {
+    // Not found, or already the start point.
+    return null
+  }
+
+  const node = path.nodes[index]
+  if (node.type === 'offcurve' || node.type === 'qcurve') {
+    return null
+  }
+
+  return { pathId, nodeId }
 }

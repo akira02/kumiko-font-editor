@@ -501,6 +501,27 @@ export const buildPathActions = (set: ImmerSet) => ({
       markGlyphDirty(state, glyphId)
     }),
 
+  // Rotate a closed contour so the given on-curve node becomes its start
+  // point. Pure reorder — the shape is unchanged. Consistent start points
+  // keep contours interpolation-compatible across masters.
+  setStartPoint: (glyphId: string, pathId: string, nodeId: string) =>
+    set((state) => {
+      const glyph = state.fontData?.glyphs[glyphId]
+      const path = glyph?.paths.find((candidate) => candidate.id === pathId)
+      if (!path || !path.closed) {
+        return
+      }
+
+      const index = path.nodes.findIndex((node) => node.id === nodeId)
+      if (index <= 0 || isHandleNode(path.nodes[index])) {
+        return
+      }
+
+      path.nodes = [...path.nodes.slice(index), ...path.nodes.slice(0, index)]
+      state.selectedSegment = null
+      markGlyphDirty(state, glyphId)
+    }),
+
   deleteSelectedNodes: (glyphId: string, selectedNodeIds: string[]) =>
     set((state) => {
       const glyph = state.fontData?.glyphs[glyphId]
