@@ -752,8 +752,6 @@ const glyphRecordToLayerContent = (
   }
 }
 
-const LAYER_NAMES_LIB_KEY = 'com.kumiko.fontEditor.layerNames'
-
 const buildFontDataFromUfoGlyphs = (
   glyphRecords: UfoGlyphRecord[],
   metadata: UfoMetadataRecord
@@ -1151,10 +1149,7 @@ export const loadUfoProjectIntoFontData = async (projectId: string) => {
   const fontData = buildFontDataFromUfoGlyphs(glyphRecords, activeMetadata)
 
   // Attach non-active layers as backup layers (the store source of truth).
-  const layerNames =
-    (activeMetadata.lib?.[LAYER_NAMES_LIB_KEY] as
-      | Record<string, string>
-      | undefined) ?? {}
+  // The layer name is the UFO layerId itself, so no separate name map is kept.
   for (const layer of activeMetadata.layers) {
     if (layer.layerId === activeLayer.layerId) {
       continue
@@ -1176,7 +1171,7 @@ export const loadUfoProjectIntoFontData = async (projectId: string) => {
       glyph.layers = glyph.layers ?? {}
       glyph.layers[layer.layerId] = {
         id: layer.layerId,
-        name: layerNames[layer.layerId] ?? layer.layerId,
+        name: layer.layerId,
         type: 'backup',
         associatedMasterId: activeLayer.layerId,
         ...glyphRecordToLayerContent(record, resolveBounds),
@@ -1340,7 +1335,6 @@ export const syncHotFontDataToUfoRecords = async (input: {
     .filter((layer) => layer.layerId !== input.activeLayerId)
     .map((layer) => layer.layerId)
   const seenBackupLayerIds = new Set<string>()
-  const backupLayerNames: Record<string, string> = {}
 
   for (const glyphId of input.dirtyGlyphIds) {
     const glyph = input.fontData.glyphs[glyphId]
@@ -1358,7 +1352,6 @@ export const syncHotFontDataToUfoRecords = async (input: {
       }
       glyphBackupIds.add(layerId)
       seenBackupLayerIds.add(layerId)
-      backupLayerNames[layerId] = layer.name
       const existing = await loadUfoGlyph(
         makeUfoGlyphKey(input.projectId, input.activeUfoId, layerId, glyph.id)
       )
@@ -1468,20 +1461,6 @@ export const syncHotFontDataToUfoRecords = async (input: {
       }
     }
 
-    const nextLib = buildUfoLibFromFontData(
-      input.fontData,
-      metadata.lib
-    ) as Record<string, unknown>
-    const mergedLayerNames = {
-      ...((metadata.lib?.[LAYER_NAMES_LIB_KEY] as
-        | Record<string, string>
-        | undefined) ?? {}),
-      ...backupLayerNames,
-    }
-    if (Object.keys(mergedLayerNames).length > 0) {
-      nextLib[LAYER_NAMES_LIB_KEY] = mergedLayerNames
-    }
-
     await saveUfoMetadata({
       ...metadata,
       contents: nextContents,
@@ -1489,7 +1468,7 @@ export const syncHotFontDataToUfoRecords = async (input: {
       fontinfo: nextFontInfo,
       glyphOrder: nextGlyphOrder,
       layers: nextLayers,
-      lib: nextLib,
+      lib: buildUfoLibFromFontData(input.fontData, metadata.lib),
       updatedAt: timestamp,
     })
   }

@@ -38,6 +38,33 @@ type ImmerSet = Parameters<
   StateCreator<GlobalState, [['zustand/immer', never]], []>
 >[0]
 
+const MONTHS = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+]
+
+// Backup layer base name, e.g. "16 Jun, 25 17:08". Same-minute clashes are
+// disambiguated downstream (glyphLayerOps).
+const backupLayerName = (): string => {
+  const now = new Date()
+  const day = now.getDate()
+  const month = MONTHS[now.getMonth()]
+  const year = String(now.getFullYear()).slice(-2)
+  const hours = String(now.getHours()).padStart(2, '0')
+  const minutes = String(now.getMinutes()).padStart(2, '0')
+  return `${day} ${month}, ${year} ${hours}:${minutes}`
+}
+
 export const buildGlyphActions = (set: ImmerSet) => ({
   deleteGlyph: (glyphId: string) =>
     set((state) => {
@@ -310,11 +337,9 @@ export const buildGlyphActions = (set: ImmerSet) => ({
       if (!glyph) {
         return
       }
-      const name = `Backup ${new Date().toLocaleString()}`
       state.fontData!.glyphs[glyphId] = createBackupLayer(
         current(glyph),
-        generateId('layer'),
-        name
+        backupLayerName()
       )
       markGlyphDirty(state, glyphId)
     }),
@@ -329,7 +354,6 @@ export const buildGlyphActions = (set: ImmerSet) => ({
       state.fontData!.glyphs[glyphId] = duplicateLayer(
         current(glyph),
         layerId,
-        generateId('layer'),
         `${sourceName} copy`
       )
       markGlyphDirty(state, glyphId)
@@ -368,12 +392,10 @@ export const buildGlyphActions = (set: ImmerSet) => ({
       if (!glyph) {
         return
       }
-      const name = `Backup ${new Date().toLocaleString()}`
       state.fontData!.glyphs[glyphId] = promoteBackupToMaster(
         current(glyph),
         layerId,
-        generateId('layer'),
-        name
+        backupLayerName()
       )
       state.selectedNodeIds = []
       state.selectedSegment = null

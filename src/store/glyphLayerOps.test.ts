@@ -4,8 +4,8 @@ import {
   deleteBackupLayer,
   duplicateLayer,
   listGlyphLayers,
-  renameBackupLayer,
   promoteBackupToMaster,
+  renameBackupLayer,
 } from './glyphLayerOps'
 import type { GlyphData } from './types'
 
@@ -34,13 +34,14 @@ describe('glyphLayerOps', () => {
     expect(layers[0].paths[0].nodes[0].x).toBe(1)
   })
 
-  it('creates a backup snapshot of the hot content', () => {
-    const glyph = createBackupLayer(makeGlyph(), 'b1', 'Backup 1')
+  it('creates a backup whose id is its name, snapshotting hot content', () => {
+    const glyph = createBackupLayer(makeGlyph(), 'Backup 1')
     const layers = listGlyphLayers(glyph)
-    expect(layers.map((l) => l.id)).toEqual(['public.default', 'b1'])
+    expect(layers.map((l) => l.id)).toEqual(['public.default', 'Backup 1'])
     expect(layers[1].type).toBe('backup')
+    expect(layers[1].name).toBe('Backup 1')
     expect(layers[1].paths[0].nodes[0].x).toBe(1)
-    // editing the master afterwards must not mutate the backup snapshot
+    // mutating the master afterwards must not mutate the backup snapshot
     glyph.paths = [
       {
         id: 'p1',
@@ -48,50 +49,64 @@ describe('glyphLayerOps', () => {
         nodes: [{ id: 'n1', x: 99, y: 2, type: 'corner' }],
       },
     ]
-    expect(glyph.layers!.b1.paths[0].nodes[0].x).toBe(1)
+    expect(glyph.layers!['Backup 1'].paths[0].nodes[0].x).toBe(1)
   })
 
-  it('renames and deletes backups but never the master', () => {
-    let glyph = createBackupLayer(makeGlyph(), 'b1', 'Backup 1')
-    glyph = renameBackupLayer(glyph, 'b1', 'Renamed')
-    expect(glyph.layers!.b1.name).toBe('Renamed')
-    glyph = deleteBackupLayer(glyph, 'public.default') // master: no-op
-    expect(glyph.layers!.b1).toBeDefined()
-    glyph = deleteBackupLayer(glyph, 'b1')
-    expect(glyph.layers!.b1).toBeUndefined()
+  it('disambiguates same-name backups with " (2)"', () => {
+    let glyph = createBackupLayer(makeGlyph(), '16 Jun, 25 17:08')
+    glyph = createBackupLayer(glyph, '16 Jun, 25 17:08')
+    expect(listGlyphLayers(glyph).map((l) => l.id)).toEqual([
+      'public.default',
+      '16 Jun, 25 17:08',
+      '16 Jun, 25 17:08 (2)',
+    ])
+  })
+
+  it('renames by re-keying so id stays equal to name', () => {
+    let glyph = createBackupLayer(makeGlyph(), 'Backup 1')
+    glyph = renameBackupLayer(glyph, 'Backup 1', 'Renamed')
+    expect(glyph.layers!['Backup 1']).toBeUndefined()
+    expect(glyph.layers!.Renamed.name).toBe('Renamed')
+    expect(listGlyphLayers(glyph).map((l) => l.id)).toEqual([
+      'public.default',
+      'Renamed',
+    ])
+  })
+
+  it('deletes backups but never the master', () => {
+    let glyph = createBackupLayer(makeGlyph(), 'Backup 1')
+    glyph = deleteBackupLayer(glyph, 'public.default')
+    expect(glyph.layers!['Backup 1']).toBeDefined()
+    glyph = deleteBackupLayer(glyph, 'Backup 1')
     expect(listGlyphLayers(glyph)).toHaveLength(1)
   })
 
   it('duplicates a layer into a new backup', () => {
-    let glyph = createBackupLayer(makeGlyph(), 'b1', 'Backup 1')
-    glyph = duplicateLayer(glyph, 'b1', 'b2', 'Backup 2')
+    let glyph = createBackupLayer(makeGlyph(), 'Backup 1')
+    glyph = duplicateLayer(glyph, 'Backup 1', 'Backup 1 copy')
     expect(listGlyphLayers(glyph).map((l) => l.id)).toEqual([
       'public.default',
-      'b1',
-      'b2',
+      'Backup 1',
+      'Backup 1 copy',
     ])
   })
 
-  it('promoteBackupToMaster swaps backup into hot and keeps old hot as a backup', () => {
-    let glyph = makeGlyph()
-    // backup holds a distinct outline
-    glyph = createBackupLayer(glyph, 'b1', 'Backup 1')
-    glyph.layers!.b1.paths = [
+  it('promoteBackupToMaster swaps backup into hot, keeping old hot as a backup', () => {
+    let glyph = createBackupLayer(makeGlyph(), 'Backup 1')
+    glyph.layers!['Backup 1'].paths = [
       {
         id: 'p9',
         closed: true,
         nodes: [{ id: 'n9', x: 50, y: 60, type: 'corner' }],
       },
     ]
-    const result = promoteBackupToMaster(glyph, 'b1', 'b-old', 'Previous')
-    // hot now holds the backup's outline
+    const result = promoteBackupToMaster(glyph, 'Backup 1', 'Previous')
     expect(result.paths[0].nodes[0].x).toBe(50)
-    // promoted backup is gone, old hot kept as a new backup
-    expect(result.layers!.b1).toBeUndefined()
-    expect(result.layers!['b-old'].paths[0].nodes[0].x).toBe(1)
+    expect(result.layers!['Backup 1']).toBeUndefined()
+    expect(result.layers!.Previous.paths[0].nodes[0].x).toBe(1)
     expect(listGlyphLayers(result).map((l) => l.id)).toEqual([
       'public.default',
-      'b-old',
+      'Previous',
     ])
   })
 })

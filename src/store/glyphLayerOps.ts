@@ -63,30 +63,48 @@ export const listGlyphLayers = (glyph: GlyphData): GlyphLayerData[] => {
   return [master, ...backups]
 }
 
+// A backup layer's id is its display name (a date-time string). Collisions are
+// disambiguated with " (2)", " (3)", … so the id stays unique without a
+// separate name table — the UFO layer name carries the name on round-trip.
+const uniqueLayerId = (
+  baseName: string,
+  glyph: GlyphData,
+  ignoreId?: string
+): string => {
+  const taken = new Set(Object.keys(glyph.layers ?? {}))
+  taken.add(masterLayerId(glyph))
+  if (ignoreId) {
+    taken.delete(ignoreId)
+  }
+  if (!taken.has(baseName)) {
+    return baseName
+  }
+  let counter = 2
+  while (taken.has(`${baseName} (${counter})`)) {
+    counter += 1
+  }
+  return `${baseName} (${counter})`
+}
+
 export const createBackupLayer = (
   glyph: GlyphData,
-  newId: string,
   name: string
 ): GlyphData => {
+  const id = uniqueLayerId(name, glyph)
   const layers = { ...(glyph.layers ?? {}) }
-  layers[newId] = {
-    id: newId,
-    name,
+  layers[id] = {
+    id,
+    name: id,
     type: 'backup',
     associatedMasterId: masterLayerId(glyph),
     ...snapshotHot(glyph),
   }
-  const layerOrder = [
-    ...(glyph.layerOrder ?? []).filter((layerId) => layerId !== newId),
-    newId,
-  ]
-  return { ...glyph, layers, layerOrder }
+  return { ...glyph, layers, layerOrder: [...(glyph.layerOrder ?? []), id] }
 }
 
 export const duplicateLayer = (
   glyph: GlyphData,
   sourceId: string,
-  newId: string,
   name: string
 ): GlyphData => {
   const source =
@@ -98,19 +116,16 @@ export const duplicateLayer = (
   if (!source) {
     return glyph
   }
+  const id = uniqueLayerId(name, glyph)
   const layers = { ...(glyph.layers ?? {}) }
-  layers[newId] = {
-    id: newId,
-    name,
+  layers[id] = {
+    id,
+    name: id,
     type: 'backup',
     associatedMasterId: masterLayerId(glyph),
     ...source,
   }
-  const layerOrder = [
-    ...(glyph.layerOrder ?? []).filter((layerId) => layerId !== newId),
-    newId,
-  ]
-  return { ...glyph, layers, layerOrder }
+  return { ...glyph, layers, layerOrder: [...(glyph.layerOrder ?? []), id] }
 }
 
 export const deleteBackupLayer = (
@@ -127,6 +142,8 @@ export const deleteBackupLayer = (
   return { ...glyph, layers, layerOrder }
 }
 
+// Renaming re-keys the layer (id === name), so the new name survives the UFO
+// round-trip without a separate name table.
 export const renameBackupLayer = (
   glyph: GlyphData,
   layerId: string,
@@ -136,10 +153,17 @@ export const renameBackupLayer = (
   if (!layer) {
     return glyph
   }
-  return {
-    ...glyph,
-    layers: { ...glyph.layers, [layerId]: { ...layer, name } },
+  const id = uniqueLayerId(name, glyph, layerId)
+  if (id === layerId) {
+    return glyph
   }
+  const layers = { ...glyph.layers }
+  delete layers[layerId]
+  layers[id] = { ...layer, id, name: id }
+  const layerOrder = (glyph.layerOrder ?? []).map((existing) =>
+    existing === layerId ? id : existing
+  )
+  return { ...glyph, layers, layerOrder }
 }
 
 // Glyphs "Use as Master": the backup's content moves onto the master layer, and
@@ -148,27 +172,27 @@ export const renameBackupLayer = (
 export const promoteBackupToMaster = (
   glyph: GlyphData,
   backupId: string,
-  newBackupId: string,
   newBackupName: string
 ): GlyphData => {
   const backup = glyph.layers?.[backupId]
   if (!backup) {
     return glyph
   }
+  const newId = uniqueLayerId(newBackupName, glyph, backupId)
   const layers = { ...glyph.layers }
   delete layers[backupId]
-  layers[newBackupId] = {
-    id: newBackupId,
-    name: newBackupName,
+  layers[newId] = {
+    id: newId,
+    name: newId,
     type: 'backup',
     associatedMasterId: masterLayerId(glyph),
     ...snapshotHot(glyph),
   }
   const layerOrder = (glyph.layerOrder ?? []).map((id) =>
-    id === backupId ? newBackupId : id
+    id === backupId ? newId : id
   )
-  if (!layerOrder.includes(newBackupId)) {
-    layerOrder.push(newBackupId)
+  if (!layerOrder.includes(newId)) {
+    layerOrder.push(newId)
   }
   return { ...glyph, ...contentOf(backup), layers, layerOrder }
 }
