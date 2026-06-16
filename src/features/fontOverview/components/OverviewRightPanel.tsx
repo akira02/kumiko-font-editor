@@ -1,5 +1,6 @@
 import { Box, Stack, Text, useDisclosure } from '@chakra-ui/react'
 import { useState } from 'react'
+import { BatchTransformCard } from 'src/features/fontOverview/components/BatchTransformCard'
 import { ExportFontModal } from 'src/features/common/fontExport/ExportFontModal'
 import { useFontExport } from 'src/features/common/fontExport/useFontExport'
 import { GitHubCommitModal } from 'src/features/common/glyphInspector/components/GitHubCommitModal'
@@ -99,12 +100,15 @@ export function OverviewRightPanel({
         />
 
         {hasMultiSelection ? (
-          <SelectedGlyphsCard
-            selectedGlyphCount={selectedGlyphIds.length}
-            onDeleteGlyphs={onDeleteSelectedGlyphs}
-            onEnterEditor={handleEnterSelectedGlyphs}
-            onOpenQualityCheck={handleOpenSelectedQualityCheck}
-          />
+          <>
+            <SelectedGlyphsCard
+              selectedGlyphCount={selectedGlyphIds.length}
+              onDeleteGlyphs={onDeleteSelectedGlyphs}
+              onEnterEditor={handleEnterSelectedGlyphs}
+              onOpenQualityCheck={handleOpenSelectedQualityCheck}
+            />
+            <BatchTransformCard selectedGlyphIds={selectedGlyphIds} />
+          </>
         ) : !panel.glyph ? (
           <Text fontSize="sm" color="field.muted" fontFamily="mono">
             {t('fontOverview.noGlyphSelected')}

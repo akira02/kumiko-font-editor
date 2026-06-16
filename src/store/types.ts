@@ -307,6 +307,7 @@ export interface GlobalState {
   viewport: ViewportState
 
   setSearchQuery: (query: string) => void
+  refreshFilteredGlyphList: () => void
   setSelectedGlyphId: (id: string | null) => void
   addGlyphToEditor: (id: string) => void
   insertGlyphIntoEditor: (id: string, afterGlyphId?: string | null) => void
@@ -383,6 +384,16 @@ export interface GlobalState {
       pathId: string
       nodeId: string
       newPos: { x: number; y: number }
+    }>
+  ) => void
+  applyBatchNodePositions: (
+    batch: Array<{
+      glyphId: string
+      updates: Array<{
+        pathId: string
+        nodeId: string
+        newPos: { x: number; y: number }
+      }>
     }>
   ) => void
   updateNodeType: (

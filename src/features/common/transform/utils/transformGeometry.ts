@@ -69,6 +69,16 @@ export const getSelectedNodes = (
   return nodes
 }
 
+export const getAllNodes = (paths: PathData[]): SelectionNode[] =>
+  paths.flatMap((path) =>
+    path.nodes.map((node) => ({
+      pathId: path.id,
+      nodeId: node.id,
+      x: node.x,
+      y: node.y,
+    }))
+  )
+
 export const getSelectionBounds = (
   nodes: SelectionNode[]
 ): SelectionBounds | null => {

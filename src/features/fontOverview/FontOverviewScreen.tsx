@@ -7,11 +7,14 @@ import { OverviewRightPanel } from 'src/features/fontOverview/components/Overvie
 import { OverviewSidebar } from 'src/features/fontOverview/components/OverviewSidebar'
 import { useAddGlyphsFlow } from 'src/features/fontOverview/hooks/useAddGlyphsFlow'
 import { useCloseProjectWithDraftSave } from 'src/features/fontOverview/hooks/useCloseProjectWithDraftSave'
+import { useHistoryShortcuts } from 'src/features/fontOverview/hooks/useHistoryShortcuts'
 import { useOverviewGridPersistence } from 'src/features/fontOverview/hooks/useOverviewGridPersistence'
 import { useOverviewSections } from 'src/features/fontOverview/hooks/useOverviewSections'
 import { useOverviewSelection } from 'src/features/fontOverview/hooks/useOverviewSelection'
 
 export function FontOverviewScreen() {
+  useHistoryShortcuts()
+
   const [showOnlyEmptyGlyphs, setShowOnlyEmptyGlyphs] = useState(false)
   const currentSearchQuery = useStore((state) => state.currentSearchQuery)
   const setSearchQuery = useStore((state) => state.setSearchQuery)

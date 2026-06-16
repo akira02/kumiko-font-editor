@@ -9,78 +9,54 @@ import {
   Tooltip,
 } from '@chakra-ui/react'
 import { Refresh } from 'iconoir-react'
-import { useMemo, useState } from 'react'
-import type { GlyphData } from 'src/store'
-import type { PathBooleanOperation } from 'src/lib/pathBooleanOperations'
+import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   ScaleActionGroup,
   SkewIcon,
   TransformActionRow,
   type SkewAxis,
 } from 'src/features/common/transform/components/TransformActionControls'
-import { MirrorControls } from 'src/features/common/transform/components/TransformPanelSections'
 import {
-  AlignControls,
-  PathOpsControls,
-  TransformFrameControls,
-} from 'src/features/editor/rightPanel/components/TransformPanelSections'
+  MirrorControls,
+  OriginPicker,
+} from 'src/features/common/transform/components/TransformPanelSections'
 import {
-  buildAlignUpdates,
-  buildFieldCommitUpdates,
   buildMirrorUpdates,
   buildRotatedUpdates,
   buildScaledUpdates,
   buildSkewedUpdates,
-  formatTransformNumber,
-  getSelectedNodes,
+  getAllNodes,
   getSelectionBounds,
   parseTransformNumber,
-  type AlignTarget,
   type NodePositionUpdate,
-  type TransformField,
+  type SelectionBounds,
+  type SelectionNode,
   type TransformOrigin,
 } from 'src/features/common/transform/utils/transformGeometry'
-import { useTranslation } from 'react-i18next'
+import { useStore } from 'src/store'
 
-interface TransformCardProps {
-  glyph: GlyphData | null
-  selectedNodeIds: string[]
-  onMoveSelection: (updates: NodePositionUpdate[]) => void
-  onPathOperation: (operation: PathBooleanOperation, pathIds: string[]) => void
+interface BatchTransformCardProps {
+  selectedGlyphIds: string[]
 }
 
 type TransformActionField = 'rotate' | 'scaleX' | 'scaleY' | 'skewX' | 'skewY'
 type ScaleAxis = 'x' | 'y'
 
-export function TransformCard({
-  glyph,
-  selectedNodeIds,
-  onMoveSelection,
-  onPathOperation,
-}: TransformCardProps) {
-  const { t } = useTranslation()
+type GlyphUpdateBuilder = (
+  nodes: SelectionNode[],
+  bounds: SelectionBounds
+) => NodePositionUpdate[]
 
-  const selectedNodes = useMemo(
-    () => getSelectedNodes(glyph?.paths ?? [], selectedNodeIds),
-    [glyph?.paths, selectedNodeIds]
+export function BatchTransformCard({
+  selectedGlyphIds,
+}: BatchTransformCardProps) {
+  const { t } = useTranslation()
+  const glyphs = useStore((state) => state.fontData?.glyphs)
+  const applyBatchNodePositions = useStore(
+    (state) => state.applyBatchNodePositions
   )
-  const bounds = useMemo(
-    () => getSelectionBounds(selectedNodes),
-    [selectedNodes]
-  )
-  const selectedClosedPathIds = useMemo(() => {
-    const selectedPathIds = new Set(
-      selectedNodeIds.flatMap((selectionKey) => {
-        const [pathId] = selectionKey.split(':')
-        return pathId ? [pathId] : []
-      })
-    )
-    return (glyph?.paths ?? [])
-      .filter((path) => selectedPathIds.has(path.id) && path.closed)
-      .map((path) => path.id)
-  }, [glyph?.paths, selectedNodeIds])
-  const [focusedField, setFocusedField] = useState<TransformField | null>(null)
-  const [draftValue, setDraftValue] = useState('')
+
   const [origin, setOrigin] = useState<TransformOrigin>({
     x: 'center',
     y: 'middle',
@@ -95,90 +71,54 @@ export function TransformCard({
     skewX: '10',
     skewY: '10',
   })
-  const boundsValues = useMemo(
-    () => ({
-      x: formatTransformNumber(bounds?.xMin),
-      y: formatTransformNumber(bounds?.yMin),
-      width: formatTransformNumber(bounds?.width),
-      height: formatTransformNumber(bounds?.height),
-    }),
-    [bounds]
-  )
 
-  const commitField = (field: TransformField, value: string) => {
-    if (!bounds || selectedNodes.length === 0 || value.trim() === '') {
+  const isDisabled = selectedGlyphIds.length === 0
+
+  // Each glyph transforms around its own bounding-box origin so the chosen
+  // origin (top-left, center, ...) is applied relative to each glyph's shape.
+  const applyToAll = (build: GlyphUpdateBuilder) => {
+    if (isDisabled || !glyphs) {
       return
     }
 
-    const updates = buildFieldCommitUpdates(
-      field,
-      value,
-      selectedNodes,
-      bounds,
-      origin
-    )
-    if (updates.length > 0) {
-      onMoveSelection(updates)
+    const batch = selectedGlyphIds.flatMap((glyphId) => {
+      const glyph = glyphs[glyphId]
+      if (!glyph) {
+        return []
+      }
+
+      const nodes = getAllNodes(glyph.paths)
+      const bounds = getSelectionBounds(nodes)
+      if (!bounds) {
+        return []
+      }
+
+      const updates = build(nodes, bounds)
+      return updates.length > 0 ? [{ glyphId, updates }] : []
+    })
+
+    if (batch.length > 0) {
+      applyBatchNodePositions(batch)
     }
-  }
-
-  const handleFieldChange = (field: TransformField, value: string) => {
-    void field
-    setDraftValue(value)
-  }
-
-  const handleFieldBlur = (field: TransformField) => {
-    setFocusedField(null)
-    commitField(field, draftValue)
-    setDraftValue('')
-  }
-
-  const stepField = (field: TransformField, delta: number) => {
-    const currentValue =
-      focusedField === field ? draftValue : boundsValues[field]
-    const nextValue = String(parseTransformNumber(currentValue) + delta)
-    if (focusedField === field) {
-      setDraftValue(nextValue)
-    }
-    commitField(field, nextValue)
   }
 
   const applyMirror = (axis: 'x' | 'y') => {
-    if (!bounds || selectedNodes.length === 0) {
-      return
-    }
-
-    onMoveSelection(buildMirrorUpdates(selectedNodes, bounds, axis, origin))
-  }
-
-  const applyAlign = (target: AlignTarget) => {
-    if (!bounds || selectedNodes.length === 0) {
-      return
-    }
-
-    onMoveSelection(buildAlignUpdates(selectedNodes, bounds, target))
+    applyToAll((nodes, bounds) =>
+      buildMirrorUpdates(nodes, bounds, axis, origin)
+    )
   }
 
   const applyRotationStep = (direction: 1 | -1) => {
-    if (!bounds || selectedNodes.length === 0) {
-      return
-    }
-
     const amount = Number.parseFloat(actionDrafts.rotate)
     if (!Number.isFinite(amount) || amount === 0) {
       return
     }
-
-    onMoveSelection(
-      buildRotatedUpdates(selectedNodes, bounds, amount * direction, origin)
+    applyToAll((nodes, bounds) =>
+      buildRotatedUpdates(nodes, bounds, amount * direction, origin)
     )
   }
 
   const applyScaleStep = (axis: ScaleAxis, direction: 1 | -1) => {
-    if (!bounds || selectedNodes.length === 0) {
-      return
-    }
-
     const field = axis === 'x' ? 'scaleX' : 'scaleY'
     const amount = Number.parseFloat(actionDrafts[field])
     if (!Number.isFinite(amount) || amount <= 0 || amount === 100) {
@@ -188,25 +128,20 @@ export function TransformCard({
     const factor = direction === 1 ? amount / 100 : 100 / amount
     const scaleX = isScaleLocked || axis === 'x' ? factor : 1
     const scaleY = isScaleLocked || axis === 'y' ? factor : 1
-    onMoveSelection(
-      buildScaledUpdates(selectedNodes, bounds, scaleX, scaleY, origin)
+    applyToAll((nodes, bounds) =>
+      buildScaledUpdates(nodes, bounds, scaleX, scaleY, origin)
     )
   }
 
   const applySkewStep = (axis: SkewAxis, direction: 1 | -1) => {
-    if (!bounds || selectedNodes.length === 0) {
-      return
-    }
-
     const field = axis === 'x' ? 'skewX' : 'skewY'
     const amount = Number.parseFloat(actionDrafts[field])
     if (!Number.isFinite(amount) || amount === 0) {
       return
     }
-
-    onMoveSelection(
+    applyToAll((nodes, bounds) =>
       buildSkewedUpdates(
-        selectedNodes,
+        nodes,
         bounds,
         axis === 'x' ? amount * direction : 0,
         axis === 'y' ? amount * direction : 0,
@@ -226,21 +161,11 @@ export function TransformCard({
         parseTransformNumber(current[field] || fallback) + delta
       )
       if (isScaleLocked && (field === 'scaleX' || field === 'scaleY')) {
-        return {
-          ...current,
-          scaleX: nextValue,
-          scaleY: nextValue,
-        }
+        return { ...current, scaleX: nextValue, scaleY: nextValue }
       }
-      return {
-        ...current,
-        [field]: nextValue,
-      }
+      return { ...current, [field]: nextValue }
     })
   }
-
-  const isDisabled = selectedNodes.length === 0
-  const canApplyPathOps = selectedClosedPathIds.length >= 2
 
   return (
     <Box p={4} bg="field.panel" borderRadius="sm">
@@ -250,29 +175,21 @@ export function TransformCard({
             {t('editor.transform')}
           </Heading>
           <Text fontSize="xs" color="field.muted" fontFamily="mono">
-            {selectedNodes.length > 0
-              ? `${selectedNodes.length} nodes selected`
-              : 'No editable selection'}
+            {t('fontOverview.selection.selectedGlyphs', {
+              count: selectedGlyphIds.length,
+            })}
           </Text>
         </Box>
       </HStack>
 
       <Stack spacing={4}>
-        <TransformFrameControls
-          origin={origin}
-          isDisabled={isDisabled}
-          onOriginChange={setOrigin}
-          focusedField={focusedField}
-          draftValue={draftValue}
-          boundsValues={boundsValues}
-          onFocus={(field) => {
-            setFocusedField(field)
-            setDraftValue(boundsValues[field])
-          }}
-          onFieldChange={handleFieldChange}
-          onBlur={handleFieldBlur}
-          onStep={stepField}
-        />
+        <Box>
+          <OriginPicker
+            origin={origin}
+            isDisabled={isDisabled}
+            onOriginChange={setOrigin}
+          />
+        </Box>
 
         <Divider borderColor="field.panelMuted" />
 
@@ -359,10 +276,8 @@ export function TransformCard({
                 w="100%"
                 isDisabled={isDisabled}
                 onClick={() =>
-                  onMoveSelection(
-                    bounds
-                      ? buildRotatedUpdates(selectedNodes, bounds, 90, origin)
-                      : []
+                  applyToAll((nodes, bounds) =>
+                    buildRotatedUpdates(nodes, bounds, 90, origin)
                   )
                 }
               >
@@ -375,16 +290,6 @@ export function TransformCard({
         <Divider borderColor="field.panelMuted" />
 
         <MirrorControls isDisabled={isDisabled} onMirror={applyMirror} />
-
-        <AlignControls isDisabled={isDisabled} onAlign={applyAlign} />
-
-        <Divider borderColor="field.panelMuted" />
-
-        <PathOpsControls
-          canApply={canApplyPathOps}
-          selectedClosedPathIds={selectedClosedPathIds}
-          onPathOperation={onPathOperation}
-        />
       </Stack>
     </Box>
   )

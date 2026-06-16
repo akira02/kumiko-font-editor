@@ -113,8 +113,14 @@ export const useStore = create<GlobalState>()(
     })),
     {
       partialize: (state) => ({ fontData: state.fontData }),
+      // Treat any transition that involves a null fontData (project open/close)
+      // as "unchanged" so it is never recorded. Otherwise the null→loaded open
+      // transition becomes the bottom of the undo stack, and undoing far enough
+      // restores fontData = null, which routes the app back to the Home screen.
       equality: (pastState, currentState) =>
-        pastState.fontData === currentState.fontData,
+        pastState.fontData === currentState.fontData ||
+        !pastState.fontData ||
+        !currentState.fontData,
       limit: 50,
     }
   )

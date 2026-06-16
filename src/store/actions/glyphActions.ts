@@ -263,6 +263,41 @@ export const buildGlyphActions = (set: ImmerSet) => ({
       markGlyphDirty(state, glyphId)
     }),
 
+  applyBatchNodePositions: (
+    batch: Array<{
+      glyphId: string
+      updates: Array<{
+        pathId: string
+        nodeId: string
+        newPos: { x: number; y: number }
+      }>
+    }>
+  ) =>
+    set((state) => {
+      for (const { glyphId, updates } of batch) {
+        const glyph = state.fontData?.glyphs[glyphId]
+        if (!glyph) {
+          continue
+        }
+
+        for (const update of updates) {
+          const node = findNode(findPath(glyph, update.pathId), update.nodeId)
+          if (!node) {
+            continue
+          }
+
+          node.x = Math.round(update.newPos.x)
+          node.y = Math.round(update.newPos.y)
+        }
+        recomputeGlyphSidebearings(glyph)
+        markGlyphDirty(state, glyphId)
+      }
+      // Rebuild the overview list so the glyph grid re-renders with the
+      // transformed shapes; it holds glyph references that node mutations
+      // would otherwise leave stale.
+      syncFilteredGlyphList(state)
+    }),
+
   updateNodeType: (
     glyphId: string,
     pathId: string,

@@ -1,6 +1,4 @@
 import {
-  Box,
-  Button,
   Grid,
   GridItem,
   HStack,
@@ -16,26 +14,20 @@ import {
   AlignRightBox,
   AlignTopBox,
   AlignVerticalCenters,
-  Flip,
   Intersect,
   Cut,
   Substract,
   Union,
 } from 'iconoir-react'
 import type { PathBooleanOperation } from 'src/lib/pathBooleanOperations'
-import { SteppedNumberInput } from 'src/features/editor/rightPanel/components/SteppedNumberInput'
+import { SteppedNumberInput } from 'src/features/common/transform/components/SteppedNumberInput'
+import { OriginPicker } from 'src/features/common/transform/components/TransformPanelSections'
 import type {
   AlignTarget,
   TransformField,
   TransformOrigin,
-} from 'src/features/editor/rightPanel/utils/transformGeometry'
+} from 'src/features/common/transform/utils/transformGeometry'
 import { useTranslation } from 'react-i18next'
-
-interface OriginPickerProps {
-  origin: TransformOrigin
-  isDisabled: boolean
-  onOriginChange: (origin: TransformOrigin) => void
-}
 
 interface BoundsFieldsProps {
   focusedField: TransformField | null
@@ -48,14 +40,14 @@ interface BoundsFieldsProps {
   onStep: (field: TransformField, delta: number) => void
 }
 
-interface TransformFrameControlsProps
-  extends OriginPickerProps, Omit<BoundsFieldsProps, 'isDisabled' | 'values'> {
-  boundsValues: Record<TransformField, string>
-}
-
-interface MirrorControlsProps {
+interface TransformFrameControlsProps extends Omit<
+  BoundsFieldsProps,
+  'isDisabled' | 'values'
+> {
+  origin: TransformOrigin
   isDisabled: boolean
-  onMirror: (axis: 'x' | 'y') => void
+  onOriginChange: (origin: TransformOrigin) => void
+  boundsValues: Record<TransformField, string>
 }
 
 interface AlignControlsProps {
@@ -134,60 +126,6 @@ export function TransformFrameControls({
   )
 }
 
-function OriginPicker({
-  origin,
-  isDisabled,
-  onOriginChange,
-}: OriginPickerProps) {
-  const { t } = useTranslation()
-
-  return (
-    <Box minW="72px">
-      <Text fontSize="xs" color="field.muted" mb={1} fontFamily="mono">
-        {t('editor.origin')}
-      </Text>
-      <Grid templateColumns="repeat(3, 18px)" gap="3px">
-        {(
-          [
-            ['left', 'top'],
-            ['center', 'top'],
-            ['right', 'top'],
-            ['left', 'middle'],
-            ['center', 'middle'],
-            ['right', 'middle'],
-            ['left', 'bottom'],
-            ['center', 'bottom'],
-            ['right', 'bottom'],
-          ] as const
-        ).map(([x, y]) => {
-          const isActive = origin.x === x && origin.y === y
-          return (
-            <Tooltip key={`${x}-${y}`} label={`${x} ${y}`}>
-              <Button
-                aria-label={`${x} ${y} origin`}
-                size="xs"
-                minW="18px"
-                h="18px"
-                p={0}
-                borderRadius="1px"
-                variant={isActive ? 'solid' : 'outline'}
-                isDisabled={isDisabled}
-                onClick={() => onOriginChange({ x, y })}
-              >
-                <Box
-                  w="5px"
-                  h="5px"
-                  bg={isActive ? 'field.ink' : 'field.muted'}
-                />
-              </Button>
-            </Tooltip>
-          )
-        })}
-      </Grid>
-    </Box>
-  )
-}
-
 function BoundsFields({
   focusedField,
   draftValue,
@@ -223,42 +161,6 @@ function BoundsFields({
         </GridItem>
       ))}
     </Grid>
-  )
-}
-
-export function MirrorControls({ isDisabled, onMirror }: MirrorControlsProps) {
-  const { t } = useTranslation()
-
-  return (
-    <Stack spacing={2}>
-      <Text fontSize="xs" color="field.muted" fontFamily="mono">
-        {t('editor.mirror')}
-      </Text>
-      <Grid templateColumns="repeat(2, minmax(0, 1fr))" gap={2}>
-        <Tooltip label={t('editor.mirrorHorizontally')}>
-          <Button
-            size="sm"
-            variant="outline"
-            leftIcon={<Flip width={16} height={16} transform="rotate(-90)" />}
-            isDisabled={isDisabled}
-            onClick={() => onMirror('x')}
-          >
-            X
-          </Button>
-        </Tooltip>
-        <Tooltip label={t('editor.mirrorVertically')}>
-          <Button
-            size="sm"
-            variant="outline"
-            leftIcon={<Flip width={16} height={16} />}
-            isDisabled={isDisabled}
-            onClick={() => onMirror('y')}
-          >
-            Y
-          </Button>
-        </Tooltip>
-      </Grid>
-    </Stack>
   )
 }
 
