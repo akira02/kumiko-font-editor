@@ -29,7 +29,12 @@ import type { ToolId } from 'src/features/editor/canvas/workspace/types'
 import { useCanvasClipboard } from 'src/features/editor/canvas/hooks/useCanvasClipboard'
 import { useCanvasKeyboardShortcuts } from 'src/features/editor/canvas/hooks/useCanvasKeyboardShortcuts'
 import { VarPackedPath } from 'src/font/VarPackedPath'
-import { buildReferenceCharPath } from 'src/lib/referenceFont/referenceFontStore'
+import {
+  buildReferenceCharPath,
+  clearReferenceFont,
+  loadReferenceFontFromBytes,
+} from 'src/lib/referenceFont/referenceFontStore'
+import { loadReferenceFontRecord } from 'src/lib/referenceFont/referenceFontPersistence'
 import type { PathData } from 'src/store'
 
 const buildPath2DFromPaths = (paths: PathData[]) =>
@@ -110,6 +115,12 @@ export function CanvasWorkspace() {
   const referenceFontName = useStore((state) => state.referenceFontName)
   const referenceFontVisible = useStore((state) => state.referenceFontVisible)
   const referenceFontChar = useStore((state) => state.referenceFontChar)
+  const projectId = useStore((state) => state.projectId)
+  const setReferenceFontName = useStore((state) => state.setReferenceFontName)
+  const setReferenceFontVisible = useStore(
+    (state) => state.setReferenceFontVisible
+  )
+  const setReferenceFontChar = useStore((state) => state.setReferenceFontChar)
   const visibleBackdropLayerIds = useStore(
     (state) => state.visibleBackdropLayerIds
   )
@@ -483,6 +494,46 @@ export function CanvasWorkspace() {
     sceneController.sceneModel.structureGuide = structureGuide
     controller.requestUpdate()
   }, [structureGuide])
+
+  // Restore (or clear) the per-project reference font when the project changes.
+  useEffect(() => {
+    let cancelled = false
+    const restore = async () => {
+      const record = projectId
+        ? await loadReferenceFontRecord(projectId)
+        : undefined
+      if (cancelled) {
+        return
+      }
+      if (record) {
+        try {
+          const name = loadReferenceFontFromBytes(
+            record.fontBytes,
+            record.fontName
+          )
+          setReferenceFontName(name)
+          setReferenceFontVisible(true)
+          setReferenceFontChar(null)
+          return
+        } catch {
+          // fall through to the cleared state below
+        }
+      }
+      clearReferenceFont()
+      setReferenceFontName(null)
+      setReferenceFontVisible(false)
+      setReferenceFontChar(null)
+    }
+    void restore()
+    return () => {
+      cancelled = true
+    }
+  }, [
+    projectId,
+    setReferenceFontChar,
+    setReferenceFontName,
+    setReferenceFontVisible,
+  ])
 
   useEffect(() => {
     const sceneController = sceneControllerRef.current

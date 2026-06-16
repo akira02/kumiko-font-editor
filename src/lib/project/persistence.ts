@@ -11,13 +11,14 @@ export const UFO_PROJECTS_STORE = 'ufo_projects'
 export const UFO_METADATA_STORE = 'ufo_metadata'
 export const UFO_GLYPHS_STORE = 'ufo_glyphs'
 export const UFO_UI_STATE_STORE = 'ufo_ui_state'
+export const UFO_REFERENCE_FONTS_STORE = 'ufo_reference_fonts'
 
 export type ProjectDraft = KumikoProjectDraft
 export type ProjectSummary = KumikoProjectSummary
 
 export const openDatabase = async () => {
   return new Promise<IDBDatabase>((resolve, reject) => {
-    const request = globalThis.indexedDB.open(DB_NAME, 5)
+    const request = globalThis.indexedDB.open(DB_NAME, 6)
 
     request.onupgradeneeded = () => {
       const database = request.result
@@ -73,6 +74,11 @@ export const openDatabase = async () => {
       if (!database.objectStoreNames.contains(UFO_UI_STATE_STORE)) {
         database.createObjectStore(UFO_UI_STATE_STORE, {
           keyPath: ['projectId', 'key'],
+        })
+      }
+      if (!database.objectStoreNames.contains(UFO_REFERENCE_FONTS_STORE)) {
+        database.createObjectStore(UFO_REFERENCE_FONTS_STORE, {
+          keyPath: 'projectId',
         })
       }
     }

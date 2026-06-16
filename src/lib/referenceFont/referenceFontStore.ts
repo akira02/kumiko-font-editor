@@ -1,7 +1,7 @@
 // In-memory holder for a user-loaded reference font. Renders a single
-// character behind the editing glyph for tracing (補字 workflow).
-// Not persisted yet — re-loaded each session; persisting the bytes would need
-// an IndexedDB schema bump (see src/lib/project/persistence.ts).
+// character behind the editing glyph for tracing (補字 workflow). The bytes
+// are persisted per-project in IndexedDB (see referenceFontPersistence); this
+// module just holds the parsed font for the current session.
 
 import opentype from 'opentype.js'
 
@@ -13,8 +13,12 @@ interface LoadedReferenceFont {
 
 let loaded: LoadedReferenceFont | null = null
 
-export async function loadReferenceFontFromFile(file: File): Promise<string> {
-  const buffer = await file.arrayBuffer()
+// Parse font bytes into the holder and return a display name. `fallbackName`
+// is used when the font has no family name (e.g. derived from a file name).
+export function loadReferenceFontFromBytes(
+  buffer: ArrayBuffer,
+  fallbackName?: string
+): string {
   const font = opentype.parse(buffer)
   const familyNames = font.names?.fontFamily as
     | Record<string, string>
@@ -22,7 +26,8 @@ export async function loadReferenceFontFromFile(file: File): Promise<string> {
   const name =
     familyNames?.en ??
     (familyNames ? Object.values(familyNames)[0] : undefined) ??
-    file.name.replace(/\.[^.]+$/, '')
+    fallbackName ??
+    'Reference'
   loaded = { name, font, unitsPerEm: font.unitsPerEm }
   return name
 }

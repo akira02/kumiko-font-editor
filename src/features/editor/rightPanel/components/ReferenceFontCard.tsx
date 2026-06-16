@@ -11,8 +11,12 @@ import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   clearReferenceFont,
-  loadReferenceFontFromFile,
+  loadReferenceFontFromBytes,
 } from 'src/lib/referenceFont/referenceFontStore'
+import {
+  deleteReferenceFont,
+  saveReferenceFont,
+} from 'src/lib/referenceFont/referenceFontPersistence'
 import { useStore } from 'src/store'
 
 export function ReferenceFontCard() {
@@ -20,6 +24,7 @@ export function ReferenceFontCard() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [error, setError] = useState<string | null>(null)
 
+  const projectId = useStore((state) => state.projectId)
   const referenceFontName = useStore((state) => state.referenceFontName)
   const referenceFontChar = useStore((state) => state.referenceFontChar)
   const setReferenceFontName = useStore((state) => state.setReferenceFontName)
@@ -38,9 +43,14 @@ export function ReferenceFontCard() {
     }
     setError(null)
     try {
-      const name = await loadReferenceFontFromFile(file)
+      const buffer = await file.arrayBuffer()
+      const fallbackName = file.name.replace(/\.[^.]+$/, '')
+      const name = loadReferenceFontFromBytes(buffer, fallbackName)
       setReferenceFontName(name)
       setReferenceFontVisible(true)
+      if (projectId) {
+        await saveReferenceFont(projectId, name, buffer)
+      }
     } catch {
       setError(t('editor.referenceFontLoadFailed'))
     }
@@ -51,6 +61,9 @@ export function ReferenceFontCard() {
     setReferenceFontName(null)
     setReferenceFontVisible(false)
     setError(null)
+    if (projectId) {
+      void deleteReferenceFont(projectId)
+    }
   }
 
   return (
