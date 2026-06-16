@@ -701,6 +701,58 @@ const buildBoundsResolver = (glyphRecords: UfoGlyphRecord[]) => {
   return resolve
 }
 
+// Build the interpolatable content (outline + metrics) of one glyph layer from
+// its UFO record. Shared by the master layer and backup layers.
+const glyphRecordToLayerContent = (
+  record: UfoGlyphRecord,
+  resolveBounds: (glyphName: string) => GlyphBounds | null
+) => {
+  const width = record.advance.width ?? 0
+  const bounds = resolveBounds(record.glyphName)
+  const lsb = Math.round(bounds?.xMin ?? 0)
+  const metrics: GlyphMetrics = {
+    width,
+    lsb,
+    rsb: Math.round(bounds ? width - bounds.xMax : width - lsb),
+  }
+  return {
+    paths: record.contours.map((contour, index) => ({
+      id: `p${index}`,
+      closed: !isOpenContour(contour),
+      nodes: buildPathNodesFromContour(contour),
+    })),
+    components: record.components.map((component) => component.base),
+    componentRefs: record.components.map((component, index) => ({
+      id: component.identifier ?? `c${index}`,
+      glyphId: component.base,
+      x: component.xOffset ?? 0,
+      y: component.yOffset ?? 0,
+      scaleX: component.xScale ?? 1,
+      scaleY: component.yScale ?? 1,
+      xyScale: component.xyScale ?? 0,
+      yxScale: component.yxScale ?? 0,
+      rotation: 0,
+    })),
+    anchors: record.anchors.map((anchor, index) => ({
+      id: anchor.identifier ?? `a${index}`,
+      name: anchor.name,
+      x: anchor.x,
+      y: anchor.y,
+    })),
+    guidelines: record.guidelines.map((guide, index) => ({
+      id: guide.identifier ?? `g${index}`,
+      x: guide.x ?? 0,
+      y: guide.y ?? 0,
+      angle: guide.angle ?? 0,
+      locked: false,
+      name: guide.name ?? undefined,
+    })),
+    metrics,
+  }
+}
+
+const LAYER_NAMES_LIB_KEY = 'com.kumiko.fontEditor.layerNames'
+
 const buildFontDataFromUfoGlyphs = (
   glyphRecords: UfoGlyphRecord[],
   metadata: UfoMetadataRecord
@@ -1097,6 +1149,41 @@ export const loadUfoProjectIntoFontData = async (projectId: string) => {
   )
   const fontData = buildFontDataFromUfoGlyphs(glyphRecords, activeMetadata)
 
+  // Attach non-active layers as backup layers (the store source of truth).
+  const layerNames =
+    (activeMetadata.lib?.[LAYER_NAMES_LIB_KEY] as
+      | Record<string, string>
+      | undefined) ?? {}
+  for (const layer of activeMetadata.layers) {
+    if (layer.layerId === activeLayer.layerId) {
+      continue
+    }
+    const backupRecords = await listUfoGlyphsInLayer(
+      projectId,
+      activeMetadata.ufoId,
+      layer.layerId
+    )
+    if (backupRecords.length === 0) {
+      continue
+    }
+    const resolveBounds = buildBoundsResolver(backupRecords)
+    for (const record of backupRecords) {
+      const glyph = fontData.glyphs[record.glyphName]
+      if (!glyph) {
+        continue
+      }
+      glyph.layers = glyph.layers ?? {}
+      glyph.layers[layer.layerId] = {
+        id: layer.layerId,
+        name: layerNames[layer.layerId] ?? layer.layerId,
+        type: 'backup',
+        associatedMasterId: activeLayer.layerId,
+        ...glyphRecordToLayerContent(record, resolveBounds),
+      }
+      glyph.layerOrder = [...(glyph.layerOrder ?? []), layer.layerId]
+    }
+  }
+
   return {
     project,
     metadata: activeMetadata,
@@ -1239,6 +1326,87 @@ export const syncHotFontDataToUfoRecords = async (input: {
     })
   }
 
+  // Backup layers: write each dirty glyph's backups as their own layer records,
+  // and reconcile (delete) backups the glyph no longer has.
+  const existingBackupLayerIds = (metadata?.layers ?? [])
+    .filter((layer) => layer.layerId !== input.activeLayerId)
+    .map((layer) => layer.layerId)
+  const seenBackupLayerIds = new Set<string>()
+  const backupLayerNames: Record<string, string> = {}
+
+  for (const glyphId of input.dirtyGlyphIds) {
+    const glyph = input.fontData.glyphs[glyphId]
+    if (!glyph) {
+      continue
+    }
+    const fileName = nextContents[glyph.id] ?? `${glyph.id}.glif`
+    const glyphBackupIds = new Set<string>()
+
+    for (const [layerId, layer] of Object.entries(glyph.layers ?? {})) {
+      if (layerId === input.activeLayerId || layer.type === 'master') {
+        continue
+      }
+      glyphBackupIds.add(layerId)
+      seenBackupLayerIds.add(layerId)
+      backupLayerNames[layerId] = layer.name
+      const existing = await loadUfoGlyph(
+        makeUfoGlyphKey(input.projectId, input.activeUfoId, layerId, glyph.id)
+      )
+      records.push({
+        projectId: input.projectId,
+        ufoId: input.activeUfoId,
+        layerId,
+        glyphName: glyph.id,
+        fileName: existing?.fileName ?? fileName,
+        sourceHash: existing?.sourceHash ?? null,
+        remoteBlobSha: existing?.remoteBlobSha ?? null,
+        unicodes: glyph.unicode ? [glyph.unicode.toUpperCase()] : [],
+        advance: { width: layer.metrics.width, height: null },
+        anchors: layer.anchors.map((anchor) => ({
+          x: anchor.x,
+          y: anchor.y,
+          name: anchor.name,
+          identifier: anchor.id,
+        })),
+        guidelines: layer.guidelines.map((guide) => ({
+          x: guide.x,
+          y: guide.y,
+          angle: guide.angle,
+          name: guide.name ?? null,
+          identifier: guide.id,
+        })),
+        contours: layer.paths.map((path) => ({ ...pathToUfoContour(path) })),
+        components: layer.componentRefs.map((component) => {
+          const matrix = getComponentMatrix(component)
+          return {
+            base: component.glyphId,
+            identifier: component.id,
+            xScale: matrix.a,
+            yScale: matrix.d,
+            ...(matrix.b !== 0 ? { xyScale: matrix.b } : {}),
+            ...(matrix.c !== 0 ? { yxScale: matrix.c } : {}),
+            xOffset: matrix.e,
+            yOffset: matrix.f,
+          }
+        }),
+        note: existing?.note ?? null,
+        image: existing?.image ?? null,
+        lib: existing?.lib ?? null,
+        dirty: true,
+        dirtyIndex: 1,
+        updatedAt: timestamp,
+      })
+    }
+
+    for (const layerId of existingBackupLayerIds) {
+      if (!glyphBackupIds.has(layerId)) {
+        deletedKeys.push(
+          makeUfoGlyphKey(input.projectId, input.activeUfoId, layerId, glyph.id)
+        )
+      }
+    }
+  }
+
   if (records.length > 0) {
     await saveUfoGlyphBatch(records)
   }
@@ -1280,13 +1448,38 @@ export const syncHotFontDataToUfoRecords = async (input: {
         : {}),
     }
 
+    const nextLayers = [...metadata.layers]
+    for (const layerId of seenBackupLayerIds) {
+      if (!nextLayers.some((layer) => layer.layerId === layerId)) {
+        nextLayers.push({
+          layerId,
+          glyphDir: `glyphs.${layerId.replace(/[^A-Za-z0-9._-]/g, '_')}`,
+        })
+      }
+    }
+
+    const nextLib = buildUfoLibFromFontData(
+      input.fontData,
+      metadata.lib
+    ) as Record<string, unknown>
+    const mergedLayerNames = {
+      ...((metadata.lib?.[LAYER_NAMES_LIB_KEY] as
+        | Record<string, string>
+        | undefined) ?? {}),
+      ...backupLayerNames,
+    }
+    if (Object.keys(mergedLayerNames).length > 0) {
+      nextLib[LAYER_NAMES_LIB_KEY] = mergedLayerNames
+    }
+
     await saveUfoMetadata({
       ...metadata,
       contents: nextContents,
       featuresText: selectUfoFeatureText(input.fontData),
       fontinfo: nextFontInfo,
       glyphOrder: nextGlyphOrder,
-      lib: buildUfoLibFromFontData(input.fontData, metadata.lib),
+      layers: nextLayers,
+      lib: nextLib,
       updatedAt: timestamp,
     })
   }
