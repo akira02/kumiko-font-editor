@@ -1,5 +1,25 @@
 import type { FontAxes } from 'src/store'
 
+const escapeXmlAttr = (value: string) =>
+  value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+
+const sameLocation = (
+  a: Record<string, number>,
+  b: Record<string, number>
+): boolean => {
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)])
+  for (const key of keys) {
+    if ((a[key] ?? 0) !== (b[key] ?? 0)) {
+      return false
+    }
+  }
+  return true
+}
+
 // Minimal .designspace (designspaceLib) parser: axes + sources. Instances and
 // avar2 cross-axis rules are out of scope for the first multi-master import.
 // Source/axis locations are keyed by axis NAME (the designspace dimension key);
@@ -115,3 +135,65 @@ export const designspaceDefaultLocation = (
   designspace: Designspace
 ): Record<string, number> =>
   Object.fromEntries(designspace.axes.map((axis) => [axis.name, axis.default]))
+
+export interface DesignspaceSourceOut {
+  filename: string
+  name: string
+  location: Record<string, number>
+}
+
+// Serialize FontData axes + sources back to a .designspace document. The source
+// at the axis-defaults location is marked default via <info copy="1"/>.
+export const serializeDesignspace = (
+  axes: FontAxes | undefined,
+  sources: DesignspaceSourceOut[]
+): string => {
+  const axisEntries = axes?.axes ?? []
+  const defaultLocation = Object.fromEntries(
+    axisEntries.map((axis) => [axis.name, axis.defaultValue])
+  )
+
+  const axesXml = axisEntries
+    .map((axis) => {
+      const maps = (axis.mapping ?? [])
+        .map(
+          ([input, output]) =>
+            `      <map input="${input}" output="${output}"/>`
+        )
+        .join('\n')
+      const open = `    <axis tag="${escapeXmlAttr(axis.tag)}" name="${escapeXmlAttr(axis.name)}" minimum="${axis.minValue}" maximum="${axis.maxValue}" default="${axis.defaultValue}">`
+      return maps ? `${open}\n${maps}\n    </axis>` : `${open}\n    </axis>`
+    })
+    .join('\n')
+
+  const sourcesXml = sources
+    .map((source) => {
+      const dimensions = Object.entries(source.location)
+        .map(
+          ([name, value]) =>
+            `      <dimension name="${escapeXmlAttr(name)}" xvalue="${value}"/>`
+        )
+        .join('\n')
+      const isDefault = sameLocation(source.location, defaultLocation)
+      return [
+        `    <source filename="${escapeXmlAttr(source.filename)}" name="${escapeXmlAttr(source.name)}" stylename="${escapeXmlAttr(source.name)}">`,
+        ...(isDefault ? ['      <info copy="1"/>'] : []),
+        '      <location>',
+        dimensions,
+        '      </location>',
+        '    </source>',
+      ].join('\n')
+    })
+    .join('\n')
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<designspace format="4.1">
+  <axes>
+${axesXml}
+  </axes>
+  <sources>
+${sourcesXml}
+  </sources>
+</designspace>
+`
+}

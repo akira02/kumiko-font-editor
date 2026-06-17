@@ -10,6 +10,7 @@ import {
   serializeXmlPlist,
 } from 'src/lib/fontFormats/adapters/ufo'
 import { selectUfoFeatureText } from 'src/lib/openTypeFeatures/legacyFeatureText'
+import { serializeDesignspace } from 'src/lib/fontFormats/designspace'
 import type { UfoGlyphRecord } from 'src/lib/fontFormats/ufoTypes'
 
 const DEFAULT_LAYER_ID = 'public.default'
@@ -126,13 +127,17 @@ const toGlyphRecord = (
   }
 }
 
-export const exportFontDataAsUfoZip = (input: {
+// Build the file map for one .ufo (under ufoDir), reading each glyph's content
+// from the given layer (a source id for multi-master). Shared by the single-ufo
+// and multi-master (designspace) exporters.
+const buildUfoFileMap = (input: {
   fontData: FontData
   projectId: string
-  projectTitle: string
+  fontInfoName: string
   selectedLayerId: string | null
-}) => {
-  const ufoDir = `${sanitizeFilePart(input.projectTitle || input.projectId)}.ufo`
+  ufoDir: string
+}): Record<string, Uint8Array> => {
+  const ufoDir = input.ufoDir
   const files: Record<string, Uint8Array> = {}
   const glyphs = Object.values(input.fontData.glyphs).filter(
     (glyph) => glyph.export !== false
@@ -166,7 +171,7 @@ export const exportFontDataAsUfoZip = (input: {
     serializeXmlPlist({
       ...fontInfoToUfoFontInfo(
         input.fontData.fontInfo,
-        input.projectTitle || input.projectId,
+        input.fontInfoName,
         input.fontData.unitsPerEm ?? 1000
       ),
       ...(input.fontData.lineMetricsHorizontalLayout?.ascender
@@ -219,8 +224,80 @@ export const exportFontDataAsUfoZip = (input: {
     )
   })
 
+  return files
+}
+
+const zipFiles = (files: Record<string, Uint8Array>): Blob => {
   const zipBytes = zipSync(files)
   const zipBuffer = new ArrayBuffer(zipBytes.byteLength)
   new Uint8Array(zipBuffer).set(zipBytes)
   return new Blob([zipBuffer], { type: 'application/zip' })
+}
+
+export const exportFontDataAsUfoZip = (input: {
+  fontData: FontData
+  projectId: string
+  projectTitle: string
+  selectedLayerId: string | null
+}): Blob =>
+  zipFiles(
+    buildUfoFileMap({
+      fontData: input.fontData,
+      projectId: input.projectId,
+      fontInfoName: input.projectTitle || input.projectId,
+      selectedLayerId: input.selectedLayerId,
+      ufoDir: `${sanitizeFilePart(input.projectTitle || input.projectId)}.ufo`,
+    })
+  )
+
+// Multi-master export: one .ufo per font source + a .designspace tying them
+// together, all in one zip. Built directly from fontData (each source reads its
+// own master layer), so it does not depend on the UFO IndexedDB stores.
+export const exportMultiMasterUfoZip = (input: {
+  fontData: FontData
+  projectId: string
+  projectTitle: string
+}): Blob => {
+  const sources = Object.values(input.fontData.sources ?? {})
+  const family = input.projectTitle || input.projectId
+  const files: Record<string, Uint8Array> = {}
+  const usedDirs = new Set<string>()
+
+  const sourceDirs = sources.map((source) => {
+    const base = sanitizeFilePart(source.name || source.id)
+    let dir = `${base}.ufo`
+    let suffix = 2
+    while (usedDirs.has(dir.toLowerCase())) {
+      dir = `${base}-${suffix}.ufo`
+      suffix += 1
+    }
+    usedDirs.add(dir.toLowerCase())
+    return { source, dir }
+  })
+
+  for (const { source, dir } of sourceDirs) {
+    Object.assign(
+      files,
+      buildUfoFileMap({
+        fontData: input.fontData,
+        projectId: input.projectId,
+        fontInfoName: family,
+        selectedLayerId: source.id,
+        ufoDir: dir,
+      })
+    )
+  }
+
+  files[`${sanitizeFilePart(family)}.designspace`] = strToU8(
+    serializeDesignspace(
+      input.fontData.axes,
+      sourceDirs.map(({ source, dir }) => ({
+        filename: dir,
+        name: source.name,
+        location: source.location,
+      }))
+    )
+  )
+
+  return zipFiles(files)
 }

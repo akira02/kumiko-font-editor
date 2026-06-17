@@ -2,7 +2,10 @@ import { useToast } from '@chakra-ui/react'
 import { zipSync } from 'fflate'
 import { useState } from 'react'
 import { exportFontAsBinary } from 'src/lib/fontFormats/adapters/binary'
-import { exportFontDataAsUfoZip } from 'src/lib/fontFormats/fontUfoZipExport'
+import {
+  exportFontDataAsUfoZip,
+  exportMultiMasterUfoZip,
+} from 'src/lib/fontFormats/fontUfoZipExport'
 import {
   createCompilerRuntimeStatus,
   deriveOpenTypeExportWarnings,
@@ -130,6 +133,21 @@ export function useFontExport() {
             fileName: `${baseFileName}.${format}`,
             label: format.toUpperCase(),
             totalGlyphs: null,
+          }
+        }
+
+        // Multi-master: export a .designspace + one .ufo per source, straight
+        // from fontData (which holds every master layer).
+        if (Object.keys(fontData.sources ?? {}).length > 1) {
+          return {
+            blob: exportMultiMasterUfoZip({
+              fontData,
+              projectId,
+              projectTitle: baseFileName,
+            }),
+            fileName: `${baseFileName}.designspace.zip`,
+            label: 'Designspace + UFO',
+            totalGlyphs: Object.keys(fontData.glyphs).length,
           }
         }
 

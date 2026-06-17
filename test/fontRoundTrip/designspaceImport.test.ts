@@ -1,15 +1,18 @@
 // @vitest-environment happy-dom
 // parseDesignspace uses DOMParser, which needs a DOM; scope it to this file.
 import { describe, expect, it } from 'vitest'
+import { strFromU8, unzipSync } from 'fflate'
 import {
   parseDesignspace,
   designspaceToFontAxes,
+  serializeDesignspace,
 } from 'src/lib/fontFormats/designspace'
 import {
   buildMultiMasterFontData,
   resolveSourceRefs,
   resolveDefaultSourceRef,
 } from 'src/lib/fontFormats/ufoFormat'
+import { exportMultiMasterUfoZip } from 'src/lib/fontFormats/fontUfoZipExport'
 import { getGlyphLayer } from 'src/store/glyphLayer'
 import type {
   UfoGlyphRecord,
@@ -162,5 +165,83 @@ describe('resolveSourceRefs (save-path routing)', () => {
     expect(
       resolveDefaultSourceRef(refs(), parseDesignspace(DESIGNSPACE))?.sourceId
     ).toBe('Light')
+  })
+})
+
+describe('serializeDesignspace round-trip', () => {
+  it('re-parses to the same axes and source locations', () => {
+    const fontData = buildMultiMasterFontData(
+      [metadata('sources/Light.ufo'), metadata('sources/Bold.ufo')],
+      [
+        glyphRecord('sources/Light.ufo', 10, 500),
+        glyphRecord('sources/Bold.ufo', 80, 700),
+      ],
+      parseDesignspace(DESIGNSPACE)
+    )
+    const xml = serializeDesignspace(
+      fontData.axes,
+      Object.values(fontData.sources ?? {}).map((source) => ({
+        filename: `${source.name}.ufo`,
+        name: source.name,
+        location: source.location,
+      }))
+    )
+    const reparsed = parseDesignspace(xml)
+    expect(reparsed.axes[0]).toMatchObject({
+      name: 'Weight',
+      tag: 'wght',
+      minimum: 0,
+      default: 0,
+      maximum: 100,
+    })
+    expect(reparsed.sources.map((s) => s.location)).toEqual([
+      { Weight: 0 },
+      { Weight: 100 },
+    ])
+  })
+})
+
+describe('exportMultiMasterUfoZip', () => {
+  const fontData = () =>
+    buildMultiMasterFontData(
+      [metadata('sources/Light.ufo'), metadata('sources/Bold.ufo')],
+      [
+        glyphRecord('sources/Light.ufo', 10, 500),
+        glyphRecord('sources/Bold.ufo', 80, 700),
+      ],
+      parseDesignspace(DESIGNSPACE)
+    )
+
+  it('writes a designspace plus one ufo per source', async () => {
+    const blob = exportMultiMasterUfoZip({
+      fontData: fontData(),
+      projectId: 'p',
+      projectTitle: 'Fam',
+    })
+    const files = unzipSync(new Uint8Array(await blob.arrayBuffer()))
+    const paths = Object.keys(files)
+
+    expect(paths).toContain('Fam.designspace')
+    expect(paths.some((p) => p.startsWith('Light.ufo/'))).toBe(true)
+    expect(paths.some((p) => p.startsWith('Bold.ufo/'))).toBe(true)
+    expect(paths).toContain('Light.ufo/glyphs/A.glif')
+    expect(paths).toContain('Bold.ufo/glyphs/A.glif')
+
+    const designspace = parseDesignspace(strFromU8(files['Fam.designspace']))
+    expect(designspace.sources.map((s) => s.filename).sort()).toEqual([
+      'Bold.ufo',
+      'Light.ufo',
+    ])
+  })
+
+  it("each source ufo carries that source's outline", async () => {
+    const blob = exportMultiMasterUfoZip({
+      fontData: fontData(),
+      projectId: 'p',
+      projectTitle: 'Fam',
+    })
+    const files = unzipSync(new Uint8Array(await blob.arrayBuffer()))
+    expect(strFromU8(files['Light.ufo/glyphs/A.glif'])).toContain('x="10"')
+    expect(strFromU8(files['Bold.ufo/glyphs/A.glif'])).toContain('x="80"')
   })
 })
