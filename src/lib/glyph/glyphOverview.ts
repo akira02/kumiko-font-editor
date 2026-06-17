@@ -1,5 +1,10 @@
 import { VarPackedPath } from 'src/font/VarPackedPath'
-import type { GlyphData, GlyphLayerData } from 'src/store'
+import {
+  getNodeSegmentType,
+  isOffCurveNode,
+  type GlyphData,
+  type GlyphLayerData,
+} from 'src/store'
 import { activeLayer, getGlyphLayer } from 'src/store/glyphLayer'
 import type { GlyphEditTimes } from 'src/lib/glyph/glyphEditTimes'
 
@@ -377,16 +382,21 @@ const PREVIEW_FLIP_BASELINE = 800
 const buildPathSvg = (layer: GlyphLayerData) => {
   const contours = layer.paths.map((path) => ({
     isClosed: path.closed,
-    points: path.nodes.map((node) => ({
-      x: node.x,
-      y: node.y,
-      type: (node.type === 'offcurve'
-        ? 'offCurveCubic'
-        : node.type === 'qcurve'
-          ? 'offCurveQuad'
+    points: path.nodes.map((node, index) => {
+      const nextOnCurve = path.nodes
+        .slice(index + 1)
+        .find((candidate) => !isOffCurveNode(candidate))
+      return {
+        x: node.x,
+        y: node.y,
+        type: (isOffCurveNode(node)
+          ? getNodeSegmentType(nextOnCurve) === 'quadratic'
+            ? 'offCurveQuad'
+            : 'offCurveCubic'
           : 'onCurve') as 'onCurve' | 'offCurveQuad' | 'offCurveCubic',
-      smooth: node.type === 'smooth',
-    })),
+        smooth: node.smooth ?? false,
+      }
+    }),
   }))
 
   return VarPackedPath.fromUnpackedContours(contours).toSVGPath()

@@ -2,8 +2,10 @@ import { VarPackedPath } from 'src/font/VarPackedPath'
 import {
   getEffectiveNodeType,
   getGlyphLayer,
+  getNodeSegmentType,
+  isOffCurveNode,
   type FontData,
-  type NodeType,
+  type PathNode,
 } from 'src/store'
 import type {
   ComponentData,
@@ -43,21 +45,29 @@ const pathDataToVarPackedPath = (
       id: string
       x: number
       y: number
-      type: NodeType
+      kind?: PathNode['kind']
+      type?: PathNode['type']
+      segmentType?: PathNode['segmentType']
+      smooth?: boolean
     }>
   }>
 ) => {
   const contours = paths.map((pathData) => ({
-    points: pathData.nodes.map((node) => ({
-      x: node.x,
-      y: node.y,
-      type: (node.type === 'offcurve'
-        ? 'offCurveCubic'
-        : node.type === 'qcurve'
-          ? 'offCurveQuad'
+    points: pathData.nodes.map((node, index) => {
+      const nextOnCurve = pathData.nodes
+        .slice(index + 1)
+        .find((candidate) => !isOffCurveNode(candidate))
+      return {
+        x: node.x,
+        y: node.y,
+        type: (isOffCurveNode(node)
+          ? getNodeSegmentType(nextOnCurve) === 'quadratic'
+            ? 'offCurveQuad'
+            : 'offCurveCubic'
           : 'onCurve') as 'onCurve' | 'offCurveQuad' | 'offCurveCubic',
-      smooth: getEffectiveNodeType(pathData, node) === 'smooth',
-    })),
+        smooth: getEffectiveNodeType(pathData, node) === 'smooth',
+      }
+    }),
     isClosed: pathData.closed,
   }))
 

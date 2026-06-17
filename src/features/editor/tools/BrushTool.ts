@@ -5,7 +5,13 @@ import {
   type EventStream,
   type ToolEvent,
 } from 'src/features/editor/tools/BaseTool'
-import { useStore, type PathData, type PathNode } from 'src/store'
+import {
+  useStore,
+  type LegacyNodeType,
+  type PathData,
+  type PathNode,
+  type PathSegmentType,
+} from 'src/store'
 import { fitCurve } from 'src/font/fitCurve'
 
 // Squared distance tolerance (font units) for the freehand curve fit.
@@ -51,12 +57,26 @@ export class BrushTool extends BaseTool {
     }
 
     const pathId = this.generateId('path')
-    const node = (point: { x: number; y: number }, type: PathNode['type']) => ({
-      id: this.generateId('node'),
-      x: Math.round(point.x),
-      y: Math.round(point.y),
-      type,
-    })
+    const node = (
+      point: { x: number; y: number },
+      type: LegacyNodeType,
+      segmentType: PathSegmentType = 'line'
+    ): PathNode => {
+      const base = {
+        id: this.generateId('node'),
+        x: Math.round(point.x),
+        y: Math.round(point.y),
+      }
+      if (type === 'offcurve' || type === 'qcurve') {
+        return { ...base, kind: 'offcurve' }
+      }
+      return {
+        ...base,
+        kind: 'oncurve',
+        segmentType,
+        smooth: type === 'smooth',
+      }
+    }
 
     const segments = fitCurve(points, FIT_TOLERANCE * FIT_TOLERANCE)
     const nodes: PathNode[] = []
@@ -69,7 +89,7 @@ export class BrushTool extends BaseTool {
         const isLast = index === segments.length - 1
         nodes.push(node(control1, 'offcurve'))
         nodes.push(node(control2, 'offcurve'))
-        nodes.push(node(end, isLast ? 'corner' : 'smooth'))
+        nodes.push(node(end, isLast ? 'corner' : 'smooth', 'cubic'))
       })
     } else {
       nodes.push(node(points[0], 'corner'))

@@ -1,8 +1,9 @@
 import {
   getEffectiveNodeType,
   getActiveLayer,
+  getNodeType,
   type GlyphData,
-  type GlyphLayerData,
+  type OnCurveNodeType,
 } from 'src/store'
 
 export interface GlyphSelectionNodeEntry {
@@ -11,8 +12,8 @@ export interface GlyphSelectionNodeEntry {
   nodeId: string
   x: number
   y: number
-  type: GlyphLayerData['paths'][number]['nodes'][number]['type']
-  effectiveType: GlyphLayerData['paths'][number]['nodes'][number]['type']
+  type: OnCurveNodeType | undefined
+  effectiveType: OnCurveNodeType | undefined
 }
 
 export const buildGlyphSelectionNodeEntries = (
@@ -25,8 +26,8 @@ export const buildGlyphSelectionNodeEntries = (
       nodeId: node.id,
       x: node.x,
       y: node.y,
-      type: node.type,
-      effectiveType: getEffectiveNodeType(path, node) ?? node.type,
+      type: getNodeType(node),
+      effectiveType: getEffectiveNodeType(path, node) ?? getNodeType(node),
     }))
   )
 

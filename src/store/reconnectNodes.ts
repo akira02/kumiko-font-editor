@@ -1,4 +1,5 @@
 import type { GlyphLayerData, PathData, PathNode } from 'src/store/types'
+import { isOffCurveNode } from 'src/store/glyphGeometry'
 import { generateId } from 'src/store/glyphGeometry'
 
 /** Fixed nudge distance (font units) to avoid overlapping closing segments. */
@@ -170,7 +171,7 @@ export const performReconnect = (
     }
     const path = layer.paths.find((p) => p.id === pathId)
     const node = path?.nodes.find((n) => n.id === nodeId)
-    if (!node || node.type === 'offcurve' || node.type === 'qcurve') {
+    if (!node || isOffCurveNode(node)) {
       continue
     }
     const nodeIds = selectedByPath.get(pathId) ?? new Set<string>()

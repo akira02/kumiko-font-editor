@@ -4,7 +4,14 @@ import {
   type EventStream,
   type ToolEvent,
 } from 'src/features/editor/tools/BaseTool'
-import { useStore, activeLayer, type PathData, type PathNode } from 'src/store'
+import {
+  useStore,
+  activeLayer,
+  isOnCurveNode,
+  type LegacyNodeType,
+  type PathData,
+  type PathNode,
+} from 'src/store'
 
 interface CutCandidate {
   pathId: string
@@ -347,16 +354,25 @@ export class KnifeTool extends BaseTool {
       const q0 = lerpPoint(nodes[0], nodes[1], t)
       const q1 = lerpPoint(nodes[1], nodes[2], t)
       return [
-        { ...nodes[0], type: 'smooth' },
-        this.createNode(q0.x, q0.y, 'qcurve'),
+        { ...nodes[0], kind: 'oncurve', smooth: true, type: undefined },
+        this.createNode(q0.x, q0.y, 'offcurve'),
         {
           ...inserted,
           x: Math.round(cut.point.x),
           y: Math.round(cut.point.y),
-          type: 'smooth',
+          kind: 'oncurve',
+          segmentType: 'quadratic',
+          smooth: true,
+          type: undefined,
         },
-        this.createNode(q1.x, q1.y, 'qcurve'),
-        { ...nodes[2], type: 'smooth' },
+        this.createNode(q1.x, q1.y, 'offcurve'),
+        {
+          ...nodes[2],
+          kind: 'oncurve',
+          segmentType: 'quadratic',
+          smooth: true,
+          type: undefined,
+        },
       ]
     }
 
@@ -367,30 +383,47 @@ export class KnifeTool extends BaseTool {
       const r0 = lerpPoint(q0, q1, t)
       const r1 = lerpPoint(q1, q2, t)
       return [
-        { ...nodes[0], type: 'smooth' },
+        { ...nodes[0], kind: 'oncurve', smooth: true, type: undefined },
         this.createNode(q0.x, q0.y, 'offcurve'),
         this.createNode(r0.x, r0.y, 'offcurve'),
         {
           ...inserted,
           x: Math.round(cut.point.x),
           y: Math.round(cut.point.y),
-          type: 'smooth',
+          kind: 'oncurve',
+          segmentType: 'cubic',
+          smooth: true,
+          type: undefined,
         },
         this.createNode(r1.x, r1.y, 'offcurve'),
         this.createNode(q2.x, q2.y, 'offcurve'),
-        { ...nodes[3], type: 'smooth' },
+        {
+          ...nodes[3],
+          kind: 'oncurve',
+          segmentType: 'cubic',
+          smooth: true,
+          type: undefined,
+        },
       ]
     }
 
     return [nodes[0], inserted, nodes.at(-1)!]
   }
 
-  private createNode(x: number, y: number, type: PathNode['type']): PathNode {
-    return {
+  private createNode(x: number, y: number, type: LegacyNodeType): PathNode {
+    const base = {
       id: this.generateId('node'),
       x: Math.round(x),
       y: Math.round(y),
-      type,
+    }
+    if (type === 'offcurve' || type === 'qcurve') {
+      return { ...base, kind: 'offcurve' }
+    }
+    return {
+      ...base,
+      kind: 'oncurve',
+      segmentType: 'line',
+      smooth: type === 'smooth',
     }
   }
 
@@ -466,7 +499,7 @@ function* iterPathSegments(path: PathData): Generator<PathSegment> {
 }
 
 function isOnCurve(node: PathNode) {
-  return node.type === 'corner' || node.type === 'smooth'
+  return isOnCurveNode(node)
 }
 
 function constrainHorVerDiag(

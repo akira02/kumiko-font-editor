@@ -5,7 +5,7 @@ import {
 } from 'src/features/editor/tools/BaseTool'
 import {
   useStore,
-  type NodeType,
+  type LegacyNodeType,
   type PathData,
   type PathNode,
 } from 'src/store'
@@ -180,12 +180,20 @@ export class ShapeTool extends BaseTool {
     }
   }
 
-  private createNode(x: number, y: number, type: NodeType): PathNode {
-    return {
+  private createNode(x: number, y: number, type: LegacyNodeType): PathNode {
+    const base = {
       id: this.generateId('node'),
       x: Math.round(x),
       y: Math.round(y),
-      type,
+    }
+    if (type === 'offcurve' || type === 'qcurve') {
+      return { ...base, kind: 'offcurve' }
+    }
+    return {
+      ...base,
+      kind: 'oncurve',
+      segmentType: type === 'smooth' ? 'cubic' : 'line',
+      smooth: type === 'smooth',
     }
   }
 

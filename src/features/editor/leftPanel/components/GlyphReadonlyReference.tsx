@@ -18,6 +18,8 @@ import {
 import {
   useStore,
   activeLayer,
+  getNodeSegmentType,
+  isOffCurveNode,
   type GlyphData,
   type GlyphComponentRef,
   type PathData,
@@ -54,17 +56,21 @@ const buildVarPackedPathForPaths = (paths: PathData[]) =>
   VarPackedPath.fromUnpackedContours(
     paths.map((path) => ({
       isClosed: path.closed,
-      points: path.nodes.map((node) => ({
-        x: node.x,
-        y: node.y,
-        type:
-          node.type === 'offcurve'
-            ? 'offCurveCubic'
-            : node.type === 'qcurve'
+      points: path.nodes.map((node, index) => {
+        const nextOnCurve = path.nodes
+          .slice(index + 1)
+          .find((candidate) => !isOffCurveNode(candidate))
+        return {
+          x: node.x,
+          y: node.y,
+          type: isOffCurveNode(node)
+            ? getNodeSegmentType(nextOnCurve) === 'quadratic'
               ? 'offCurveQuad'
-              : 'onCurve',
-        smooth: node.type === 'smooth',
-      })),
+              : 'offCurveCubic'
+            : 'onCurve',
+          smooth: node.smooth ?? false,
+        }
+      }),
     }))
   )
 

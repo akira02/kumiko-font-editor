@@ -1,10 +1,10 @@
 import paper from 'paper'
 import type { PathData, PathNode } from 'src/store/types'
+import { isOnCurveNode } from 'src/store/glyphGeometry'
 
 export type PathBooleanOperation = 'union' | 'subtract' | 'intersect' | 'divide'
 
-const isOnCurve = (node: PathNode) =>
-  node.type === 'corner' || node.type === 'smooth'
+const isOnCurve = (node: PathNode) => isOnCurveNode(node)
 
 const generateId = (prefix: string) =>
   `${prefix}_${Math.random().toString(36).slice(2, 10)}`
@@ -15,7 +15,7 @@ const isZeroHandle = (point: paper.Point) =>
 const absoluteHandle = (point: paper.Point, handle: paper.Point) => ({
   x: Math.round(point.x + handle.x),
   y: Math.round(point.y + handle.y),
-  type: 'offcurve' as const,
+  kind: 'offcurve' as const,
   id: generateId('node'),
 })
 
@@ -157,13 +157,22 @@ const paperPathToPathData = (
 
   for (let index = 0; index < segmentCount; index += 1) {
     const segment = path.segments[index]
+    const previousSegment =
+      index === 0 ? path.segments[segmentCount - 1] : path.segments[index - 1]
+    const hasIncomingCurve =
+      (path.closed || index > 0) &&
+      previousSegment &&
+      (!isZeroHandle(previousSegment.handleOut) ||
+        !isZeroHandle(segment.handleIn))
     const hasHandleIn = !isZeroHandle(segment.handleIn)
     const hasHandleOut = !isZeroHandle(segment.handleOut)
     nodes.push({
       id: generateId('node'),
       x: Math.round(segment.point.x),
       y: Math.round(segment.point.y),
-      type: hasHandleIn || hasHandleOut ? 'smooth' : 'corner',
+      kind: 'oncurve',
+      segmentType: hasIncomingCurve ? 'cubic' : 'line',
+      smooth: hasHandleIn || hasHandleOut,
     })
 
     if (index >= curveCount) {

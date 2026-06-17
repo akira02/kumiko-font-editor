@@ -11,7 +11,13 @@ import {
 import { SceneController } from 'src/features/editor/tools'
 import { useGlyphInsight } from 'src/features/editor/insight/glyphInsight'
 import { buildStructureGuideModel } from 'src/features/editor/insight/structureGuideModel'
-import { useStore, useTemporalStore, getGlyphLayer } from 'src/store'
+import {
+  getNodeSegmentType,
+  isOffCurveNode,
+  useStore,
+  useTemporalStore,
+  getGlyphLayer,
+} from 'src/store'
 import { CanvasContextMenu } from 'src/features/editor/canvas/workspace/components/CanvasContextMenu'
 import { CanvasWorkspaceOverlay } from 'src/features/editor/canvas/workspace/components/CanvasWorkspaceOverlay'
 import { HiddenTextInput } from 'src/features/editor/canvas/workspace/components/HiddenTextInput'
@@ -42,17 +48,21 @@ const buildPath2DFromPaths = (paths: PathData[]) =>
     VarPackedPath.fromUnpackedContours(
       paths.map((path) => ({
         isClosed: path.closed,
-        points: path.nodes.map((node) => ({
-          x: node.x,
-          y: node.y,
-          type:
-            node.type === 'offcurve'
-              ? ('offCurveCubic' as const)
-              : node.type === 'qcurve'
+        points: path.nodes.map((node, index) => {
+          const nextOnCurve = path.nodes
+            .slice(index + 1)
+            .find((candidate) => !isOffCurveNode(candidate))
+          return {
+            x: node.x,
+            y: node.y,
+            type: isOffCurveNode(node)
+              ? getNodeSegmentType(nextOnCurve) === 'quadratic'
                 ? ('offCurveQuad' as const)
-                : ('onCurve' as const),
-          smooth: node.type === 'smooth',
-        })),
+                : ('offCurveCubic' as const)
+              : ('onCurve' as const),
+            smooth: node.smooth ?? false,
+          }
+        }),
       }))
     ).toSVGPath()
   )

@@ -9,7 +9,8 @@ import {
   useStore,
   activeLayer,
   getGlyphLayer,
-  type NodeType,
+  isOffCurveNode,
+  type LegacyNodeType,
   type PathData,
   type PathNode,
 } from 'src/store'
@@ -329,13 +330,7 @@ export class PenTool extends BaseTool {
       (candidate) => candidate.id === pathId
     )
     const node = path?.nodes.find((candidate) => candidate.id === nodeId)
-    if (
-      !path ||
-      !node ||
-      path.closed ||
-      node.type === 'offcurve' ||
-      node.type === 'qcurve'
-    ) {
+    if (!path || !node || path.closed || isOffCurveNode(node)) {
       return null
     }
 
@@ -373,8 +368,7 @@ export class PenTool extends BaseTool {
       !node ||
       path.closed ||
       (path.nodes[0]?.id !== node.id && path.nodes.at(-1)?.id !== node.id) ||
-      node.type === 'offcurve' ||
-      node.type === 'qcurve'
+      isOffCurveNode(node)
     ) {
       return null
     }
@@ -462,13 +456,19 @@ export class PenTool extends BaseTool {
       )
 
       store.replacePathNodes(glyphId, pathId, startNode.id, endNode.id, [
-        { ...startNode, type: 'corner' },
+        { ...startNode, kind: 'oncurve', smooth: false, type: undefined },
         startHandle,
         handleIn,
-        inserted,
+        { ...inserted, segmentType: 'cubic' },
         handleOut,
         endHandle,
-        { ...endNode, type: 'corner' },
+        {
+          ...endNode,
+          kind: 'oncurve',
+          segmentType: 'cubic',
+          smooth: false,
+          type: undefined,
+        },
       ])
       return { pathId, nodeId: inserted.id }
     }
@@ -527,10 +527,16 @@ export class PenTool extends BaseTool {
       'offcurve'
     )
     const replacement: PathNode[] = [
-      { ...startNode, type: 'smooth' },
+      { ...startNode, kind: 'oncurve', smooth: true, type: undefined },
       handle1,
       handle2,
-      { ...endNode, type: 'smooth' },
+      {
+        ...endNode,
+        kind: 'oncurve',
+        segmentType: 'cubic',
+        smooth: true,
+        type: undefined,
+      },
     ]
     store.replacePathNodes(
       glyphId,
@@ -592,11 +598,17 @@ export class PenTool extends BaseTool {
       const anchor = lerpPoint(q0, q1, t)
       const inserted = this.createNode(anchor.x, anchor.y, 'smooth')
       const nodes: PathNode[] = [
-        { ...startNode, type: 'smooth' },
-        this.createNode(q0.x, q0.y, 'qcurve'),
-        inserted,
-        this.createNode(q1.x, q1.y, 'qcurve'),
-        { ...endNode, type: 'smooth' },
+        { ...startNode, kind: 'oncurve', smooth: true, type: undefined },
+        this.createNode(q0.x, q0.y, 'offcurve'),
+        { ...inserted, segmentType: 'quadratic' },
+        this.createNode(q1.x, q1.y, 'offcurve'),
+        {
+          ...endNode,
+          kind: 'oncurve',
+          segmentType: 'quadratic',
+          smooth: true,
+          type: undefined,
+        },
       ]
       return {
         insertedNodeId: inserted.id,
@@ -615,13 +627,19 @@ export class PenTool extends BaseTool {
       const anchor = lerpPoint(r0, r1, t)
       const inserted = this.createNode(anchor.x, anchor.y, 'smooth')
       const nodes: PathNode[] = [
-        { ...startNode, type: 'smooth' },
+        { ...startNode, kind: 'oncurve', smooth: true, type: undefined },
         this.createNode(q0.x, q0.y, 'offcurve'),
         this.createNode(r0.x, r0.y, 'offcurve'),
-        inserted,
+        { ...inserted, segmentType: 'cubic' },
         this.createNode(r1.x, r1.y, 'offcurve'),
         this.createNode(q2.x, q2.y, 'offcurve'),
-        { ...endNode, type: 'smooth' },
+        {
+          ...endNode,
+          kind: 'oncurve',
+          segmentType: 'cubic',
+          smooth: true,
+          type: undefined,
+        },
       ]
       return {
         insertedNodeId: inserted.id,
@@ -773,12 +791,20 @@ export class PenTool extends BaseTool {
     }))
   }
 
-  private createNode(x: number, y: number, type: NodeType): PathNode {
-    return {
+  private createNode(x: number, y: number, type: LegacyNodeType): PathNode {
+    const base = {
       id: this.generateId('node'),
       x: Math.round(x),
       y: Math.round(y),
-      type,
+    }
+    if (type === 'offcurve' || type === 'qcurve') {
+      return { ...base, kind: 'offcurve' }
+    }
+    return {
+      ...base,
+      kind: 'oncurve',
+      segmentType: 'line',
+      smooth: type === 'smooth',
     }
   }
 

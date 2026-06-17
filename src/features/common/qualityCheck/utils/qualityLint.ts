@@ -5,6 +5,7 @@ import {
   type GlyphLayerData,
   type PathData,
   type PathNode,
+  isOffCurveNode,
 } from 'src/store'
 import { isHanGlyph } from 'src/features/common/qualityCheck/utils/hanClassification'
 
@@ -150,7 +151,7 @@ export const getGlyphBounds = (glyph: Pick<GlyphLayerData, 'paths'>) => {
 }
 
 const getOnCurveNodes = (path: PathData) =>
-  path.nodes.filter((node) => node.type !== 'offcurve')
+  path.nodes.filter((node) => !isOffCurveNode(node))
 
 const getSignedArea = (nodes: PathNode[]) => {
   if (nodes.length < 3) {

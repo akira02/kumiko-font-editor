@@ -4,7 +4,11 @@
  */
 import { current } from 'immer'
 import type { StateCreator } from 'zustand'
-import type { GlobalState, GlyphMetrics, NodeType } from 'src/store/types'
+import type {
+  GlobalState,
+  GlyphMetrics,
+  OnCurveNodeType,
+} from 'src/store/types'
 import {
   createBackupLayer,
   deleteBackupLayer,
@@ -17,7 +21,9 @@ import {
   findPath,
   generateId,
   getGlyphXBounds,
+  isOffCurveNode,
   isPathEndpointNode,
+  setNodeType,
   translateGlyphHorizontally,
   recomputeGlyphSidebearings,
   wouldCreateComponentCycle,
@@ -336,7 +342,7 @@ export const buildGlyphActions = (set: ImmerSet) => ({
     glyphId: string,
     pathId: string,
     nodeId: string,
-    type: NodeType
+    type: OnCurveNodeType
   ) =>
     set((state) => {
       const glyph = state.fontData?.glyphs[glyphId]
@@ -348,16 +354,16 @@ export const buildGlyphActions = (set: ImmerSet) => ({
       const path = findPath(layer, pathId)
       const node = findNode(path, nodeId)
       if (node) {
-        if (node.type === 'offcurve' || node.type === 'qcurve') {
+        if (isOffCurveNode(node)) {
           return
         }
 
         if (type === 'smooth' && path && isPathEndpointNode(path, nodeId)) {
-          node.type = 'corner'
+          node.smooth = false
           return
         }
 
-        node.type = type
+        setNodeType(node, type)
         markGlyphDirty(state, glyphId)
       }
     }),

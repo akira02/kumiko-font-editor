@@ -1,15 +1,26 @@
-import type { PathData, PathNode, NodeType, GlyphData } from 'src/store'
-import { activeLayer } from 'src/store'
+import type {
+  GlyphData,
+  LegacyNodeType,
+  PathData,
+  PathNode,
+  PathSegmentType,
+} from 'src/store'
+import { activeLayer, isOffCurveNode } from 'src/store'
+
+interface ClipboardNode {
+  x: number
+  y: number
+  kind?: PathNode['kind']
+  segmentType?: PathSegmentType
+  smooth?: boolean
+  type?: LegacyNodeType
+}
 
 export interface ClipboardPathPayload {
   type: 'kumiko-paths'
   paths: Array<{
     closed: boolean
-    nodes: Array<{
-      x: number
-      y: number
-      type: NodeType
-    }>
+    nodes: ClipboardNode[]
   }>
 }
 
@@ -61,13 +72,33 @@ export function materializeClipboardPaths(
   return payload.paths.map((path) => ({
     id: generateId('path'),
     closed: path.closed,
-    nodes: path.nodes.map((node) => ({
-      id: generateId('node'),
-      x: Math.round(node.x + offset.x),
-      y: Math.round(node.y + offset.y),
-      type: node.type,
-    })),
+    nodes: path.nodes.map((node) => materializeNode(node, offset)),
   }))
+}
+
+const materializeNode = (
+  node: ClipboardNode,
+  offset: { x: number; y: number }
+): PathNode => {
+  const base = {
+    id: generateId('node'),
+    x: Math.round(node.x + offset.x),
+    y: Math.round(node.y + offset.y),
+  }
+  if (
+    node.kind === 'offcurve' ||
+    node.type === 'offcurve' ||
+    node.type === 'qcurve'
+  ) {
+    return { ...base, kind: 'offcurve' }
+  }
+  return {
+    ...base,
+    kind: 'oncurve',
+    segmentType:
+      node.segmentType ?? (node.type === 'qcurve' ? 'quadratic' : 'line'),
+    smooth: node.smooth ?? node.type === 'smooth',
+  }
 }
 
 export function buildClipboardPayloadFromSelection(
@@ -162,7 +193,9 @@ function toClipboardNode(node: PathNode) {
   return {
     x: node.x,
     y: node.y,
-    type: node.type,
+    kind: node.kind,
+    segmentType: node.segmentType,
+    smooth: node.smooth,
   }
 }
 
@@ -293,6 +326,23 @@ function parseSvgPathData(pathData: string): ClipboardPathPayload['paths'] {
       contours.push(currentContour)
     }
   }
+  const onCurve = (
+    x: number,
+    y: number,
+    segmentType: PathSegmentType = 'line',
+    smooth = false
+  ): ClipboardNode => ({
+    x,
+    y,
+    kind: 'oncurve',
+    segmentType,
+    smooth,
+  })
+  const offCurve = (x: number, y: number): ClipboardNode => ({
+    x,
+    y,
+    kind: 'offcurve',
+  })
 
   while (index < tokens.length) {
     const token = tokens[index]
@@ -317,7 +367,7 @@ function parseSvgPathData(pathData: string): ClipboardPathPayload['paths'] {
       startY = currentY
       currentContour = {
         closed: false,
-        nodes: [{ x: currentX, y: currentY, type: 'corner' }],
+        nodes: [onCurve(currentX, currentY)],
       }
       contours.push(currentContour)
       command = relative ? 'l' : 'L'
@@ -335,7 +385,7 @@ function parseSvgPathData(pathData: string): ClipboardPathPayload['paths'] {
       const y = readNumber()
       currentX = relative ? currentX + x : x
       currentY = relative ? currentY + y : y
-      currentContour!.nodes.push({ x: currentX, y: currentY, type: 'corner' })
+      currentContour!.nodes.push(onCurve(currentX, currentY))
       lastCubicControlX = null
       lastCubicControlY = null
       lastQuadControlX = null
@@ -346,7 +396,7 @@ function parseSvgPathData(pathData: string): ClipboardPathPayload['paths'] {
     if (normalized === 'H') {
       const x = readNumber()
       currentX = relative ? currentX + x : x
-      currentContour!.nodes.push({ x: currentX, y: currentY, type: 'corner' })
+      currentContour!.nodes.push(onCurve(currentX, currentY))
       lastCubicControlX = null
       lastCubicControlY = null
       lastQuadControlX = null
@@ -357,7 +407,7 @@ function parseSvgPathData(pathData: string): ClipboardPathPayload['paths'] {
     if (normalized === 'V') {
       const y = readNumber()
       currentY = relative ? currentY + y : y
-      currentContour!.nodes.push({ x: currentX, y: currentY, type: 'corner' })
+      currentContour!.nodes.push(onCurve(currentX, currentY))
       lastCubicControlX = null
       lastCubicControlY = null
       lastQuadControlX = null
@@ -379,9 +429,9 @@ function parseSvgPathData(pathData: string): ClipboardPathPayload['paths'] {
       currentX = relative ? currentX + x : x
       currentY = relative ? currentY + y : y
       currentContour!.nodes.push(
-        { x: handle1X, y: handle1Y, type: 'offcurve' },
-        { x: handle2X, y: handle2Y, type: 'offcurve' },
-        { x: currentX, y: currentY, type: 'smooth' }
+        offCurve(handle1X, handle1Y),
+        offCurve(handle2X, handle2Y),
+        onCurve(currentX, currentY, 'cubic', true)
       )
       lastCubicControlX = handle2X
       lastCubicControlY = handle2Y
@@ -404,9 +454,9 @@ function parseSvgPathData(pathData: string): ClipboardPathPayload['paths'] {
       currentX = relative ? currentX + x : x
       currentY = relative ? currentY + y : y
       currentContour!.nodes.push(
-        { x: handle1X, y: handle1Y, type: 'offcurve' },
-        { x: handle2X, y: handle2Y, type: 'offcurve' },
-        { x: currentX, y: currentY, type: 'smooth' }
+        offCurve(handle1X, handle1Y),
+        offCurve(handle2X, handle2Y),
+        onCurve(currentX, currentY, 'cubic', true)
       )
       lastCubicControlX = handle2X
       lastCubicControlY = handle2Y
@@ -425,8 +475,8 @@ function parseSvgPathData(pathData: string): ClipboardPathPayload['paths'] {
       currentX = relative ? currentX + x : x
       currentY = relative ? currentY + y : y
       currentContour!.nodes.push(
-        { x: handleX, y: handleY, type: 'qcurve' },
-        { x: currentX, y: currentY, type: 'smooth' }
+        offCurve(handleX, handleY),
+        onCurve(currentX, currentY, 'quadratic', true)
       )
       lastQuadControlX = handleX
       lastQuadControlY = handleY
@@ -445,8 +495,8 @@ function parseSvgPathData(pathData: string): ClipboardPathPayload['paths'] {
       currentX = relative ? currentX + x : x
       currentY = relative ? currentY + y : y
       currentContour!.nodes.push(
-        { x: handleX, y: handleY, type: 'qcurve' },
-        { x: currentX, y: currentY, type: 'smooth' }
+        offCurve(handleX, handleY),
+        onCurve(currentX, currentY, 'quadratic', true)
       )
       lastQuadControlX = handleX
       lastQuadControlY = handleY

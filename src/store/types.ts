@@ -426,7 +426,7 @@ export interface GlobalState {
     glyphId: string,
     pathId: string,
     nodeId: string,
-    type: NodeType
+    type: OnCurveNodeType
   ) => void
   updateGlyphMetrics: (glyphId: string, metrics: Partial<GlyphMetrics>) => void
   createPath: (glyphId: string, path: PathData) => void

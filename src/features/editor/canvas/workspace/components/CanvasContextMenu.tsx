@@ -2,6 +2,7 @@ import { Box } from '@chakra-ui/react'
 import { useCallback, useMemo, type ReactNode } from 'react'
 import {
   getGlyphLayer,
+  isOffCurveNode,
   type FontData,
   type SelectedSegmentState,
 } from 'src/store'
@@ -312,7 +313,7 @@ function getSelectedStartPointTarget({
   }
 
   const node = path.nodes[index]
-  if (node.type === 'offcurve' || node.type === 'qcurve') {
+  if (isOffCurveNode(node)) {
     return null
   }
 

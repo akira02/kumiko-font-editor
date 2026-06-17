@@ -33,18 +33,36 @@ interface FlattenNode {
 }
 
 const toFlattenNodes = (
-  nodes: Array<{ x: number; y: number; type: string }>
+  nodes: Array<{
+    x: number
+    y: number
+    kind?: 'oncurve' | 'offcurve'
+    type?: string
+    segmentType?: 'line' | 'cubic' | 'quadratic'
+  }>
 ): FlattenNode[] =>
-  nodes.map((node) => ({
-    x: node.x,
-    y: node.y,
-    kind:
-      node.type === 'offcurve'
-        ? 'cubic'
-        : node.type === 'qcurve'
-          ? 'quad'
+  nodes.map((node, index) => {
+    const nextOnCurve = nodes
+      .slice(index + 1)
+      .find(
+        (candidate) =>
+          candidate.kind === 'oncurve' ||
+          candidate.type === 'corner' ||
+          candidate.type === 'smooth' ||
+          candidate.type === 'qcurve'
+      )
+    return {
+      x: node.x,
+      y: node.y,
+      kind:
+        node.kind === 'offcurve' || node.type === 'offcurve'
+          ? nextOnCurve?.segmentType === 'quadratic' ||
+            nextOnCurve?.type === 'qcurve'
+            ? 'quad'
+            : 'cubic'
           : 'on',
-  }))
+    }
+  })
 
 const lerp = (
   a: GeometryPoint,
@@ -92,7 +110,13 @@ const sampleCubic = (
  * quad off-curve 連續出現時依 TrueType 慣例補出隱含的 on-curve 中點。
  */
 export const flattenContour = (
-  nodes: Array<{ x: number; y: number; type: string }>
+  nodes: Array<{
+    x: number
+    y: number
+    kind?: 'oncurve' | 'offcurve'
+    type?: string
+    segmentType?: 'line' | 'cubic' | 'quadratic'
+  }>
 ): GeometryPoint[] => {
   const flattenNodes = toFlattenNodes(nodes)
   if (flattenNodes.length === 0) {

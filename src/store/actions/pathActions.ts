@@ -11,6 +11,7 @@ import type { GlobalState, PathData, PathNode } from 'src/store/types'
 import {
   findPath,
   generateId,
+  isOffCurveNode,
   isPathEndpointNode,
   lerp,
   orientOpenPathNodesForConnection,
@@ -26,8 +27,7 @@ type ImmerSet = Parameters<
   StateCreator<GlobalState, [['zustand/immer', never]], []>
 >[0]
 
-const isHandleNode = (node: PathNode) =>
-  node.type === 'offcurve' || node.type === 'qcurve'
+const isHandleNode = (node: PathNode) => isOffCurveNode(node)
 
 const addAttachedHandleIds = (
   path: PathData,
@@ -452,12 +452,7 @@ export const buildPathActions = (set: ImmerSet) => ({
 
       const startNode = path.nodes[startIndex]
       const endNode = path.nodes[endIndex]
-      if (
-        startNode.type === 'offcurve' ||
-        startNode.type === 'qcurve' ||
-        endNode.type === 'offcurve' ||
-        endNode.type === 'qcurve'
-      ) {
+      if (isOffCurveNode(startNode) || isOffCurveNode(endNode)) {
         return
       }
 
@@ -465,21 +460,27 @@ export const buildPathActions = (set: ImmerSet) => ({
         id: generateId('node'),
         x: Math.round(lerp(startNode.x, endNode.x, 1 / 3)),
         y: Math.round(lerp(startNode.y, endNode.y, 1 / 3)),
-        type: 'offcurve',
+        kind: 'offcurve',
       }
       const handle2: PathNode = {
         id: generateId('node'),
         x: Math.round(lerp(startNode.x, endNode.x, 2 / 3)),
         y: Math.round(lerp(startNode.y, endNode.y, 2 / 3)),
-        type: 'offcurve',
+        kind: 'offcurve',
       }
 
       path.nodes = [
         ...path.nodes.slice(0, startIndex),
-        { ...startNode, type: 'smooth' },
+        { ...startNode, kind: 'oncurve', smooth: true, type: undefined },
         handle1,
         handle2,
-        { ...endNode, type: 'smooth' },
+        {
+          ...endNode,
+          kind: 'oncurve',
+          segmentType: 'cubic',
+          smooth: true,
+          type: undefined,
+        },
         ...path.nodes.slice(endIndex + 1),
       ]
       state.selectedSegment = null
