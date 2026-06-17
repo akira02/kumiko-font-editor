@@ -47,6 +47,7 @@ export function useRightPanelModel() {
     (state) => state.convertLineSegmentToCurve
   )
   const setSelectedLayerId = useStore((state) => state.setSelectedLayerId)
+  const setActiveMasterId = useStore((state) => state.setActiveMasterId)
   const setWorkspaceView = useStore((state) => state.setWorkspaceView)
   const markDraftSaved = useStore((state) => state.markDraftSaved)
   const deleteGlyph = useStore((state) => state.deleteGlyph)
@@ -244,9 +245,20 @@ export function useRightPanelModel() {
     }
   }
 
+  // Layer panel rows: a font source switches the active master (font-wide),
+  // anything else (backups) is a per-glyph layer selection.
+  const selectLayer = (layerId: string) => {
+    if (fontData?.sources?.[layerId]) {
+      setActiveMasterId(layerId)
+    } else {
+      setSelectedLayerId(layerId)
+    }
+  }
+
   return {
     activeLayer,
     availableLayers,
+    selectLayer,
     displayedMetrics,
     effectiveNodeType,
     glyph,

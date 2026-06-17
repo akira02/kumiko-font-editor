@@ -3,8 +3,6 @@ import type { ToolId } from 'src/features/editor/canvas/workspace/types'
 import { AVAILABLE_TOOLS } from 'src/features/editor/canvas/workspace/types'
 import { HistoryButton } from 'src/features/editor/canvas/workspace/components/HistoryButton'
 import { ToolButton } from 'src/features/editor/canvas/workspace/components/ToolButton'
-import { MasterSwitcher } from 'src/features/common/masterSwitcher/MasterSwitcher'
-import { useStore } from 'src/store'
 
 interface CanvasWorkspaceOverlayProps {
   activeToolId: ToolId
@@ -23,30 +21,8 @@ export function CanvasWorkspaceOverlay({
   onSelectTool,
   onUndo,
 }: CanvasWorkspaceOverlayProps) {
-  const hasMultipleMasters = useStore(
-    (state) => Object.keys(state.fontData?.sources ?? {}).length > 1
-  )
   return (
     <>
-      {hasMultipleMasters ? (
-        <Flex
-          position="absolute"
-          left="50%"
-          top={4}
-          transform="translateX(-50%)"
-          align="center"
-          px={2}
-          py={2}
-          borderRadius="sm"
-          bg="rgba(8, 11, 13, 0.9)"
-          border="1px solid"
-          borderColor="rgba(247, 235, 64, 0.58)"
-          backdropFilter="blur(10px)"
-        >
-          <MasterSwitcher tone="dark" />
-        </Flex>
-      ) : null}
-
       <Flex
         position="absolute"
         left="50%"

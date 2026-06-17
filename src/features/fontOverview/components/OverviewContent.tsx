@@ -169,7 +169,7 @@ export function OverviewContent({
             </Text>
           </Box>
           <HStack spacing={3} flexShrink={0} align="center">
-            <MasterSwitcher tone="light" />
+            <MasterSwitcher />
             <Button
               size="sm"
               flexShrink={0}

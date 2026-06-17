@@ -111,7 +111,7 @@ export function EditorRightPanel() {
                     activeLayerId={
                       panel.glyph.activeLayerId ?? 'public.default'
                     }
-                    onSelectLayer={panel.setSelectedLayerId}
+                    onSelectLayer={panel.selectLayer}
                   />
 
                   <NodeInspectorCard
