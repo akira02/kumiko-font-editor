@@ -21,8 +21,16 @@ export {
   normalizeGlyphToLayers,
 } from 'src/store/glyphLayer'
 export {
+  createOffCurveNode,
+  createOnCurveNode,
   getEffectiveNodeType,
+  getNodeSegmentType,
+  getNodeType,
+  isOffCurveNode,
+  isOnCurveNode,
   isPathEndpointNode,
+  setNodeSegmentType,
+  setNodeType,
 } from 'src/store/glyphGeometry'
 export { deterministicStringify } from 'src/store/deterministicStringify'
 export type {
@@ -44,10 +52,13 @@ export type {
   CrossAxisMapping,
   DevelopmentStatusDefinition,
   NodeType,
+  OnCurveNodeType,
   OpenTypeFeatures,
   OverviewGroupByState,
   PathData,
   PathNode,
+  PathNodeKind,
+  PathSegmentType,
   SelectedNodeRef,
   SelectedSegmentState,
   ViewportState,

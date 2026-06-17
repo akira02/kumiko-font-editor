@@ -14,13 +14,23 @@ import type {
   SpacingBehaviorDraft,
 } from 'src/lib/openTypeFeatures'
 
-export type NodeType = 'corner' | 'smooth' | 'offcurve' | 'qcurve'
+export type LegacyNodeType = 'corner' | 'smooth' | 'offcurve' | 'qcurve'
+export type NodeType = LegacyNodeType
+export type OnCurveNodeType = 'corner' | 'smooth'
+export type PathNodeKind = 'oncurve' | 'offcurve'
+export type PathSegmentType = 'line' | 'cubic' | 'quadratic'
 
 export interface PathNode {
   id: string
   x: number
   y: number
-  type: NodeType
+  kind: PathNodeKind
+  // On-curve nodes carry the segment ending at this node. Off-curve nodes are
+  // handles and leave this unset.
+  segmentType?: PathSegmentType
+  smooth?: boolean
+  /** @deprecated Temporary migration bridge; use kind/segmentType/smooth. */
+  type?: LegacyNodeType
 }
 
 export interface PathData {

@@ -1,11 +1,84 @@
 import type {
   GlyphData,
   GlyphLayerData,
+  OnCurveNodeType,
   PathData,
   PathNode,
-  NodeType,
+  PathSegmentType,
 } from 'src/store/types'
 import { activeLayer } from 'src/store/glyphLayer'
+
+export const createOnCurveNode = (
+  id: string,
+  x: number,
+  y: number,
+  segmentType: PathSegmentType = 'line',
+  smooth = false
+): PathNode => ({
+  id,
+  x,
+  y,
+  kind: 'oncurve',
+  segmentType,
+  smooth,
+})
+
+export const createOffCurveNode = (
+  id: string,
+  x: number,
+  y: number
+): PathNode => ({
+  id,
+  x,
+  y,
+  kind: 'offcurve',
+})
+
+export const isOnCurveNode = (node: PathNode | undefined): node is PathNode =>
+  node?.kind === 'oncurve' ||
+  node?.type === 'corner' ||
+  node?.type === 'smooth'
+
+export const isOffCurveNode = (node: PathNode | undefined): node is PathNode =>
+  node?.kind === 'offcurve' ||
+  node?.type === 'offcurve' ||
+  node?.type === 'qcurve'
+
+export const getNodeType = (
+  node: PathNode | undefined
+): OnCurveNodeType | undefined =>
+  isOnCurveNode(node)
+    ? node.smooth || node.type === 'smooth'
+      ? 'smooth'
+      : 'corner'
+    : undefined
+
+export const setNodeType = (node: PathNode, type: OnCurveNodeType) => {
+  node.kind = 'oncurve'
+  node.smooth = type === 'smooth'
+  node.type = undefined
+}
+
+export const getNodeSegmentType = (
+  node: PathNode | undefined
+): PathSegmentType | undefined =>
+  isOnCurveNode(node)
+    ? (node.segmentType ??
+      (node.type === 'qcurve'
+        ? 'quadratic'
+        : node.type === 'corner' || node.type === 'smooth'
+          ? 'line'
+          : 'line'))
+    : undefined
+
+export const setNodeSegmentType = (
+  node: PathNode,
+  segmentType: PathSegmentType
+) => {
+  node.kind = 'oncurve'
+  node.segmentType = segmentType
+  node.type = undefined
+}
 
 export const isPathEndpointNode = (path: PathData, nodeId: string) => {
   if (path.closed || path.nodes.length === 0) {
@@ -23,14 +96,14 @@ export const getEffectiveNodeType = (
   node: PathNode | undefined
 ): NodeType | undefined => {
   if (!path || !node) {
-    return node?.type
+    return getNodeType(node)
   }
 
-  if (node.type === 'smooth' && isPathEndpointNode(path, node.id)) {
+  if (node.smooth && isPathEndpointNode(path, node.id)) {
     return 'corner'
   }
 
-  return node.type
+  return getNodeType(node)
 }
 
 export const findPath = (layer: GlyphLayerData, pathId: string) =>
