@@ -138,24 +138,25 @@ master 名稱無固定字串（Glyphs 的 `customName`、designspace 的 source 
 - accessor：`activeLayer` / `ensureActiveLayer` / `getGlyphLayer` / `withActiveLayer` / `setGlyphActiveLayer` / `normalizeGlyphToLayers`。
 - 刪除 hot↔layers 對帳；persistence 改讀/寫 active layer；舊資料於 `ingestProjectData` 自動遷移。
 
-### M2 — `.designspace` + 多 `.ufo` 匯入（多 master 資料來源）
+### M2 — `.designspace` + 多 `.ufo` 匯入（多 master 資料來源，已完成）
 
 > 修正：原規劃的「`.glyphs` 多 master 展開」前提不成立（glyphs 無匯入）。改以 designspace 為多 master 的第一個資料來源，建在已可用的 UFO importer 上。
 
-- 解析 `.designspace` XML → `axes`（`FontAxes`）、`sources`（每個指向一個 `.ufo`，帶 `location` / `name`）、`instances`（→ `exportInstances`）。
-- 逐 source 載入其 `.ufo` 字形，合併成「一個 `GlyphData`、每 source 一個 master layer」（`type:'master'`、`associatedMasterId`=source id）；`activeLayerId`=default source。
-- persistence：`ufoIds[]` 對映成多 source；匯入 UI 接受 `.designspace`。
-- 測試：designspace 解析 + 多 master 合併的 characterization。
+- `designspace.ts` 解析 `.designspace` → `FontAxes` + sources（filename / location / name）；`buildMultiMasterFontData` 逐 source 合併成「一個 `GlyphData`、每 source 一個 master layer」。
+- 匯入 UI 接受 `.designspace`；designspace 以 `UFO_DESIGNSPACE_KEY` 持久化，reload 經 `loadUfoProjectIntoFontData` 重建多 master。
+- 存檔 source-aware：`syncHotFontDataToUfoRecords` 經 `resolveSourceRefs` 把作用中 source 寫回該 ufo 的 `public.default`。
 
-### M3 — Master 切換 UI
+### M3 — Master 切換 UI（已完成）
 
-- 共用切換器元件（pills / dropdown 自動切換、sparse 標示）。
-- overview 標題右側、editor canvas 上方各掛一份，接 `setActiveMasterId`。
+- Overview：標題右側單一截斷式下拉（`MasterSwitcher`，名稱 + location）。
+- Editor：不另設按鈕；右側 layer 面板的 master 列即切換（`selectLayer` 路由：source → `setActiveMasterId`，backup → `setSelectedLayerId`）。
+- `setActiveMasterId` 收斂 `selectedLayerId` + 同步 glyph activeLayerId + 設 editLocation；載入時初始化 activeMasterId。
 
-### M4 — 匯出與 Master / sparse layer 管理
+### M4 — 匯出與 Master / sparse layer 管理（已完成）
 
-- UFO 多 master 匯出 designspace + 多 ufo。
-- sparse layer 建立（空白 / 自預設複製）；master 新增 / 刪除 / 改名管理 UI。
+- 匯出 `exportMultiMasterUfoZip`：每 source 一個 `.ufo` + `serializeDesignspace` 產生的 `.designspace`，一包 zip。
+- sparse layer 建立：layer 面板列出缺漏的 master，`createGlyphMasterLayer` 自作用中 layer 複製建立。
+- master 新增 / 刪除 / 改名：沿用 `FontSourcesTab`；`updateFontSettings` 在 source 刪除/改名時同步清理/更新每字 layer 與 active 參照。
 
 ### 之後
 
