@@ -415,6 +415,33 @@ export const buildGlyphActions = (set: ImmerSet) => ({
       markGlyphDirty(state, glyphId)
     }),
 
+  // Fill a sparse master: create the missing master layer for this glyph,
+  // seeded from its current active layer so it starts as an editable copy.
+  createGlyphMasterLayer: (glyphId: string, masterId: string) =>
+    set((state) => {
+      const glyph = state.fontData?.glyphs[glyphId]
+      const source = state.fontData?.sources?.[masterId]
+      if (!glyph || !source || glyph.layers?.[masterId]) {
+        return
+      }
+      const base = activeLayer(current(glyph))
+      glyph.layers = glyph.layers ?? {}
+      glyph.layers[masterId] = {
+        id: masterId,
+        name: source.name,
+        type: 'master',
+        associatedMasterId: masterId,
+        paths: structuredClone(base.paths),
+        components: structuredClone(base.components),
+        componentRefs: structuredClone(base.componentRefs),
+        anchors: structuredClone(base.anchors ?? []),
+        guidelines: structuredClone(base.guidelines ?? []),
+        metrics: structuredClone(base.metrics),
+      }
+      glyph.layerOrder = [...(glyph.layerOrder ?? []), masterId]
+      markGlyphDirty(state, glyphId)
+    }),
+
   duplicateLayer: (glyphId: string, layerId: string) =>
     set((state) => {
       const glyph = state.fontData?.glyphs[glyphId]

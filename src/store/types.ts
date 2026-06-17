@@ -377,6 +377,7 @@ export interface GlobalState {
   setSelectedLayerId: (id: string | null) => void
   setActiveMasterId: (id: string | null) => void
   createBackupLayer: (glyphId: string) => void
+  createGlyphMasterLayer: (glyphId: string, masterId: string) => void
   duplicateLayer: (glyphId: string, layerId: string) => void
   deleteBackupLayer: (glyphId: string, layerId: string) => void
   renameBackupLayer: (glyphId: string, layerId: string, name: string) => void

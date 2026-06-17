@@ -88,3 +88,39 @@ describe('setActiveMasterId convergence', () => {
     expect(layers?.Light.paths[0].nodes[0].x).toBe(10)
   })
 })
+
+describe('createGlyphMasterLayer (sparse fill)', () => {
+  afterEach(() => {
+    useStore.getState().closeProjectState()
+  })
+
+  const sparseFontData = (): FontData => {
+    const data = fontData()
+    // Glyph A starts with only the Light master (Bold is sparse).
+    delete data.glyphs.A.layers!.Bold
+    data.glyphs.A.layerOrder = ['Light']
+    return data
+  }
+
+  it('creates the missing master seeded from the active layer', () => {
+    useStore.getState().loadProjectState('p', 'P', sparseFontData())
+    useStore.getState().createGlyphMasterLayer('A', 'Bold')
+
+    const glyph = useStore.getState().fontData?.glyphs.A
+    expect(glyph?.layers?.Bold).toBeDefined()
+    expect(glyph?.layers?.Bold.type).toBe('master')
+    expect(glyph?.layers?.Bold.associatedMasterId).toBe('Bold')
+    // seeded from the active (Light) layer
+    expect(glyph?.layers?.Bold.paths[0].nodes[0].x).toBe(10)
+    expect(glyph?.layerOrder).toContain('Bold')
+  })
+
+  it('does not overwrite an existing master layer', () => {
+    useStore.getState().loadProjectState('p', 'P', fontData())
+    useStore.getState().createGlyphMasterLayer('A', 'Bold')
+    // Bold already existed (x=80) and must be left untouched.
+    expect(
+      useStore.getState().fontData?.glyphs.A.layers?.Bold.paths[0].nodes[0].x
+    ).toBe(80)
+  })
+})

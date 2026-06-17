@@ -69,6 +69,11 @@ export function LayerListCard({
   const [renamingLayerId, setRenamingLayerId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
   const createBackupLayer = useStore((state) => state.createBackupLayer)
+  const sources = useStore((state) => state.fontData?.sources)
+  const createGlyphMasterLayer = useStore(
+    (state) => state.createGlyphMasterLayer
+  )
+  const setActiveMasterId = useStore((state) => state.setActiveMasterId)
   const duplicateLayer = useStore((state) => state.duplicateLayer)
   const deleteBackupLayer = useStore((state) => state.deleteBackupLayer)
   const renameBackupLayer = useStore((state) => state.renameBackupLayer)
@@ -234,6 +239,46 @@ export function LayerListCard({
             </HStack>
           )
         })}
+
+        {Object.values(sources ?? {})
+          .filter((source) => !layers.some((layer) => layer.id === source.id))
+          .map((source) => (
+            <HStack
+              key={`missing-${source.id}`}
+              spacing={2}
+              px={2}
+              py={1.5}
+              borderRadius="sm"
+              borderLeft="3px solid"
+              borderColor="transparent"
+              opacity={0.6}
+            >
+              <Box w="16px" flexShrink={0} />
+              <Text
+                flex="1"
+                minW={0}
+                fontSize="sm"
+                fontStyle="italic"
+                color="field.muted"
+                noOfLines={1}
+              >
+                {source.name}
+              </Text>
+              <Button
+                size="xs"
+                variant="ghost"
+                px={1}
+                aria-label={`${t('editor.addBackupLayer')} ${source.name}`}
+                title={source.name}
+                onClick={() => {
+                  createGlyphMasterLayer(glyphId, source.id)
+                  setActiveMasterId(source.id)
+                }}
+              >
+                +
+              </Button>
+            </HStack>
+          ))}
 
         <HStack spacing={2} px={2} py={1.5} borderRadius="sm">
           <EyeToggle
