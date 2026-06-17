@@ -225,6 +225,25 @@ export const buildGlyphActions = (set: ImmerSet) => ({
       clearTemporal()
     }),
 
+  // Switching master is font-wide; it converges selectedLayerId onto the master
+  // (layers are keyed by source id) so overview and editor both follow, and
+  // snaps editLocation to the source location (VF generalises this to any point).
+  setActiveMasterId: (id: string | null, clearTemporal: () => void) =>
+    set((state) => {
+      state.activeMasterId = id
+      const source = id ? state.fontData?.sources?.[id] : null
+      state.editLocation = source ? { ...source.location } : {}
+      if (id) {
+        state.selectedLayerId = id
+        state.selectedNodeIds = []
+        state.selectedSegment = null
+        if (state.selectedGlyphId) {
+          setGlyphActiveLayer(state.fontData?.glyphs[state.selectedGlyphId], id)
+        }
+      }
+      clearTemporal()
+    }),
+
   updateNodePosition: (
     glyphId: string,
     pathId: string,

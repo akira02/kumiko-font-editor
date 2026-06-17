@@ -72,6 +72,12 @@ export const buildProjectActions = (
           : null) ||
         (firstGlyph ? getActiveLayerId(firstGlyph) : null) ||
         null
+      // Multi-master: when the selected layer is a font source, treat it as the
+      // active master so the switcher highlights it.
+      state.activeMasterId =
+        state.selectedLayerId && hotFontData.sources?.[state.selectedLayerId]
+          ? state.selectedLayerId
+          : null
       syncFilteredGlyphList(state)
 
       if (state.selectedGlyphId && !hotFontData.glyphs[state.selectedGlyphId]) {

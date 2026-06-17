@@ -116,6 +116,14 @@ export const useStore = create<GlobalState>()(
         )
       },
 
+      // Master switch mutates glyph.activeLayerId; clear temporal so it is not an
+      // undo step (mirrors setSelectedLayerId).
+      setActiveMasterId: (id: string | null) => {
+        buildGlyphActions(set).setActiveMasterId(id, () =>
+          useStore.temporal.getState().clear()
+        )
+      },
+
       // ── Path / node actions ──────────────────────────────────────────────
       ...buildPathActions(set),
 

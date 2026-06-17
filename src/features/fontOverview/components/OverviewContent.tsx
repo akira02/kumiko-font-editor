@@ -8,6 +8,7 @@ import {
   Text,
 } from '@chakra-ui/react'
 import { useCallback, useEffect, useMemo, useRef, type MouseEvent } from 'react'
+import { MasterSwitcher } from 'src/features/common/masterSwitcher/MasterSwitcher'
 import {
   VirtuosoGrid,
   type GridStateSnapshot,
@@ -167,17 +168,20 @@ export function OverviewContent({
               {t('fontOverview.glyphCardHint')}
             </Text>
           </Box>
-          <Button
-            size="sm"
-            flexShrink={0}
-            variant="solid"
-            fontWeight="900"
-            _hover={{ bg: 'field.yellow.200' }}
-            _active={{ bg: 'field.yellow.400' }}
-            onClick={onOpenAddGlyphModal}
-          >
-            {t('fontOverview.addGlyphButton')}
-          </Button>
+          <HStack spacing={3} flexShrink={0} align="center">
+            <MasterSwitcher tone="light" />
+            <Button
+              size="sm"
+              flexShrink={0}
+              variant="solid"
+              fontWeight="900"
+              _hover={{ bg: 'field.yellow.200' }}
+              _active={{ bg: 'field.yellow.400' }}
+              onClick={onOpenAddGlyphModal}
+            >
+              {t('fontOverview.addGlyphButton')}
+            </Button>
+          </HStack>
         </HStack>
 
         {visibleSections.length === 0 ? (
