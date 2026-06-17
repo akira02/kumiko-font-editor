@@ -15,6 +15,8 @@ import {
 } from 'src/store'
 
 type NodeRole = 'corner' | 'smooth' | 'offcurve'
+type OnCurvePathNode = Extract<PathNode, { kind: 'oncurve' }>
+type OffCurvePathNode = Extract<PathNode, { kind: 'offcurve' }>
 
 type AppendTarget = {
   mode: 'append' | 'prepend'
@@ -457,7 +459,7 @@ export class PenTool extends BaseTool {
       )
 
       store.replacePathNodes(glyphId, pathId, startNode.id, endNode.id, [
-        { ...startNode, kind: 'oncurve', smooth: false, type: undefined },
+        { ...startNode, kind: 'oncurve', smooth: false },
         startHandle,
         handleIn,
         { ...inserted, segmentType: 'cubic' },
@@ -468,7 +470,6 @@ export class PenTool extends BaseTool {
           kind: 'oncurve',
           segmentType: 'cubic',
           smooth: false,
-          type: undefined,
         },
       ])
       return { pathId, nodeId: inserted.id }
@@ -528,7 +529,7 @@ export class PenTool extends BaseTool {
       'offcurve'
     )
     const replacement: PathNode[] = [
-      { ...startNode, kind: 'oncurve', smooth: true, type: undefined },
+      { ...startNode, kind: 'oncurve', smooth: true },
       handle1,
       handle2,
       {
@@ -536,7 +537,6 @@ export class PenTool extends BaseTool {
         kind: 'oncurve',
         segmentType: 'cubic',
         smooth: true,
-        type: undefined,
       },
     ]
     store.replacePathNodes(
@@ -599,7 +599,7 @@ export class PenTool extends BaseTool {
       const anchor = lerpPoint(q0, q1, t)
       const inserted = this.createNode(anchor.x, anchor.y, 'smooth')
       const nodes: PathNode[] = [
-        { ...startNode, kind: 'oncurve', smooth: true, type: undefined },
+        { ...startNode, kind: 'oncurve', smooth: true },
         this.createNode(q0.x, q0.y, 'offcurve'),
         { ...inserted, segmentType: 'quadratic' },
         this.createNode(q1.x, q1.y, 'offcurve'),
@@ -608,7 +608,6 @@ export class PenTool extends BaseTool {
           kind: 'oncurve',
           segmentType: 'quadratic',
           smooth: true,
-          type: undefined,
         },
       ]
       return {
@@ -628,7 +627,7 @@ export class PenTool extends BaseTool {
       const anchor = lerpPoint(r0, r1, t)
       const inserted = this.createNode(anchor.x, anchor.y, 'smooth')
       const nodes: PathNode[] = [
-        { ...startNode, kind: 'oncurve', smooth: true, type: undefined },
+        { ...startNode, kind: 'oncurve', smooth: true },
         this.createNode(q0.x, q0.y, 'offcurve'),
         this.createNode(r0.x, r0.y, 'offcurve'),
         { ...inserted, segmentType: 'cubic' },
@@ -639,7 +638,6 @@ export class PenTool extends BaseTool {
           kind: 'oncurve',
           segmentType: 'cubic',
           smooth: true,
-          type: undefined,
         },
       ]
       return {
@@ -792,6 +790,12 @@ export class PenTool extends BaseTool {
     }))
   }
 
+  private createNode(
+    x: number,
+    y: number,
+    type: 'corner' | 'smooth'
+  ): OnCurvePathNode
+  private createNode(x: number, y: number, type: 'offcurve'): OffCurvePathNode
   private createNode(x: number, y: number, type: NodeRole): PathNode {
     const base = {
       id: this.generateId('node'),

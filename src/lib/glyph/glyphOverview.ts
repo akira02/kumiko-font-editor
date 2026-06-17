@@ -394,7 +394,7 @@ const buildPathSvg = (layer: GlyphLayerData) => {
             ? 'offCurveQuad'
             : 'offCurveCubic'
           : 'onCurve') as 'onCurve' | 'offCurveQuad' | 'offCurveCubic',
-        smooth: node.smooth ?? false,
+        smooth: isOffCurveNode(node) ? false : (node.smooth ?? false),
       }
     }),
   }))

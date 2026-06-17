@@ -60,7 +60,7 @@ const buildPath2DFromPaths = (paths: PathData[]) =>
                 ? ('offCurveQuad' as const)
                 : ('offCurveCubic' as const)
               : ('onCurve' as const),
-            smooth: node.smooth ?? false,
+            smooth: isOffCurveNode(node) ? false : (node.smooth ?? false),
           }
         }),
       }))

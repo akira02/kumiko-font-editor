@@ -68,7 +68,7 @@ const buildVarPackedPathForPaths = (paths: PathData[]) =>
               ? 'offCurveQuad'
               : 'offCurveCubic'
             : 'onCurve',
-          smooth: node.smooth ?? false,
+          smooth: isOffCurveNode(node) ? false : (node.smooth ?? false),
         }
       }),
     }))

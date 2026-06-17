@@ -19,16 +19,25 @@ export type NodeType = OnCurveNodeType
 export type PathNodeKind = 'oncurve' | 'offcurve'
 export type PathSegmentType = 'line' | 'cubic' | 'quadratic'
 
-export interface PathNode {
+interface BasePathNode {
   id: string
   x: number
   y: number
-  kind: PathNodeKind
+}
+
+export interface OnCurvePathNode extends BasePathNode {
+  kind: 'oncurve'
   // On-curve nodes carry the segment ending at this node. Off-curve nodes are
   // handles and leave this unset.
   segmentType?: PathSegmentType
   smooth?: boolean
 }
+
+export interface OffCurvePathNode extends BasePathNode {
+  kind: 'offcurve'
+}
+
+export type PathNode = OnCurvePathNode | OffCurvePathNode
 
 export interface PathData {
   id: string

@@ -355,7 +355,7 @@ export class KnifeTool extends BaseTool {
       const q0 = lerpPoint(nodes[0], nodes[1], t)
       const q1 = lerpPoint(nodes[1], nodes[2], t)
       return [
-        { ...nodes[0], kind: 'oncurve', smooth: true, type: undefined },
+        { ...nodes[0], kind: 'oncurve', smooth: true },
         this.createNode(q0.x, q0.y, 'offcurve'),
         {
           ...inserted,
@@ -364,7 +364,6 @@ export class KnifeTool extends BaseTool {
           kind: 'oncurve',
           segmentType: 'quadratic',
           smooth: true,
-          type: undefined,
         },
         this.createNode(q1.x, q1.y, 'offcurve'),
         {
@@ -372,7 +371,6 @@ export class KnifeTool extends BaseTool {
           kind: 'oncurve',
           segmentType: 'quadratic',
           smooth: true,
-          type: undefined,
         },
       ]
     }
@@ -384,7 +382,7 @@ export class KnifeTool extends BaseTool {
       const r0 = lerpPoint(q0, q1, t)
       const r1 = lerpPoint(q1, q2, t)
       return [
-        { ...nodes[0], kind: 'oncurve', smooth: true, type: undefined },
+        { ...nodes[0], kind: 'oncurve', smooth: true },
         this.createNode(q0.x, q0.y, 'offcurve'),
         this.createNode(r0.x, r0.y, 'offcurve'),
         {
@@ -394,7 +392,6 @@ export class KnifeTool extends BaseTool {
           kind: 'oncurve',
           segmentType: 'cubic',
           smooth: true,
-          type: undefined,
         },
         this.createNode(r1.x, r1.y, 'offcurve'),
         this.createNode(q2.x, q2.y, 'offcurve'),
@@ -403,7 +400,6 @@ export class KnifeTool extends BaseTool {
           kind: 'oncurve',
           segmentType: 'cubic',
           smooth: true,
-          type: undefined,
         },
       ]
     }

@@ -5,7 +5,7 @@ import {
   getNodeSegmentType,
   isOffCurveNode,
   type FontData,
-  type PathNode,
+  type PathData,
 } from 'src/store'
 import type {
   ComponentData,
@@ -37,20 +37,7 @@ interface BuildPositionedGlyphsOptions {
   layerGeometryCache: Map<string, LayerGeometryCacheEntry>
 }
 
-const pathDataToVarPackedPath = (
-  paths: Array<{
-    id: string
-    closed: boolean
-    nodes: Array<{
-      id: string
-      x: number
-      y: number
-      kind?: PathNode['kind']
-      segmentType?: PathNode['segmentType']
-      smooth?: boolean
-    }>
-  }>
-) => {
+const pathDataToVarPackedPath = (paths: PathData[]) => {
   const contours = paths.map((pathData) => ({
     points: pathData.nodes.map((node, index) => {
       const nextOnCurve = pathData.nodes

@@ -1,7 +1,10 @@
 import type {
   GlyphData,
   GlyphLayerData,
+  NodeType,
+  OffCurvePathNode,
   OnCurveNodeType,
+  OnCurvePathNode,
   PathData,
   PathNode,
   PathSegmentType,
@@ -34,19 +37,20 @@ export const createOffCurveNode = (
   kind: 'offcurve',
 })
 
-export const isOnCurveNode = (node: PathNode | undefined): node is PathNode =>
-  node?.kind === 'oncurve'
+export const isOnCurveNode = (
+  node: PathNode | undefined
+): node is OnCurvePathNode => node?.kind === 'oncurve'
 
-export const isOffCurveNode = (node: PathNode | undefined): node is PathNode =>
-  node?.kind === 'offcurve'
+export const isOffCurveNode = (
+  node: PathNode | undefined
+): node is OffCurvePathNode => node?.kind === 'offcurve'
 
 export const getNodeType = (
   node: PathNode | undefined
 ): OnCurveNodeType | undefined =>
   isOnCurveNode(node) ? (node.smooth ? 'smooth' : 'corner') : undefined
 
-export const setNodeType = (node: PathNode, type: OnCurveNodeType) => {
-  node.kind = 'oncurve'
+export const setNodeType = (node: OnCurvePathNode, type: OnCurveNodeType) => {
   node.smooth = type === 'smooth'
 }
 
@@ -56,10 +60,9 @@ export const getNodeSegmentType = (
   isOnCurveNode(node) ? (node.segmentType ?? 'line') : undefined
 
 export const setNodeSegmentType = (
-  node: PathNode,
+  node: OnCurvePathNode,
   segmentType: PathSegmentType
 ) => {
-  node.kind = 'oncurve'
   node.segmentType = segmentType
 }
 
@@ -82,7 +85,7 @@ export const getEffectiveNodeType = (
     return getNodeType(node)
   }
 
-  if (node.smooth && isPathEndpointNode(path, node.id)) {
+  if (isOnCurveNode(node) && node.smooth && isPathEndpointNode(path, node.id)) {
     return 'corner'
   }
 

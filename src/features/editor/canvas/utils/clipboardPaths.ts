@@ -91,8 +91,7 @@ const materializeNode = (
   return {
     ...base,
     kind: 'oncurve',
-    segmentType:
-      node.segmentType ?? (node.type === 'qcurve' ? 'quadratic' : 'line'),
+    segmentType: node.segmentType ?? 'line',
     smooth: node.smooth ?? node.type === 'smooth',
   }
 }
@@ -186,6 +185,14 @@ export function buildClipboardPayloadFromSelection(
 }
 
 function toClipboardNode(node: PathNode) {
+  if (node.kind === 'offcurve') {
+    return {
+      x: node.x,
+      y: node.y,
+      kind: node.kind,
+    }
+  }
+
   return {
     x: node.x,
     y: node.y,

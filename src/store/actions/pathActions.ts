@@ -471,7 +471,7 @@ export const buildPathActions = (set: ImmerSet) => ({
 
       path.nodes = [
         ...path.nodes.slice(0, startIndex),
-        { ...startNode, kind: 'oncurve', smooth: true, type: undefined },
+        { ...startNode, kind: 'oncurve', smooth: true },
         handle1,
         handle2,
         {
@@ -479,7 +479,6 @@ export const buildPathActions = (set: ImmerSet) => ({
           kind: 'oncurve',
           segmentType: 'cubic',
           smooth: true,
-          type: undefined,
         },
         ...path.nodes.slice(endIndex + 1),
       ]
