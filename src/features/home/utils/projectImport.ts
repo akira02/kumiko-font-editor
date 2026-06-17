@@ -5,6 +5,11 @@ import {
   importUfoWorkspace,
   type ImportedUfoWorkspace,
 } from 'src/lib/fontFormats/adapters/ufo'
+import {
+  importGlyphsFile,
+  importGlyphsPackage,
+  type ImportedGlyphsProject,
+} from 'src/lib/fontFormats/adapters/glyphs'
 import type { FontData } from 'src/store'
 
 export interface ImportedKumikoProject {
@@ -28,6 +33,54 @@ export const isSingleBinaryFontImport = (files: File[]) => {
   }
   const extension = files[0].name.split('.').pop()?.toLowerCase()
   return Boolean(extension && BINARY_FONT_EXTENSIONS.has(extension))
+}
+
+const isSingleGlyphsFileImport = (files: File[]) =>
+  !hasFolderEntries(files) &&
+  files.length === 1 &&
+  files[0].name.toLowerCase().endsWith('.glyphs')
+
+const isGlyphsPackageImport = (files: File[]) =>
+  files.some((file) =>
+    (file.webkitRelativePath || file.name)
+      .toLowerCase()
+      .includes('.glyphspackage/')
+  )
+
+const saveImportedGlyphsProject = async (
+  imported: ImportedGlyphsProject,
+  sourceName: string
+): Promise<ImportedKumikoProject> => {
+  const now = Date.now()
+  const summary = await saveProjectDraft({
+    id: imported.projectId,
+    title: imported.title,
+    lastModified: now,
+    createdAt: now,
+    updatedAt: now,
+    sourceName,
+    sourceType: 'local',
+    githubSource: null,
+    fontData: imported.fontData,
+    projectMetadata: imported.projectMetadata,
+    projectSourceFormat: imported.projectSourceFormat,
+    // Glyphs projects reload straight from the draft fontData (no per-source
+    // rebuild like UFO), so there is no separate round-trip format.
+    projectRoundTripFormat: null,
+    projectGlyphsText: imported.projectGlyphsText,
+    projectGlyphsDocument: imported.projectGlyphsDocument,
+    projectGlyphsPackage: imported.projectGlyphsPackage,
+  })
+
+  return {
+    id: summary.id,
+    title: summary.title,
+    fontData: imported.fontData,
+    projectMetadata: imported.projectMetadata,
+    projectSourceFormat: imported.projectSourceFormat,
+    projectRoundTripFormat: null,
+    summary,
+  }
 }
 
 export const saveImportedUfoWorkspaceAsProject = async (
@@ -107,6 +160,16 @@ export const importLocalProjectFiles = async (
       projectRoundTripFormat: null,
       summary,
     }
+  }
+
+  if (isSingleGlyphsFileImport(selectedFiles)) {
+    const imported = await importGlyphsFile(selectedFiles[0])
+    return saveImportedGlyphsProject(imported, selectedFiles[0].name)
+  }
+
+  if (isGlyphsPackageImport(selectedFiles)) {
+    const imported = await importGlyphsPackage(selectedFiles)
+    return saveImportedGlyphsProject(imported, imported.title)
   }
 
   const importedUfo = await importUfoWorkspace(selectedFiles)

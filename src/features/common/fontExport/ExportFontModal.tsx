@@ -19,9 +19,17 @@ import {
 import { useState } from 'react'
 import type { OpenTypeExportWarning } from 'src/lib/openTypeFeatures'
 import { requiresDropUnsupportedConfirmation } from 'src/lib/openTypeFeatures/exportPolicy'
+import type { ProjectSourceFormat } from 'src/lib/project/projectFormats'
 import { useTranslation } from 'react-i18next'
 
-export type FontExportFormat = 'zip' | 'ttf' | 'otf' | 'woff' | 'woff2'
+export type FontExportFormat =
+  | 'zip'
+  | 'glyphs'
+  | 'glyphspackage'
+  | 'ttf'
+  | 'otf'
+  | 'woff'
+  | 'woff2'
 
 interface ExportFontModalProps {
   isOpen: boolean
@@ -29,6 +37,8 @@ interface ExportFontModalProps {
   isExporting: boolean
   loadingText: string
   openTypeWarnings?: OpenTypeExportWarning[]
+  // Source format of the open project; gates the .glyphs / .glyphspackage option.
+  sourceFormat?: ProjectSourceFormat | null
   onClose: () => void
   onExport: (formats: FontExportFormat[]) => void
 }
@@ -37,11 +47,25 @@ const exportOptions: Array<{
   format: FontExportFormat
   label: string
   description: string
+  // When set, only show this option for the matching project source format.
+  sourceFormat?: ProjectSourceFormat
 }> = [
   {
     format: 'zip',
     label: 'UFO (ZIP)',
     description: '可再匯入或交給其他字型工具編輯。',
+  },
+  {
+    format: 'glyphs',
+    label: 'Glyphs (.glyphs)',
+    description: '回存到 Glyphs 來源檔，保留未編輯的內容。',
+    sourceFormat: 'glyphs',
+  },
+  {
+    format: 'glyphspackage',
+    label: 'Glyphs Package (ZIP)',
+    description: '回存 .glyphspackage 內容，打包成 ZIP。',
+    sourceFormat: 'glyphspackage',
   },
   {
     format: 'ttf',
@@ -142,10 +166,15 @@ export function ExportFontModal({
   isExporting,
   loadingText,
   openTypeWarnings = [],
+  sourceFormat = null,
   onClose,
   onExport,
 }: ExportFontModalProps) {
   const { t } = useTranslation()
+
+  const visibleOptions = exportOptions.filter(
+    (option) => !option.sourceFormat || option.sourceFormat === sourceFormat
+  )
 
   const [selectedFormats, setSelectedFormats] = useState<FontExportFormat[]>([
     'zip',
@@ -188,7 +217,7 @@ export function ExportFontModal({
                 onChange={setConfirmedDropUnsupported}
               />
             )}
-            {exportOptions.map((option) => (
+            {visibleOptions.map((option) => (
               <Button
                 key={option.format}
                 h="auto"

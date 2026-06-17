@@ -2,6 +2,7 @@ import { parseOpenStep } from 'src/lib/fontFormats/openstepParser'
 import {
   applyLayerEdits,
   serializeOpenStepValue,
+  type GlyphsFormatVersion,
 } from 'src/lib/fontFormats/glyphsExport'
 import type { GlyphsDocument } from 'src/lib/fontFormats/glyphsDocument'
 import type { GlyphData } from 'src/store'
@@ -186,9 +187,28 @@ const collectGlyphBlocks = (
   return blocks
 }
 
+// Detect the geometry format from an existing glyph's layers: a Glyphs 3 layer
+// carries `shapes`, a Glyphs 2 layer carries `paths`.
+const detectFormatFromLayers = (
+  layers: Array<Record<string, unknown>>
+): GlyphsFormatVersion | null => {
+  for (const layer of layers) {
+    if (Array.isArray(layer.shapes)) {
+      return 3
+    }
+    if (Array.isArray(layer.paths) || Array.isArray(layer.components)) {
+      return 2
+    }
+  }
+  return null
+}
+
 export const patchGlyphText = (
   glyph: GlyphData,
-  rawGlyphText: string | undefined
+  rawGlyphText: string | undefined,
+  // Explicit target format; .glyphspackage is always Glyphs 3. When omitted the
+  // format is inferred from the existing glyph layers (falling back to G2).
+  formatVersionOverride?: GlyphsFormatVersion
 ) => {
   const rawGlyph = rawGlyphText
     ? (parseOpenStep(rawGlyphText) as Record<string, unknown>)
@@ -220,6 +240,8 @@ export const patchGlyphText = (
   const layers = Array.isArray(glyphRecord.layers)
     ? (glyphRecord.layers as Array<Record<string, unknown>>)
     : []
+  const formatVersion =
+    formatVersionOverride ?? detectFormatFromLayers(layers) ?? 2
   const layerMap = new Map(
     layers.map((layer) => [
       String(layer.layerId ?? layer.associatedMasterId ?? layer.name ?? ''),
@@ -278,7 +300,7 @@ export const patchGlyphText = (
         return null
       }
       const layerRecord = { ...(layerMap.get(layerId) ?? {}) }
-      applyLayerEdits(layerRecord, glyphLayer)
+      applyLayerEdits(layerRecord, glyphLayer, formatVersion)
       return layerRecord
     })
     .filter(Boolean)

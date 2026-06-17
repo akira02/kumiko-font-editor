@@ -224,7 +224,9 @@ export const patchGlyphsPackageData = (input: {
       appendedGlyph = true
     }
 
-    const patchedText = `${patchGlyphText(glyph, files[relativePath]).trim()}\n`
+    // .glyphspackage is a Glyphs 3 container: emit G3 native geometry even when
+    // appending a brand-new glyph that has no existing layer to detect from.
+    const patchedText = `${patchGlyphText(glyph, files[relativePath], 3).trim()}\n`
     files[relativePath] = patchedText
     changedPaths.add(relativePath)
 

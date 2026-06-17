@@ -14,9 +14,15 @@ import {
   needsOpenTypeFeatureCompilationForBinaryExport,
   validateFeatures,
 } from 'src/lib/openTypeFeatures'
-import { getProjectArchiveMetadata } from 'src/lib/project/projectArchive'
+import {
+  getProjectArchiveMetadata,
+  getProjectArchiveSourceFormat,
+} from 'src/lib/project/projectArchive'
 import { syncHotFontDataToUfoRecords } from 'src/lib/fontFormats/adapters/ufo'
 import { exportUfoAsZipBlob } from 'src/lib/fontFormats/ufoZipExportClient'
+import { serializeGlyphsFileToBlob } from 'src/lib/fontFormats/glyphsExport'
+import { patchGlyphsPackageData } from 'src/lib/fontFormats/glyphsPackage'
+import { loadProjectDraft } from 'src/lib/project/projectRepository'
 import { useStore } from 'src/store'
 import type { FontExportFormat } from 'src/features/common/fontExport/ExportFontModal'
 
@@ -99,7 +105,8 @@ export function useFontExport() {
     try {
       setIsExporting(true)
       const selectedBinaryFormats = selectedFormats.filter(
-        (format) => format !== 'zip'
+        (format) =>
+          format !== 'zip' && format !== 'glyphs' && format !== 'glyphspackage'
       )
       if (
         fontData.openTypeFeatures &&
@@ -127,6 +134,46 @@ export function useFontExport() {
       const buildExportAsset = async (
         format: FontExportFormat
       ): Promise<ExportAsset> => {
+        // Glyphs round-trip: re-serialize the stored source from current fontData.
+        if (format === 'glyphs') {
+          const draft = await loadProjectDraft(projectId)
+          const blob = serializeGlyphsFileToBlob(
+            fontData,
+            getProjectArchiveMetadata(),
+            draft?.projectGlyphsDocument ?? null
+          )
+          return {
+            blob,
+            fileName: `${baseFileName}.glyphs`,
+            label: 'Glyphs',
+            totalGlyphs: Object.keys(fontData.glyphs).length,
+          }
+        }
+
+        if (format === 'glyphspackage') {
+          const draft = await loadProjectDraft(projectId)
+          if (!draft?.projectGlyphsPackage) {
+            throw new Error('找不到 .glyphspackage 來源資料')
+          }
+          // Patch every current glyph into the stored package, preserving the
+          // glyphs and files the user never touched.
+          const patched = patchGlyphsPackageData({
+            packageData: draft.projectGlyphsPackage,
+            dirtyGlyphs: fontData.glyphs,
+          })
+          const files: Record<string, Uint8Array> = {}
+          const encoder = new TextEncoder()
+          for (const [innerPath, text] of Object.entries(patched.files)) {
+            files[`${patched.packageName}/${innerPath}`] = encoder.encode(text)
+          }
+          return {
+            blob: makeZipBlob(files),
+            fileName: `${baseFileName}.glyphspackage.zip`,
+            label: 'Glyphs Package',
+            totalGlyphs: Object.keys(fontData.glyphs).length,
+          }
+        }
+
         if (format !== 'zip') {
           return {
             blob: await exportFontAsBinary(fontData, format),
@@ -246,5 +293,6 @@ export function useFontExport() {
     isExporting,
     loadingText,
     ufoExportProgress,
+    sourceFormat: getProjectArchiveSourceFormat(),
   }
 }

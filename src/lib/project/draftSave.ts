@@ -5,7 +5,6 @@ import {
 } from 'src/lib/project/projectArchive'
 import {
   loadProjectDraft,
-  loadProjectDraftSummary,
   saveProjectDraft,
 } from 'src/lib/project/projectRepository'
 import {
@@ -99,7 +98,9 @@ export const saveDraftSnapshot = async (input: {
     return
   }
 
-  const persistedProject = await loadProjectDraftSummary(input.projectId)
+  // Load the full draft (not just the summary) so glyphs round-trip sources
+  // (text / document / package) survive an edit-and-save cycle.
+  const persistedProject = await loadProjectDraft(input.projectId)
   const projectMetadata = getProjectArchiveMetadata()
   const now = Date.now()
   await saveProjectDraft({
@@ -118,8 +119,8 @@ export const saveDraftSnapshot = async (input: {
     ),
     projectSourceFormat,
     projectRoundTripFormat,
-    projectGlyphsText: null,
-    projectGlyphsDocument: null,
-    projectGlyphsPackage: null,
+    projectGlyphsText: persistedProject?.projectGlyphsText ?? null,
+    projectGlyphsDocument: persistedProject?.projectGlyphsDocument ?? null,
+    projectGlyphsPackage: persistedProject?.projectGlyphsPackage ?? null,
   })
 }

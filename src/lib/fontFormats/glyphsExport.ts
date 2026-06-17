@@ -11,6 +11,16 @@ import type {
   PathNode,
 } from 'src/store'
 
+// A pre-formatted OpenStep token emitted verbatim (no quoting, no re-indent).
+// Used for Glyphs 3 compact tuples like `(302,128,l)` and `pos = (250,700)`,
+// which must stay inline rather than being expanded by the array serializer.
+class RawGlyphsValue {
+  readonly raw: string
+  constructor(raw: string) {
+    this.raw = raw
+  }
+}
+
 const quoteString = (value: string) => {
   if (/^[A-Za-z0-9._/+-]+$/.test(value)) {
     return value
@@ -31,6 +41,11 @@ const serializeOpenStepValueToChunks = (
 ) => {
   const indent = '  '.repeat(indentLevel)
   const childIndent = '  '.repeat(indentLevel + 1)
+
+  if (value instanceof RawGlyphsValue) {
+    chunks.push(value.raw)
+    return
+  }
 
   if (Array.isArray(value)) {
     if (value.length === 0) {
@@ -157,14 +172,101 @@ const serializeLayerGuides = (layer: GlyphLayerData) =>
     ...(guide.name ? { name: guide.name } : {}),
   }))
 
+// --- Glyphs 3 native geometry (shapes + tuple nodes) ------------------------
+
+export type GlyphsFormatVersion = 2 | 3
+
+// A Glyphs 3 source declares `.formatVersion = 3`; .glyphspackage is always G3.
+export const detectGlyphsFormatVersion = (
+  document: Record<string, unknown> | null | undefined
+): GlyphsFormatVersion =>
+  document && Number(document['.formatVersion']) >= 3 ? 3 : 2
+
+const getG3OnCurveCode = (path: PathData, node: PathNode, index: number) => {
+  const base = getOnCurveNodeKeyword(path, index) === 'CURVE' ? 'c' : 'l'
+  return node.type === 'smooth' ? `${base}s` : base
+}
+
+// Glyphs 3 node: compact tuple `(x,y,type)` with type l/ls/c/cs/o/q.
+const serializeG3Node = (path: PathData, node: PathNode, index: number) => {
+  const coords = `${Math.round(node.x)},${Math.round(node.y)}`
+  const code =
+    node.type === 'offcurve'
+      ? 'o'
+      : node.type === 'qcurve'
+        ? 'q'
+        : getG3OnCurveCode(path, node, index)
+  return new RawGlyphsValue(`(${coords},${code})`)
+}
+
+const serializeLayerShapesG3 = (layer: GlyphLayerData) => {
+  const contours = layer.paths.map((path) => ({
+    closed: path.closed ? 1 : 0,
+    nodes: path.nodes.map((node, nodeIndex) =>
+      serializeG3Node(path, node, nodeIndex)
+    ),
+  }))
+
+  const components = layer.componentRefs.map((component) => {
+    // Read pos/scale/angle straight from the ref fields. The folded matrix would
+    // mix rotation into the diagonal, so it cannot be reused for `scale` here.
+    // Shear (xyScale/yxScale) has no Glyphs 3 native field and is dropped.
+    const x = Math.round(component.x)
+    const y = Math.round(component.y)
+    const hasScale = component.scaleX !== 1 || component.scaleY !== 1
+    return {
+      ref: component.glyphId,
+      ...(x !== 0 || y !== 0 ? { pos: new RawGlyphsValue(`(${x},${y})`) } : {}),
+      ...(hasScale
+        ? {
+            scale: new RawGlyphsValue(
+              `(${component.scaleX},${component.scaleY})`
+            ),
+          }
+        : {}),
+      ...(component.rotation ? { angle: component.rotation } : {}),
+    }
+  })
+
+  return [...contours, ...components]
+}
+
+const serializeLayerAnchorsG3 = (layer: GlyphLayerData) =>
+  layer.anchors.map((anchor) => ({
+    name: anchor.name,
+    pos: new RawGlyphsValue(
+      `(${Math.round(anchor.x)},${Math.round(anchor.y)})`
+    ),
+  }))
+
+const serializeLayerGuidesG3 = (layer: GlyphLayerData) =>
+  layer.guidelines.map((guide) => ({
+    pos: new RawGlyphsValue(`(${Math.round(guide.x)},${Math.round(guide.y)})`),
+    ...(guide.angle ? { angle: guide.angle } : {}),
+    ...(guide.locked ? { locked: 1 } : {}),
+    ...(guide.name ? { name: guide.name } : {}),
+  }))
+
 export const applyLayerEdits = (
   targetLayer: Record<string, unknown>,
-  layer: GlyphLayerData
+  layer: GlyphLayerData,
+  formatVersion: GlyphsFormatVersion = 2
 ) => {
   targetLayer.layerId = layer.id
   targetLayer.associatedMasterId = layer.associatedMasterId ?? layer.id
   targetLayer.name = layer.name
   targetLayer.width = Math.round(layer.metrics.width)
+
+  if (formatVersion >= 3) {
+    targetLayer.shapes = serializeLayerShapesG3(layer)
+    targetLayer.anchors = serializeLayerAnchorsG3(layer)
+    targetLayer.guides = serializeLayerGuidesG3(layer)
+    // Drop any stale Glyphs 2 keys carried over from the source layer.
+    delete targetLayer.paths
+    delete targetLayer.components
+    return
+  }
+
   targetLayer.paths = serializeLayerPaths(layer)
   targetLayer.components = serializeLayerComponents(layer)
   targetLayer.anchors = serializeLayerAnchors(layer)
@@ -245,7 +347,8 @@ const createBaseGlyphsDocument = (
 
 const createPatchedGlyphRecord = (
   rawGlyph: Record<string, unknown> | undefined,
-  glyph: GlyphData
+  glyph: GlyphData,
+  formatVersion: GlyphsFormatVersion = 2
 ) => {
   const patchedGlyph: Record<string, unknown> = {
     ...(rawGlyph ?? {}),
@@ -280,7 +383,7 @@ const createPatchedGlyphRecord = (
     }
 
     const patchedLayer = { ...rawLayer }
-    applyLayerEdits(patchedLayer, editedLayer)
+    applyLayerEdits(patchedLayer, editedLayer, formatVersion)
     patchedLayers.push(patchedLayer)
     layerMap.delete(layerId)
   }
@@ -306,7 +409,7 @@ const createPatchedGlyphRecord = (
       layerId,
       associatedMasterId: layer.associatedMasterId ?? layerId,
     }
-    applyLayerEdits(patchedLayer, layer)
+    applyLayerEdits(patchedLayer, layer, formatVersion)
     patchedLayers.push(patchedLayer)
   }
 
@@ -318,7 +421,8 @@ const serializeGlyphsArrayToChunks = (
   rawGlyphs: Array<Record<string, unknown>>,
   fontData: FontData,
   chunks: string[],
-  indentLevel: number
+  indentLevel: number,
+  formatVersion: GlyphsFormatVersion
 ) => {
   const indent = '  '.repeat(indentLevel)
   const childIndent = '  '.repeat(indentLevel + 1)
@@ -350,7 +454,7 @@ const serializeGlyphsArrayToChunks = (
       .find((id): id is string => Boolean(id))
     const editedGlyph = matchedId ? glyphsById.get(matchedId) : undefined
     const valueToWrite = editedGlyph
-      ? createPatchedGlyphRecord(rawGlyph, editedGlyph)
+      ? createPatchedGlyphRecord(rawGlyph, editedGlyph, formatVersion)
       : rawGlyph
 
     chunks.push(childIndent)
@@ -369,7 +473,7 @@ const serializeGlyphsArrayToChunks = (
 
     chunks.push(childIndent)
     serializeOpenStepValueToChunks(
-      createPatchedGlyphRecord(undefined, glyph),
+      createPatchedGlyphRecord(undefined, glyph, formatVersion),
       chunks,
       indentLevel + 1
     )
@@ -397,6 +501,7 @@ export const serializeGlyphsFileToBlob = (
       ? glyphsDocument
       : createBaseGlyphsDocument(fontData, projectMetadata)
 
+  const formatVersion = detectGlyphsFormatVersion(baseDocument)
   const chunks: string[] = []
 
   const entries = Object.entries(
@@ -410,7 +515,13 @@ export const serializeGlyphsFileToBlob = (
       const rawGlyphs = Array.isArray(entryValue)
         ? (entryValue as Array<Record<string, unknown>>)
         : []
-      serializeGlyphsArrayToChunks(rawGlyphs, fontData, chunks, 1)
+      serializeGlyphsArrayToChunks(
+        rawGlyphs,
+        fontData,
+        chunks,
+        1,
+        formatVersion
+      )
     } else {
       serializeOpenStepValueToChunks(entryValue, chunks, 1)
     }
