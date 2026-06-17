@@ -2,6 +2,8 @@
 
 本文件記錄 Kumiko 支援 variable font（多 master 插值、補不同字重）的設計與分階段實作計畫，作為日後動工的起點。產品脈絡見 [產品定位與開發路線](product-direction.md)，跟進 fontra 的整體策略見 [與 fontra 的相容與跟進策略](fontra-parity.md)。
 
+> 前置工程：本文件預設 `FontData.sources` 已填妥多個 master。「這些 master 從哪個檔案格式來、如何進入資料模型、如何在 UI 切換」見 [多 Master 支援 Roadmap Spec](multi-master.md)。
+
 ## 範圍
 
 目標是讓同一個 glyph 能在多個 master（source）之間插值，於設計空間任一位置預覽與編輯，最終匯出 instance。補字工作流的延伸需求是「補一個字重後，能在其他字重看到對應結果」。

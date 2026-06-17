@@ -1,0 +1,164 @@
+# 多 Master 支援：Roadmap Spec
+
+本文件規畫 Kumiko 的多 master（多 source）支援，作為 [Variable Font 支援](variable-fonts.md) 的前置工程。產品脈絡見 [產品定位與開發路線](product-direction.md)，跟進 fontra 的策略見 [與 fontra 的相容與跟進策略](fontra-parity.md)。
+
+variable-fonts.md 預設了 `FontData.sources` 已填妥多個 master；本文件補上「這些 master 從哪個檔案格式來、如何進入資料模型、如何在 UI 切換」這一段。
+
+## 範圍
+
+讓同一個字體擁有多個 master，於 overview 與 editor 切換檢視/編輯任一 master，並讓各來源格式（`.glyphs` / `.glyphspackage` / `.designspace` + 多 `.ufo` / 單一 `.ufo`）的多 master 資料能正確進出。
+
+不在本文件範圍：插值與設計空間任意位置預覽（屬 variable-fonts.md）。本文件只負責「離散的 master 集合」與其切換。
+
+## 核心概念：master 是字體層級，layer 是字形層級
+
+這條界線決定整個狀態設計：
+
+- **master / source**：字體層級（font-wide）。存於 `FontData.sources[id]`，帶 `location`（設計空間座標）與 `name`。
+- **layer**：字形層級（per-glyph）。`GlyphData.layers[layerId]`，每個 master layer 以 `associatedMasterId` 指回某個 source；`type: 'backup'` 的 layer 與 master 無關，是單字內的快照。
+
+在某個字內，「目前要編輯/檢視的 master layer」＝該字中 `associatedMasterId === activeMasterId` 的 layer。Glyphs 與 fontra 皆採此模型。
+
+### sparse master
+
+補字情境下，某字可能尚無某 master 的 layer（sparse）。資料模型上即「該 glyph 的 layers 沒有對應 `activeMasterId` 的項目」。UI 需明確標示並提供「建立此 master 的 layer」（空白或自預設 master 複製）。
+
+## 現況盤點
+
+### 已就緒
+
+- 資料模型支援多 master：`FontData.axes`、`FontData.sources`（各帶 `location`）、`GlyphLayerData.type: 'master' | 'backup'` 與 `associatedMasterId`（`src/store/types.ts`）。
+- 插值演算法已移植（見 variable-fonts.md），與多 master 解耦。
+- 既有 layer 取值：`getGlyphLayer(glyph, layerId)`、`syncGlyphTopLevelFromLayer`（`src/store/glyphLayer.ts`）。
+- UFO 匯入會建立 `sources`：`fontSourcesFromLib()` / `fontAxesFromLib()`（`src/lib/fontFormats/ufoFormat.ts`、`fontInfoSettings.ts`）。
+- 既有 backup layer 切換 UI：`LayerListCard`（`src/features/editor/rightPanel/components/LayerListCard.tsx`）。
+
+### 缺口
+
+- **狀態混用**：store 只有 `selectedLayerId`（預設 `'default'`），把「切 master」與「切 backup layer」混在一起，缺乏字體層級的 `activeMasterId`。
+- **`.glyphs` / `.glyphspackage` 多 master 被壓平**：`fontMaster[]` 僅原樣存入 `projectMetadata.fontMasters` 供 round-trip 匯出（`glyphsDocument.ts`、`glyphsExport.ts`），未轉成 `FontData.sources` / `axes`，每字只載第一個 master 的輪廓。
+- **無 `.designspace` 支援**：`src/` 無任何 designspace 解析，多 `.ufo` 無法以多 master 形式載入（目前 `UfoProjectRecord.ufoIds[]` 僅載 `selectedUfoId` 一個）。
+- **渲染只畫單一 layer**：GlyphCard 與 Canvas 取 `glyph.paths`（active layer），未依 `activeMasterId` 解析。
+- **無 master 切換 UI**：overview / editor 皆無 master 切換器。
+
+## 各來源格式的多 master 對應
+
+| 來源 | 多 master 載體 | 目前 | 目標 |
+| ---- | -------------- | ---- | ---- |
+| `.glyphs` / `.glyphspackage` | 內建 `fontMaster` + 每字多 layer | 壓平成單 master | 展開為 `sources` + 每字 master layers |
+| `.designspace` + 多 `.ufo` | designspace XML + N 個 ufo | 不支援 | 解析 designspace → `axes`/`sources`/`instances`，逐 source 載入 |
+| 單一 `.ufo` | 一個檔＝一個 master | 正常（單一 source） | 維持 |
+
+> UFO 格式本身一個 `.ufo` 即一個 master；UFO3 的 layer 是 background/替代字形用途，**不可**作為插值 master。多 master 一律走 `.designspace` + 多 `.ufo`。
+
+## 架構設計
+
+### 狀態模型
+
+新增字體層級的 active master，與既有 per-glyph backup 選擇分離：
+
+- store 新增 `activeMasterId: string | null`（＝ `FontSource.id`）與 `setActiveMasterId(id)`。
+- 新增解析輔助：`getActiveLayer(glyph, activeMasterId)` → 回傳該字中 `associatedMasterId === activeMasterId` 的 master layer；無則回 `null`（sparse）。
+- `selectedLayerId` 收斂為「單字內是否改看某 backup layer」的覆寫；未覆寫時 editor 編輯目標＝active master layer。
+
+#### 為 VF 預留：editLocation 從一開始就存在
+
+關鍵接縫：多 master 的選擇是**離散的**（只能落在某個既有 master），但 variable font（variable-fonts.md Phase 1）需要的是**連續的設計空間 location**。為避免 VF 階段回頭重做狀態層，本期就把「目前位置」設計成 location：
+
+- store 同時持有 `editLocation: Record<string, number>`（設計空間座標）。
+- `setActiveMasterId(id)` 內部除了設 `activeMasterId`，也把 `editLocation = sources[id].location`（master 切換＝吸附到該 source location，是 location 的特例）。
+- `activeMasterId` 由 `editLocation` 反查：恰好等於某 source location 時即該 master，否則為 `null`（位於 master 之間）。
+
+如此 VF 階段只需：(1) 解除「location 必須等於某 master」限制、加軸 slider；(2) 渲染分支多一條——落在 master 上 → `getActiveLayer` 走編輯路徑，落在 master 之間 → 插值器產 read-only instance。`getActiveLayer` 與插值器並存而非互斥。
+
+### 匯入
+
+統一目標：所有來源都填出 `FontData.axes` + `FontData.sources` + 每字的 master layers，並設定初始 `activeMasterId`（default master）。
+
+- **`.glyphs` / `.glyphspackage`**：解析 `Axes` → `axes`；`fontMaster[]` → `sources`（`id`=master id、`name`=`customName`/`name`、`location`=各軸值）；每字各 `layer`（其 `layerId` 對應 master）→ `GlyphLayerData{ type:'master', associatedMasterId }`。`projectMetadata.fontMasters` 仍保留供 round-trip。
+- **`.designspace` + 多 `.ufo`**：解析 designspace XML → `axes` / `sources` / `instances`（→ `exportInstances`）；逐 `<source>` 載入對應 `.ufo` 字形到該 master layer；ufoPersistence 的 `ufoIds[]` 真正對映成 sources。
+- **單一 `.ufo`**：維持現狀。
+
+### 匯出
+
+- `.glyphs`：沿用既有 round-trip。
+- UFO 多 master：匯出 `.designspace` + N 個 `.ufo`（新）。
+
+### 渲染
+
+GlyphCard 與 Canvas 改以 `getActiveLayer(glyph, activeMasterId)` 取得輪廓，而非 `glyph.paths`：
+
+- GlyphCard：傳入 `activeMasterId`，以對應 layer 的 `paths` / `componentRefs` 餵 `buildGlyphPreviewData`。
+- Canvas：`activeLayerId` 解析順序為 `selectedLayerId(backup 覆寫)` → active master layer → `null`。
+
+## UI 設計
+
+overview 與 editor 共用同一個 master 切換器元件，差別只在擺放位置：
+
+- **少量 master（≤4~5）**：segmented pills，逐顆顯示 master `name`，選中態以 `info` 底色，hover 顯示 `location`。
+- **數量多或名稱長**：退化為「目前 master + dropdown」。建議規則：master 數 ≤4 用 pills，>4 用 dropdown。
+- **sparse**：此字無該 master layer 時，pill / 列以虛線框 + `+` 表示「點此建立 layer」。
+
+擺放位置：
+
+- **Overview**：放在字符總覽標題列右邊（`OverviewContent.tsx` 的 title + Add Glyph `HStack` 內，title 右側）。
+- **Editor**：浮動於 canvas 上方（既有 `CanvasWorkspaceOverlay` 工具列在底部置中；master 切換器置於頂部，與工具列分離）。
+
+### Master 名稱是自訂的
+
+master 名稱無固定字串（Glyphs 的 `customName`、designspace 的 source name 皆任意），不可假設為 Regular/Bold，數量也不固定。元件須：
+
+- 名稱任意長度 → `max-width` + 截斷 + tooltip。
+- 名稱為空 → fallback 以 `location` 組標籤（如 `wght 700`）。
+- hover 顯示完整 `location`。
+
+## 分階段實作
+
+### M0 — 狀態拆分與渲染解耦
+
+- store 新增 `activeMasterId` 與 `setActiveMasterId`。
+- store 同時新增 `editLocation`；`setActiveMasterId` 連帶設 `editLocation = source.location`，讓「目前位置」這個狀態從 M0 就存在（VF 的連續 location 是其推廣）。
+- 新增 `getActiveLayer(glyph, activeMasterId)`。
+- GlyphCard / Canvas 改吃解析後的 active master layer。
+- 單 master 專案行為不變（`activeMasterId` 指向唯一 source）。
+
+### M1 — `.glyphs` / `.glyphspackage` 多 master 展開
+
+- `fontMaster[]` → `sources`、`Axes` → `axes`、每字 layers → master layers。
+- 因資料已在 `projectMetadata.fontMasters`，可在不新增解析器下打通「多 master → sources → layers → 切換渲染」全鏈路，故列為最高優先。
+
+### M2 — Master 切換 UI
+
+- 共用切換器元件（pills / dropdown 自動切換、sparse 標示）。
+- overview 標題右側、editor canvas 上方各掛一份，接 `setActiveMasterId`。
+
+### M3 — `.designspace` + 多 `.ufo`
+
+- designspace XML 讀寫；ufoPersistence 的 `ufoIds[]` 對映成 sources。
+- UFO 多 master 匯出 designspace + 多 ufo。
+
+### M4 — Master 與 sparse layer 管理
+
+- sparse layer 建立（空白 / 自預設複製）。
+- master 新增 / 刪除 / 改名管理 UI（對應 fontra designspace navigation 子集）。
+
+### 之後
+
+- 接 variable-fonts.md 的插值預覽 Phase 1→4（在離散 master 之間於任意 location 插值）。
+
+## 待決策
+
+- **`activeMasterId` 與 `selectedLayerId` 的收斂**：是否將 backup 覆寫完全併入 `selectedLayerId`，或另設獨立旗標。
+- **sparse layer 預設內容**：空白或自 default master 複製輪廓。
+- **離散軸**：italic 等離散軸於 `FontAxis` 是否加 `values`（與 variable-fonts.md 共用此決策）。
+- **`.glyphs` 舊版相容**：無 `Axes` 區塊的舊檔，是否自 master 的 `weightValue` / `widthValue` / `customParameters` 推回 axes。
+- **editLocation 的表示**：用原始設計空間座標或正規化座標儲存；以及 `activeMasterId` 反查 master 時 location 比對的容差（floating point 相等）。
+
+## fontra 對應檔案（參考來源）
+
+| 主題 | fontra 檔案 |
+| ---- | ----------- |
+| glyph 多 layer / master 控制 | `src-js/fontra-core/src/glyph-controller.js`（`VariableGlyphController`） |
+| 設計空間 / source 導覽 UI | `src-js/views-editor/src/panel-designspace-navigation.js` |
+| 多 source 同步編輯 | `src-js/views-editor/src/scene-controller.js`（`editLayersAndRecordChanges`） |
+| 資料模型定義 | `src-js/fontra-core/src/classes.json` |
