@@ -1,7 +1,6 @@
 // Pure helpers for glyph layers. With layers-as-truth all content lives in
-// GlyphData.layers (keyed by id); the active layer (glyph.activeLayerId) is the
-// editable "master", other layers are backups. These functions are immutable so
-// they can be unit-tested without the store, and are wrapped by glyphActions.
+// GlyphData.layers (keyed by id). The selected/active layer may be a backup;
+// master identity comes from the layer's type, matching Glyphs' layer UX.
 
 import type { GlyphData, GlyphLayerData } from 'src/store/types'
 
@@ -16,6 +15,12 @@ interface LayerContent {
 
 // Kept local (not imported from glyphLayer) to avoid an import cycle.
 const masterLayerId = (glyph: GlyphData): string =>
+  (glyph.layerOrder ?? []).find(
+    (id) => glyph.layers?.[id]?.type === 'master'
+  ) ??
+  Object.entries(glyph.layers ?? {}).find(
+    ([, layer]) => layer.type === 'master'
+  )?.[0] ??
   glyph.activeLayerId ??
   glyph.layerOrder?.[0] ??
   Object.keys(glyph.layers ?? {})[0] ??
@@ -47,8 +52,8 @@ const masterContent = (glyph: GlyphData): LayerContent => {
   return master ? contentOf(master) : emptyContent()
 }
 
-// The list shown in the layer panel: the active master first, then the rest in
-// layerOrder. All layers live in glyph.layers.
+// The list shown in the layer panel: master layers first, then backups in
+// layerOrder. Selection does not change a layer's master/backup identity.
 export const listGlyphLayers = (glyph: GlyphData): GlyphLayerData[] => {
   const layers = glyph.layers ?? {}
   const masterId = masterLayerId(glyph)
@@ -56,21 +61,21 @@ export const listGlyphLayers = (glyph: GlyphData): GlyphLayerData[] => {
   const seen = new Set<string>()
   const result: GlyphLayerData[] = []
 
-  const push = (id: string, type: 'master' | 'backup') => {
+  const push = (id: string) => {
     const layer = layers[id]
     if (!layer || seen.has(id)) {
       return
     }
     seen.add(id)
-    result.push({ ...layer, type })
+    result.push(layer)
   }
 
-  push(masterId, 'master')
+  push(masterId)
   for (const id of order) {
-    push(id, 'backup')
+    push(id)
   }
   for (const id of Object.keys(layers)) {
-    push(id, 'backup')
+    push(id)
   }
   return result
 }
@@ -139,14 +144,23 @@ export const deleteBackupLayer = (
   glyph: GlyphData,
   layerId: string
 ): GlyphData => {
-  // The active master cannot be deleted from the panel.
-  if (layerId === masterLayerId(glyph) || !glyph.layers?.[layerId]) {
+  // Master layers cannot be deleted from the backup-layer panel.
+  const layer = glyph.layers?.[layerId]
+  if (!layer || layer.type === 'master') {
     return glyph
   }
   const layers = { ...glyph.layers }
   delete layers[layerId]
   const layerOrder = (glyph.layerOrder ?? []).filter((id) => id !== layerId)
-  return { ...glyph, layers, layerOrder }
+  return {
+    ...glyph,
+    activeLayerId:
+      glyph.activeLayerId === layerId
+        ? masterLayerId(glyph)
+        : glyph.activeLayerId,
+    layers,
+    layerOrder,
+  }
 }
 
 // Renaming re-keys the layer (id === name), so the new name survives the UFO
@@ -157,7 +171,7 @@ export const renameBackupLayer = (
   name: string
 ): GlyphData => {
   const layer = glyph.layers?.[layerId]
-  if (!layer) {
+  if (!layer || layer.type === 'master') {
     return glyph
   }
   const id = uniqueLayerId(name, glyph, layerId)
@@ -170,7 +184,12 @@ export const renameBackupLayer = (
   const layerOrder = (glyph.layerOrder ?? []).map((existing) =>
     existing === layerId ? id : existing
   )
-  return { ...glyph, layers, layerOrder }
+  return {
+    ...glyph,
+    activeLayerId: glyph.activeLayerId === layerId ? id : glyph.activeLayerId,
+    layers,
+    layerOrder,
+  }
 }
 
 // Glyphs "Use as Master": the backup's content moves onto the master layer, and
@@ -182,7 +201,7 @@ export const promoteBackupToMaster = (
   newBackupName: string
 ): GlyphData => {
   const backup = glyph.layers?.[backupId]
-  if (!backup) {
+  if (!backup || backup.type === 'master') {
     return glyph
   }
   const masterId = masterLayerId(glyph)
@@ -212,5 +231,5 @@ export const promoteBackupToMaster = (
   if (!layerOrder.includes(newId)) {
     layerOrder.push(newId)
   }
-  return { ...glyph, layers, layerOrder }
+  return { ...glyph, activeLayerId: masterId, layers, layerOrder }
 }

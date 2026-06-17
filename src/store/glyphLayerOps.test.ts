@@ -63,6 +63,16 @@ describe('glyphLayerOps', () => {
     expect(glyph.layers!['Backup 1'].paths[0].nodes[0].x).toBe(1)
   })
 
+  it('keeps backup identity when the selected layer is a backup', () => {
+    const glyph = createBackupLayer(makeGlyph(), 'Backup 1')
+    const selectedBackup = { ...glyph, activeLayerId: 'Backup 1' }
+    const layers = listGlyphLayers(selectedBackup)
+    expect(layers.map((l) => [l.id, l.type])).toEqual([
+      ['public.default', 'master'],
+      ['Backup 1', 'backup'],
+    ])
+  })
+
   it('disambiguates same-name backups with " (2)"', () => {
     let glyph = createBackupLayer(makeGlyph(), '16 Jun, 25 17:08')
     glyph = createBackupLayer(glyph, '16 Jun, 25 17:08')
@@ -84,12 +94,32 @@ describe('glyphLayerOps', () => {
     ])
   })
 
+  it('keeps selection on a renamed backup', () => {
+    let glyph = createBackupLayer(makeGlyph(), 'Backup 1')
+    glyph = { ...glyph, activeLayerId: 'Backup 1' }
+    glyph = renameBackupLayer(glyph, 'Backup 1', 'Renamed')
+    expect(glyph.activeLayerId).toBe('Renamed')
+  })
+
+  it('does not rename master layers', () => {
+    const glyph = renameBackupLayer(makeGlyph(), 'public.default', 'Renamed')
+    expect(glyph.layers?.['public.default']?.name).toBe('public.default')
+    expect(glyph.layers?.Renamed).toBeUndefined()
+  })
+
   it('deletes backups but never the master', () => {
     let glyph = createBackupLayer(makeGlyph(), 'Backup 1')
     glyph = deleteBackupLayer(glyph, 'public.default')
     expect(glyph.layers!['Backup 1']).toBeDefined()
     glyph = deleteBackupLayer(glyph, 'Backup 1')
     expect(listGlyphLayers(glyph)).toHaveLength(1)
+  })
+
+  it('returns selection to the master when deleting the selected backup', () => {
+    let glyph = createBackupLayer(makeGlyph(), 'Backup 1')
+    glyph = { ...glyph, activeLayerId: 'Backup 1' }
+    glyph = deleteBackupLayer(glyph, 'Backup 1')
+    expect(glyph.activeLayerId).toBe('public.default')
   })
 
   it('duplicates a layer into a new backup', () => {
@@ -115,9 +145,20 @@ describe('glyphLayerOps', () => {
     expect(result.layers!['public.default'].paths[0].nodes[0].x).toBe(50)
     expect(result.layers!['Backup 1']).toBeUndefined()
     expect(result.layers!.Previous.paths[0].nodes[0].x).toBe(1)
+    expect(result.activeLayerId).toBe('public.default')
     expect(listGlyphLayers(result).map((l) => l.id)).toEqual([
       'public.default',
       'Previous',
     ])
+  })
+
+  it('does not promote master layers through the backup action', () => {
+    const glyph = promoteBackupToMaster(
+      makeGlyph(),
+      'public.default',
+      'Previous'
+    )
+    expect(glyph.layers?.Previous).toBeUndefined()
+    expect(glyph.layers?.['public.default']?.type).toBe('master')
   })
 })

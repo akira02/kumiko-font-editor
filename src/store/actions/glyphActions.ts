@@ -417,10 +417,11 @@ export const buildGlyphActions = (set: ImmerSet) => ({
       if (!glyph) {
         return
       }
-      state.fontData!.glyphs[glyphId] = deleteBackupLayer(
-        current(glyph),
-        layerId
-      )
+      const nextGlyph = deleteBackupLayer(current(glyph), layerId)
+      state.fontData!.glyphs[glyphId] = nextGlyph
+      if (state.selectedLayerId === layerId) {
+        state.selectedLayerId = nextGlyph.activeLayerId ?? null
+      }
       markGlyphDirty(state, glyphId)
     }),
 
@@ -430,11 +431,11 @@ export const buildGlyphActions = (set: ImmerSet) => ({
       if (!glyph) {
         return
       }
-      state.fontData!.glyphs[glyphId] = renameBackupLayer(
-        current(glyph),
-        layerId,
-        name
-      )
+      const nextGlyph = renameBackupLayer(current(glyph), layerId, name)
+      state.fontData!.glyphs[glyphId] = nextGlyph
+      if (state.selectedLayerId === layerId) {
+        state.selectedLayerId = nextGlyph.activeLayerId ?? null
+      }
       markGlyphDirty(state, glyphId)
     }),
 
@@ -444,11 +445,15 @@ export const buildGlyphActions = (set: ImmerSet) => ({
       if (!glyph) {
         return
       }
-      state.fontData!.glyphs[glyphId] = promoteBackupToMaster(
+      const nextGlyph = promoteBackupToMaster(
         current(glyph),
         layerId,
         backupLayerName()
       )
+      state.fontData!.glyphs[glyphId] = nextGlyph
+      if (state.selectedLayerId === layerId) {
+        state.selectedLayerId = nextGlyph.activeLayerId ?? null
+      }
       state.selectedNodeIds = []
       state.selectedSegment = null
       markGlyphDirty(state, glyphId)

@@ -2,11 +2,9 @@ import {
   Badge,
   Box,
   Button,
-  Editable,
-  EditableInput,
-  EditablePreview,
   HStack,
   Heading,
+  Input,
   Menu,
   MenuButton,
   MenuItem,
@@ -15,6 +13,7 @@ import {
   Text,
 } from '@chakra-ui/react'
 import { EyeClosed, EyeSolid } from 'iconoir-react'
+import { useState, type KeyboardEvent, type MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useStore, type GlyphLayerData } from 'src/store'
 
@@ -43,7 +42,8 @@ function EyeToggle({
       color={isDisabled ? 'field.muted' : 'field.ink'}
       opacity={isDisabled ? 0.4 : 1}
       cursor={isDisabled ? 'default' : 'pointer'}
-      onClick={() => {
+      onClick={(event: MouseEvent<HTMLButtonElement>) => {
+        event.stopPropagation()
         if (!isDisabled) onToggle()
       }}
     >
@@ -66,6 +66,8 @@ export function LayerListCard({
   onSelectLayer,
 }: LayerListCardProps) {
   const { t } = useTranslation()
+  const [renamingLayerId, setRenamingLayerId] = useState<string | null>(null)
+  const [renameValue, setRenameValue] = useState('')
   const createBackupLayer = useStore((state) => state.createBackupLayer)
   const duplicateLayer = useStore((state) => state.duplicateLayer)
   const deleteBackupLayer = useStore((state) => state.deleteBackupLayer)
@@ -84,6 +86,14 @@ export function LayerListCard({
   const setReferenceFontVisible = useStore(
     (state) => state.setReferenceFontVisible
   )
+  const submitRename = (layer: GlyphLayerData) => {
+    const name = renameValue.trim() || layer.name
+    setRenamingLayerId(null)
+    setRenameValue('')
+    if (name !== layer.name) {
+      renameBackupLayer(glyphId, layer.id, name)
+    }
+  }
 
   return (
     <Box p={4} bg="field.panel" borderRadius="sm">
@@ -107,6 +117,8 @@ export function LayerListCard({
           const visible = isMaster
             ? !(isActive && hideActiveLayer)
             : visibleBackdropLayerIds.includes(layer.id)
+          const rowBg = isActive ? 'blackAlpha.100' : 'transparent'
+          const rowBorderColor = isActive ? 'field.yellow.400' : 'transparent'
 
           return (
             <HStack
@@ -115,7 +127,11 @@ export function LayerListCard({
               px={2}
               py={1.5}
               borderRadius="sm"
-              bg={isActive ? 'blackAlpha.100' : 'transparent'}
+              bg={rowBg}
+              borderLeft="3px solid"
+              borderColor={rowBorderColor}
+              cursor="default"
+              onClick={() => onSelectLayer(layer.id)}
             >
               <EyeToggle
                 visible={visible}
@@ -134,38 +150,60 @@ export function LayerListCard({
                   flex="1"
                   minW={0}
                   textAlign="left"
-                  onClick={() => onSelectLayer(layer.id)}
                 >
                   <Text fontSize="sm" fontWeight="700" noOfLines={1}>
                     {layer.name || layer.id}
                   </Text>
                 </Box>
               ) : (
-                <Editable
-                  flex="1"
-                  minW={0}
-                  fontSize="sm"
-                  defaultValue={layer.name}
-                  onSubmit={(value) =>
-                    renameBackupLayer(
-                      glyphId,
-                      layer.id,
-                      value.trim() || layer.name
-                    )
-                  }
-                >
-                  <EditablePreview noOfLines={1} />
-                  <EditableInput />
-                </Editable>
+                <Box flex="1" minW={0} ml={4}>
+                  {renamingLayerId === layer.id ? (
+                    <Input
+                      size="xs"
+                      autoFocus
+                      value={renameValue}
+                      onClick={(event) => event.stopPropagation()}
+                      onChange={(event) => setRenameValue(event.target.value)}
+                      onBlur={() => submitRename(layer)}
+                      onKeyDown={(event: KeyboardEvent<HTMLInputElement>) => {
+                        if (event.key === 'Enter') {
+                          event.currentTarget.blur()
+                        }
+                        if (event.key === 'Escape') {
+                          setRenamingLayerId(null)
+                          setRenameValue('')
+                        }
+                      }}
+                    />
+                  ) : (
+                    <Text
+                      as="button"
+                      type="button"
+                      w="100%"
+                      minW={0}
+                      textAlign="left"
+                      fontSize="sm"
+                      color="field.ink"
+                      noOfLines={1}
+                      onDoubleClick={(event) => {
+                        event.stopPropagation()
+                        setRenamingLayerId(layer.id)
+                        setRenameValue(layer.name)
+                      }}
+                    >
+                      {layer.name}
+                    </Text>
+                  )}
+                </Box>
               )}
 
-              {isMaster ? (
-                isActive ? (
-                  <Badge colorScheme="cyan" fontSize="2xs">
-                    {t('editor.layerEditing')}
-                  </Badge>
-                ) : null
-              ) : (
+              {isActive ? (
+                <Badge colorScheme="cyan" fontSize="2xs">
+                  {t('editor.layerEditing')}
+                </Badge>
+              ) : null}
+
+              {!isMaster ? (
                 <Menu>
                   <MenuButton
                     as={Button}
@@ -173,6 +211,7 @@ export function LayerListCard({
                     variant="ghost"
                     px={1}
                     aria-label={t('editor.layerActions')}
+                    onClick={(event) => event.stopPropagation()}
                   >
                     ⋯
                   </MenuButton>
@@ -192,7 +231,7 @@ export function LayerListCard({
                     </MenuItem>
                   </MenuList>
                 </Menu>
-              )}
+              ) : null}
             </HStack>
           )
         })}

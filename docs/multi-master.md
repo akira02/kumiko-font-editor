@@ -53,11 +53,11 @@ fontra（`classes.py`）的 `VariableGlyph` 無 top-level 內容，`layers: dict
 
 ## 各來源格式的多 master 對應
 
-| 來源 | 多 master 載體 | 目前 | 目標 |
-| ---- | -------------- | ---- | ---- |
-| `.designspace` + 多 `.ufo` | designspace XML + N 個 ufo | 不支援 | 解析 designspace → `axes`/`sources`/`instances`，逐 source 載入成多 master layers |
-| 單一 `.ufo` | 一個檔＝一個 master | 正常（單一 source） | 維持 |
-| `.glyphs` / `.glyphspackage` | 內建 `fontMaster` + 每字多 layer | **無匯入**（僅匯出骨架） | 之後獨立實作完整 importer（OpenStep 輪廓/節點/master 解析） |
+| 來源                         | 多 master 載體                   | 目前                     | 目標                                                                              |
+| ---------------------------- | -------------------------------- | ------------------------ | --------------------------------------------------------------------------------- |
+| `.designspace` + 多 `.ufo`   | designspace XML + N 個 ufo       | 不支援                   | 解析 designspace → `axes`/`sources`/`instances`，逐 source 載入成多 master layers |
+| 單一 `.ufo`                  | 一個檔＝一個 master              | 正常（單一 source）      | 維持                                                                              |
+| `.glyphs` / `.glyphspackage` | 內建 `fontMaster` + 每字多 layer | **無匯入**（僅匯出骨架） | 之後獨立實作完整 importer（OpenStep 輪廓/節點/master 解析）                       |
 
 > UFO 格式本身一個 `.ufo` 即一個 master；UFO3 的 layer 是 background/替代字形用途，**不可**作為插值 master。多 master 一律走 `.designspace` + 多 `.ufo`。
 
@@ -173,9 +173,9 @@ master 名稱無固定字串（Glyphs 的 `customName`、designspace 的 source 
 
 ## fontra 對應檔案（參考來源）
 
-| 主題 | fontra 檔案 |
-| ---- | ----------- |
-| glyph 多 layer / master 控制 | `src-js/fontra-core/src/glyph-controller.js`（`VariableGlyphController`） |
-| 設計空間 / source 導覽 UI | `src-js/views-editor/src/panel-designspace-navigation.js` |
-| 多 source 同步編輯 | `src-js/views-editor/src/scene-controller.js`（`editLayersAndRecordChanges`） |
-| 資料模型定義 | `src-js/fontra-core/src/classes.json` |
+| 主題                         | fontra 檔案                                                                   |
+| ---------------------------- | ----------------------------------------------------------------------------- |
+| glyph 多 layer / master 控制 | `src-js/fontra-core/src/glyph-controller.js`（`VariableGlyphController`）     |
+| 設計空間 / source 導覽 UI    | `src-js/views-editor/src/panel-designspace-navigation.js`                     |
+| 多 source 同步編輯           | `src-js/views-editor/src/scene-controller.js`（`editLayersAndRecordChanges`） |
+| 資料模型定義                 | `src-js/fontra-core/src/classes.json`                                         |
