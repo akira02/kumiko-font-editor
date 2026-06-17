@@ -7,6 +7,8 @@ import {
 import type { PathHitInfo } from 'src/sceneView/SceneView'
 import {
   useStore,
+  activeLayer,
+  getGlyphLayer,
   type NodeType,
   type PathData,
   type PathNode,
@@ -323,7 +325,9 @@ export class PenTool extends BaseTool {
     }
 
     const [pathId, nodeId] = selectedNodeId.split(':')
-    const path = glyph.paths.find((candidate) => candidate.id === pathId)
+    const path = activeLayer(glyph).paths.find(
+      (candidate) => candidate.id === pathId
+    )
     const node = path?.nodes.find((candidate) => candidate.id === nodeId)
     if (
       !path ||
@@ -356,7 +360,7 @@ export class PenTool extends BaseTool {
     const glyph = glyphId
       ? useStore.getState().fontData?.glyphs[glyphId]
       : undefined
-    const path = glyph?.paths.find(
+    const path = getGlyphLayer(glyph, null)?.paths.find(
       (candidate) => candidate.id === pointRef?.pathId
     )
     const node = path?.nodes.find(
@@ -551,7 +555,7 @@ export class PenTool extends BaseTool {
     return pointIndices
       .map((pointIndex) => {
         const pointRef = pointRefs[pointIndex]
-        const path = glyph.paths.find(
+        const path = activeLayer(glyph).paths.find(
           (candidate) => candidate.id === pointRef?.pathId
         )
         const node = path?.nodes.find(
@@ -689,8 +693,8 @@ export class PenTool extends BaseTool {
     const glyph = glyphId
       ? useStore.getState().fontData?.glyphs[glyphId]
       : undefined
-    return glyph?.paths
-      .find((path) => path.id === pointRef.pathId)
+    return getGlyphLayer(glyph, null)
+      ?.paths.find((path) => path.id === pointRef.pathId)
       ?.nodes.find((node) => node.id === pointRef.nodeId)
   }
 
@@ -788,7 +792,7 @@ export class PenTool extends BaseTool {
     }
 
     const glyph = useStore.getState().fontData?.glyphs[glyphId]
-    const path = glyph?.paths.find(
+    const path = getGlyphLayer(glyph, null)?.paths.find(
       (candidate) => candidate.id === target.pathId
     )
     const node = path?.nodes.find(

@@ -59,8 +59,19 @@ const isFiniteNumber = (value: number) => Number.isFinite(value)
 
 const round = (value: number) => Math.round(value)
 
-const getActiveLayer = (glyph: GlyphData): GlyphData | GlyphLayerData =>
-  getGlyphLayer(glyph, glyph.activeLayerId) ?? glyph
+const EMPTY_LAYER: GlyphLayerData = {
+  id: '',
+  name: '',
+  paths: [],
+  components: [],
+  componentRefs: [],
+  anchors: [],
+  guidelines: [],
+  metrics: { lsb: 0, rsb: 0, width: 0 },
+}
+
+const getActiveLayer = (glyph: GlyphData): GlyphLayerData =>
+  getGlyphLayer(glyph, glyph.activeLayerId) ?? EMPTY_LAYER
 
 export const getQualityScopeGlyphs = ({
   fontData,
@@ -124,7 +135,7 @@ const getPathBounds = (path: PathData): Bounds | null => {
   }
 }
 
-export const getGlyphBounds = (glyph: Pick<GlyphData, 'paths'>) => {
+export const getGlyphBounds = (glyph: Pick<GlyphLayerData, 'paths'>) => {
   const nodes = glyph.paths.flatMap((path) => path.nodes)
   if (nodes.length === 0) {
     return null

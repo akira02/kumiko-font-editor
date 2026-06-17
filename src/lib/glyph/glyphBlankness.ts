@@ -1,4 +1,4 @@
-import type { GlyphData } from 'src/store'
+import { activeLayer, type GlyphData } from 'src/store'
 
 const knownBlankGlyphNames = new Set([
   'cr',
@@ -45,8 +45,10 @@ export const isKnownBlankGlyph = (glyph: GlyphData) => {
     : false
 }
 
-export const hasDrawableGlyphContent = (glyph: GlyphData) =>
-  glyph.paths.length > 0 || glyph.componentRefs.length > 0
+export const hasDrawableGlyphContent = (glyph: GlyphData) => {
+  const layer = activeLayer(glyph)
+  return layer.paths.length > 0 || layer.componentRefs.length > 0
+}
 
 export const isEmptyGlyphToEdit = (glyph: GlyphData) =>
   !isKnownBlankGlyph(glyph) && !hasDrawableGlyphContent(glyph)

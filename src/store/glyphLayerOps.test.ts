@@ -13,20 +13,31 @@ const makeGlyph = (): GlyphData => ({
   id: 'g1',
   name: 'a',
   activeLayerId: 'public.default',
-  paths: [
-    {
-      id: 'p1',
-      closed: true,
-      nodes: [{ id: 'n1', x: 1, y: 2, type: 'corner' }],
+  layerOrder: ['public.default'],
+  layers: {
+    'public.default': {
+      id: 'public.default',
+      name: 'public.default',
+      type: 'master',
+      associatedMasterId: 'public.default',
+      paths: [
+        {
+          id: 'p1',
+          closed: true,
+          nodes: [{ id: 'n1', x: 1, y: 2, type: 'corner' }],
+        },
+      ],
+      components: [],
+      componentRefs: [],
+      anchors: [],
+      guidelines: [],
+      metrics: { lsb: 0, rsb: 0, width: 500 },
     },
-  ],
-  components: [],
-  componentRefs: [],
-  metrics: { lsb: 0, rsb: 0, width: 500 },
+  },
 })
 
 describe('glyphLayerOps', () => {
-  it('lists the active master synthesised from hot content', () => {
+  it('lists the active master from the layers map', () => {
     const layers = listGlyphLayers(makeGlyph())
     expect(layers).toHaveLength(1)
     expect(layers[0].id).toBe('public.default')
@@ -34,7 +45,7 @@ describe('glyphLayerOps', () => {
     expect(layers[0].paths[0].nodes[0].x).toBe(1)
   })
 
-  it('creates a backup whose id is its name, snapshotting hot content', () => {
+  it('creates a backup whose id is its name, snapshotting the master content', () => {
     const glyph = createBackupLayer(makeGlyph(), 'Backup 1')
     const layers = listGlyphLayers(glyph)
     expect(layers.map((l) => l.id)).toEqual(['public.default', 'Backup 1'])
@@ -42,7 +53,7 @@ describe('glyphLayerOps', () => {
     expect(layers[1].name).toBe('Backup 1')
     expect(layers[1].paths[0].nodes[0].x).toBe(1)
     // mutating the master afterwards must not mutate the backup snapshot
-    glyph.paths = [
+    glyph.layers!['public.default'].paths = [
       {
         id: 'p1',
         closed: true,
@@ -91,7 +102,7 @@ describe('glyphLayerOps', () => {
     ])
   })
 
-  it('promoteBackupToMaster swaps backup into hot, keeping old hot as a backup', () => {
+  it('promoteBackupToMaster swaps backup into the master, keeping old master as a backup', () => {
     const glyph = createBackupLayer(makeGlyph(), 'Backup 1')
     glyph.layers!['Backup 1'].paths = [
       {
@@ -101,7 +112,7 @@ describe('glyphLayerOps', () => {
       },
     ]
     const result = promoteBackupToMaster(glyph, 'Backup 1', 'Previous')
-    expect(result.paths[0].nodes[0].x).toBe(50)
+    expect(result.layers!['public.default'].paths[0].nodes[0].x).toBe(50)
     expect(result.layers!['Backup 1']).toBeUndefined()
     expect(result.layers!.Previous.paths[0].nodes[0].x).toBe(1)
     expect(listGlyphLayers(result).map((l) => l.id)).toEqual([

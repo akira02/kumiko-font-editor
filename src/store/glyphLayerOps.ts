@@ -1,7 +1,7 @@
-// Pure helpers for Glyphs-style backup layers. The active layer is the editable
-// "hot" content held at the GlyphData top level; backup layers are outline
-// snapshots kept in GlyphData.layers. These functions are immutable so they can
-// be unit-tested without the store, and are wrapped by glyphActions.
+// Pure helpers for glyph layers. With layers-as-truth all content lives in
+// GlyphData.layers (keyed by id); the active layer (glyph.activeLayerId) is the
+// editable "master", other layers are backups. These functions are immutable so
+// they can be unit-tested without the store, and are wrapped by glyphActions.
 
 import type { GlyphData, GlyphLayerData } from 'src/store/types'
 
@@ -14,21 +14,15 @@ interface LayerContent {
   metrics: GlyphLayerData['metrics']
 }
 
+// Kept local (not imported from glyphLayer) to avoid an import cycle.
 const masterLayerId = (glyph: GlyphData): string =>
-  glyph.activeLayerId ?? 'public.default'
+  glyph.activeLayerId ??
+  glyph.layerOrder?.[0] ??
+  Object.keys(glyph.layers ?? {})[0] ??
+  'public.default'
 
-// Snapshots are deep-copied so a backup never shares mutable arrays with the
-// hot content (or vice versa).
+// Content is deep-copied so a new layer never shares mutable arrays.
 const clone = <T>(value: T): T => structuredClone(value)
-
-const snapshotHot = (glyph: GlyphData): LayerContent => ({
-  paths: clone(glyph.paths),
-  components: clone(glyph.components),
-  componentRefs: clone(glyph.componentRefs),
-  anchors: clone(glyph.anchors ?? []),
-  guidelines: clone(glyph.guidelines ?? []),
-  metrics: clone(glyph.metrics),
-})
 
 const contentOf = (layer: GlyphLayerData): LayerContent => ({
   paths: clone(layer.paths),
@@ -39,28 +33,46 @@ const contentOf = (layer: GlyphLayerData): LayerContent => ({
   metrics: clone(layer.metrics),
 })
 
-// The list shown in the layer panel: the active master (synthesised from the
-// hot content) followed by backup layers in order.
-export const listGlyphLayers = (glyph: GlyphData): GlyphLayerData[] => {
-  const masterId = masterLayerId(glyph)
-  const layers = glyph.layers ?? {}
-  const order = glyph.layerOrder ?? Object.keys(layers)
+const emptyContent = (): LayerContent => ({
+  paths: [],
+  components: [],
+  componentRefs: [],
+  anchors: [],
+  guidelines: [],
+  metrics: { lsb: 0, rsb: 0, width: 0 },
+})
 
-  const master: GlyphLayerData = {
-    id: masterId,
-    name: layers[masterId]?.name ?? 'Master',
-    type: 'master',
-    associatedMasterId: masterId,
-    ...snapshotHot(glyph),
+const masterContent = (glyph: GlyphData): LayerContent => {
+  const master = glyph.layers?.[masterLayerId(glyph)]
+  return master ? contentOf(master) : emptyContent()
+}
+
+// The list shown in the layer panel: the active master first, then the rest in
+// layerOrder. All layers live in glyph.layers.
+export const listGlyphLayers = (glyph: GlyphData): GlyphLayerData[] => {
+  const layers = glyph.layers ?? {}
+  const masterId = masterLayerId(glyph)
+  const order = glyph.layerOrder ?? Object.keys(layers)
+  const seen = new Set<string>()
+  const result: GlyphLayerData[] = []
+
+  const push = (id: string, type: 'master' | 'backup') => {
+    const layer = layers[id]
+    if (!layer || seen.has(id)) {
+      return
+    }
+    seen.add(id)
+    result.push({ ...layer, type })
   }
 
-  const backups = order
-    .filter((layerId) => layerId !== masterId)
-    .map((layerId) => layers[layerId])
-    .filter((layer): layer is GlyphLayerData => Boolean(layer))
-    .map((layer) => ({ ...layer, type: 'backup' as const }))
-
-  return [master, ...backups]
+  push(masterId, 'master')
+  for (const id of order) {
+    push(id, 'backup')
+  }
+  for (const id of Object.keys(layers)) {
+    push(id, 'backup')
+  }
+  return result
 }
 
 // A backup layer's id is its display name (a date-time string). Collisions are
@@ -97,7 +109,7 @@ export const createBackupLayer = (
     name: id,
     type: 'backup',
     associatedMasterId: masterLayerId(glyph),
-    ...snapshotHot(glyph),
+    ...masterContent(glyph),
   }
   return { ...glyph, layers, layerOrder: [...(glyph.layerOrder ?? []), id] }
 }
@@ -107,12 +119,7 @@ export const duplicateLayer = (
   sourceId: string,
   name: string
 ): GlyphData => {
-  const source =
-    sourceId === masterLayerId(glyph)
-      ? snapshotHot(glyph)
-      : glyph.layers?.[sourceId]
-        ? contentOf(glyph.layers[sourceId])
-        : null
+  const source = glyph.layers?.[sourceId]
   if (!source) {
     return glyph
   }
@@ -123,7 +130,7 @@ export const duplicateLayer = (
     name: id,
     type: 'backup',
     associatedMasterId: masterLayerId(glyph),
-    ...source,
+    ...contentOf(source),
   }
   return { ...glyph, layers, layerOrder: [...(glyph.layerOrder ?? []), id] }
 }
@@ -132,7 +139,7 @@ export const deleteBackupLayer = (
   glyph: GlyphData,
   layerId: string
 ): GlyphData => {
-  // The master (active) layer cannot be deleted from the panel.
+  // The active master cannot be deleted from the panel.
   if (layerId === masterLayerId(glyph) || !glyph.layers?.[layerId]) {
     return glyph
   }
@@ -178,15 +185,26 @@ export const promoteBackupToMaster = (
   if (!backup) {
     return glyph
   }
+  const masterId = masterLayerId(glyph)
+  const master = glyph.layers?.[masterId]
   const newId = uniqueLayerId(newBackupName, glyph, backupId)
   const layers = { ...glyph.layers }
   delete layers[backupId]
-  layers[newId] = {
-    id: newId,
-    name: newId,
-    type: 'backup',
-    associatedMasterId: masterLayerId(glyph),
-    ...snapshotHot(glyph),
+  if (master) {
+    layers[newId] = {
+      id: newId,
+      name: newId,
+      type: 'backup',
+      associatedMasterId: masterId,
+      ...contentOf(master),
+    }
+  }
+  layers[masterId] = {
+    id: masterId,
+    name: master?.name ?? masterId,
+    type: 'master',
+    associatedMasterId: masterId,
+    ...contentOf(backup),
   }
   const layerOrder = (glyph.layerOrder ?? []).map((id) =>
     id === backupId ? newId : id
@@ -194,5 +212,5 @@ export const promoteBackupToMaster = (
   if (!layerOrder.includes(newId)) {
     layerOrder.push(newId)
   }
-  return { ...glyph, ...contentOf(backup), layers, layerOrder }
+  return { ...glyph, layers, layerOrder }
 }

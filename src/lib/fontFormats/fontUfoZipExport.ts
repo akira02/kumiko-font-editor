@@ -57,19 +57,23 @@ const getExportLayer = (
 }
 
 const getGlyphPaths = (glyph: GlyphData, selectedLayerId: string | null) =>
-  getExportLayer(glyph, selectedLayerId)?.paths ?? glyph.paths
+  getExportLayer(glyph, selectedLayerId)?.paths ?? []
 
 const getGlyphMetrics = (glyph: GlyphData, selectedLayerId: string | null) =>
-  getExportLayer(glyph, selectedLayerId)?.metrics ?? glyph.metrics
+  getExportLayer(glyph, selectedLayerId)?.metrics ?? {
+    lsb: 0,
+    rsb: 0,
+    width: 0,
+  }
 
 const getGlyphComponents = (glyph: GlyphData, selectedLayerId: string | null) =>
-  getExportLayer(glyph, selectedLayerId)?.componentRefs ?? glyph.componentRefs
+  getExportLayer(glyph, selectedLayerId)?.componentRefs ?? []
 
 const getGlyphAnchors = (glyph: GlyphData, selectedLayerId: string | null) =>
-  getExportLayer(glyph, selectedLayerId)?.anchors ?? glyph.anchors ?? []
+  getExportLayer(glyph, selectedLayerId)?.anchors ?? []
 
 const getGlyphGuidelines = (glyph: GlyphData, selectedLayerId: string | null) =>
-  getExportLayer(glyph, selectedLayerId)?.guidelines ?? glyph.guidelines ?? []
+  getExportLayer(glyph, selectedLayerId)?.guidelines ?? []
 
 const toGlyphRecord = (
   glyph: GlyphData,

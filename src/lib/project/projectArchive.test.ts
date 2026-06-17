@@ -1,18 +1,13 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import {
-  ingestProjectData,
-  hydrateProjectFontData,
-  overlayHotFontData,
-  clearProjectArchive,
-} from './projectArchive'
+import { ingestProjectData, clearProjectArchive } from './projectArchive'
 import { getGlyphLayer } from 'src/store/glyphLayer'
 import type { FontData, GlyphData, GlyphLayerData } from 'src/store'
 
-// Characterization tests pinning the save/load content contract before the
-// layers-as-truth migration. The functions exercised here are rewritten by the
-// migration, but the CONTRACT they encode — glyph content survives a persist /
-// load cycle, and per-layer content stays distinct — must not change. The
-// concrete coordinate / metric values are the regression guard.
+// Characterization tests pinning the load-time content contract. With
+// layers-as-truth, ingestProjectData normalises each glyph (folding any legacy
+// top-level content into a layer) and the saved fontData is already canonical.
+// The concrete coordinate/metric values are the regression guard against data
+// loss when loading existing projects.
 
 const backupLayer = (): GlyphLayerData => ({
   id: 'bk',
@@ -33,79 +28,89 @@ const backupLayer = (): GlyphLayerData => ({
   metrics: { lsb: 10, rsb: 10, width: 700 },
 })
 
-const makeGlyph = (): GlyphData => ({
+// A glyph in the current layers-as-truth shape.
+const layerGlyph = (): GlyphData => ({
   id: 'g1',
   name: 'a',
   activeLayerId: 'public.default',
-  paths: [
-    {
-      id: 'p1',
-      closed: true,
-      nodes: [{ id: 'n1', x: 1, y: 2, type: 'corner' }],
+  layerOrder: ['public.default', 'bk'],
+  layers: {
+    'public.default': {
+      id: 'public.default',
+      name: 'public.default',
+      type: 'master',
+      associatedMasterId: 'public.default',
+      paths: [
+        {
+          id: 'p1',
+          closed: true,
+          nodes: [{ id: 'n1', x: 1, y: 2, type: 'corner' }],
+        },
+      ],
+      components: [],
+      componentRefs: [],
+      anchors: [],
+      guidelines: [],
+      metrics: { lsb: 0, rsb: 0, width: 500 },
     },
-  ],
-  components: [],
-  componentRefs: [],
-  anchors: [],
-  guidelines: [],
-  metrics: { lsb: 0, rsb: 0, width: 500 },
-  layers: { bk: backupLayer() },
-  layerOrder: ['bk'],
+    bk: backupLayer(),
+  },
 })
+
+// A legacy glyph that still carries content at the top level (pre-migration).
+const legacyGlyph = (): GlyphData =>
+  ({
+    id: 'g2',
+    name: 'b',
+    activeLayerId: 'public.default',
+    paths: [
+      {
+        id: 'p',
+        closed: true,
+        nodes: [{ id: 'n', x: 9, y: 4, type: 'corner' }],
+      },
+    ],
+    components: [],
+    componentRefs: [],
+    anchors: [],
+    guidelines: [],
+    metrics: { lsb: 0, rsb: 0, width: 480 },
+  }) as unknown as GlyphData
 
 const makeFontData = (): FontData => ({
-  glyphs: { g1: makeGlyph() },
-  glyphOrder: ['g1'],
+  glyphs: { g1: layerGlyph(), g2: legacyGlyph() },
+  glyphOrder: ['g1', 'g2'],
 })
 
-describe('projectArchive content preservation', () => {
+describe('ingestProjectData content preservation', () => {
   beforeEach(() => {
     clearProjectArchive()
   })
 
-  it('ingest keeps the active glyph content intact', () => {
-    const ingested = ingestProjectData(makeFontData())
-    const glyph = ingested.glyphs.g1
-    expect(getGlyphLayer(glyph, 'public.default')?.paths[0].nodes[0].x).toBe(1)
-    expect(getGlyphLayer(glyph, 'bk')?.paths[0].nodes[0].x).toBe(7)
-  })
-
-  it('hydrate populates the active layer from the editable content', () => {
-    ingestProjectData(makeFontData())
-    const hydrated = hydrateProjectFontData(makeFontData())
-    const glyph = hydrated.glyphs.g1
-    // active layer content == editable content
-    expect(glyph.layers?.['public.default']?.paths[0].nodes[0].x).toBe(1)
-    expect(glyph.layers?.['public.default']?.metrics.width).toBe(500)
-    // backup preserved and distinct
-    expect(glyph.layers?.bk?.paths[0].nodes[0].x).toBe(7)
-    expect(glyph.layerOrder).toContain('bk')
-  })
-
-  it('overlay reflects a hot edit on the active layer and keeps backups', () => {
-    const persisted = hydrateProjectFontData(makeFontData())
-    const hot = makeFontData()
-    // simulate an edit to the active (hot) content
-    hot.glyphs.g1.paths[0].nodes[0].x = 42
-    hot.glyphs.g1.metrics.width = 555
-
-    const merged = overlayHotFontData(persisted, hot)
-    const glyph = merged.glyphs.g1
-    expect(getGlyphLayer(glyph, 'public.default')?.paths[0].nodes[0].x).toBe(42)
-    expect(getGlyphLayer(glyph, 'public.default')?.metrics.width).toBe(555)
-    // backup untouched by the active-layer edit
-    expect(glyph.layers?.bk?.paths[0].nodes[0].x).toBe(7)
-  })
-
-  it('a save/load cycle preserves both active and backup content', () => {
-    const original = makeFontData()
-    ingestProjectData(original)
-    const persisted = hydrateProjectFontData(original)
-    const reloaded = overlayHotFontData(persisted, original)
-    const glyph = reloaded.glyphs.g1
+  it('keeps layer-shaped glyph content (active + backup) intact', () => {
+    const glyph = ingestProjectData(makeFontData()).glyphs.g1
     expect(getGlyphLayer(glyph, 'public.default')?.paths[0].nodes[0].x).toBe(1)
     expect(getGlyphLayer(glyph, 'public.default')?.metrics.width).toBe(500)
     expect(getGlyphLayer(glyph, 'bk')?.paths[0].nodes[0].x).toBe(7)
     expect(getGlyphLayer(glyph, 'bk')?.metrics.width).toBe(700)
+  })
+
+  it('migrates legacy top-level content into the active layer', () => {
+    const glyph = ingestProjectData(makeFontData()).glyphs.g2
+    expect(getGlyphLayer(glyph, 'public.default')?.paths[0].nodes[0].x).toBe(9)
+    expect(getGlyphLayer(glyph, 'public.default')?.metrics.width).toBe(480)
+    expect((glyph as unknown as Record<string, unknown>).paths).toBeUndefined()
+  })
+
+  it('is idempotent across a second ingest (no content drift)', () => {
+    const once = ingestProjectData(makeFontData())
+    const twice = ingestProjectData(once)
+    expect(
+      getGlyphLayer(twice.glyphs.g1, 'public.default')?.paths[0].nodes[0].x
+    ).toBe(1)
+    expect(
+      getGlyphLayer(twice.glyphs.g2, 'public.default')?.paths[0].nodes[0].x
+    ).toBe(9)
+    expect(getGlyphLayer(twice.glyphs.g1, 'bk')?.paths[0].nodes[0].x).toBe(7)
   })
 })

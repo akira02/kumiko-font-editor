@@ -17,6 +17,7 @@ import {
 } from 'src/lib/glyph/glyphwikiComposition'
 import {
   useStore,
+  activeLayer,
   type GlyphData,
   type GlyphComponentRef,
   type PathData,
@@ -186,7 +187,7 @@ const materializeComponentPaths = (
 
   const nextVisited = new Set(visited)
   nextVisited.add(glyphId)
-  const paths = glyph.paths.map((path) => ({
+  const paths = activeLayer(glyph).paths.map((path) => ({
     id: generateId('path'),
     closed: path.closed,
     nodes: path.nodes.map((node) => ({
@@ -195,7 +196,7 @@ const materializeComponentPaths = (
     })),
   }))
 
-  for (const component of glyph.componentRefs) {
+  for (const component of activeLayer(glyph).componentRefs) {
     const m = getComponentMatrix(component)
     const componentMatrix = matrix.multiply(
       new DOMMatrix([m.a, m.b, m.c, m.d, m.e, m.f])
@@ -239,7 +240,7 @@ const buildComponentParts = (
   })
 
 const getPreviewWidth = (glyph: GlyphData) =>
-  Math.max(glyph.metrics.width || 0, 240)
+  Math.max(activeLayer(glyph).metrics.width || 0, 240)
 
 const getPreviewTransform = (
   cssWidth: number,
@@ -317,15 +318,16 @@ export function GlyphReadonlyReference({
         : null
 
     let semanticParts: PreviewPart[] = []
-    let leftoverPaths = glyph.paths
+    let leftoverPaths = activeLayer(glyph).paths
     if (placements && fontData) {
       const verticalBox = getFontVerticalBox(fontData)
-      const advanceWidth = glyph.metrics.width || fontData.unitsPerEm || 1000
+      const advanceWidth =
+        activeLayer(glyph).metrics.width || fontData.unitsPerEm || 1000
       const partRects = placements.map((placement) =>
         mapGlyphwikiBoxToFontUnits(placement.box, advanceWidth, verticalBox)
       )
       const { groups, remaining } = groupPathsByPartBoxes(
-        glyph.paths,
+        activeLayer(glyph).paths,
         partRects
       )
       semanticParts = groups.flatMap((groupPaths, index) =>
@@ -346,7 +348,7 @@ export function GlyphReadonlyReference({
     }
 
     return [
-      ...buildComponentParts(glyphMap, glyph.componentRefs),
+      ...buildComponentParts(glyphMap, activeLayer(glyph).componentRefs),
       ...semanticParts,
       ...buildRootPathParts(leftoverPaths),
     ]

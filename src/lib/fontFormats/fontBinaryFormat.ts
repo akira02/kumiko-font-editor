@@ -11,6 +11,7 @@ import type {
   PathData,
   PathNode,
 } from 'src/store'
+import { activeLayer } from 'src/store/glyphLayer'
 import type { ProjectSourceFormat } from 'src/lib/project/projectFormats'
 
 const WOFF2_WASM_URL = new URL(
@@ -278,10 +279,22 @@ export const importBinaryFontFile = async (file: File) => {
       id: glyphId,
       name: glyph.name ?? glyphId,
       unicode: toUnicodeString(glyph.unicode),
-      metrics,
-      paths,
-      components: [],
-      componentRefs: [],
+      activeLayerId: 'public.default',
+      layerOrder: ['public.default'],
+      layers: {
+        ['public.default']: {
+          id: 'public.default',
+          name: 'public.default',
+          type: 'master',
+          associatedMasterId: 'public.default',
+          paths,
+          components: [],
+          componentRefs: [],
+          anchors: [],
+          guidelines: [],
+          metrics,
+        },
+      },
     }
   }
 
@@ -400,7 +413,7 @@ export const exportFontAsBinary = (
   const glyphList = getBinaryExportGlyphList(fontData)
   const glyphs = glyphList.map((glyph) => {
     const path = new opentype.Path()
-    glyph.paths.forEach((shape) => {
+    activeLayer(glyph).paths.forEach((shape) => {
       appendShapeToPath(path, shape)
     })
     const codePoint = glyph.unicode
@@ -419,7 +432,7 @@ export const exportFontAsBinary = (
       // production names reach the post table via UFO public.postscriptNames.
       name: glyph.id,
       unicode,
-      advanceWidth: glyph.metrics.width,
+      advanceWidth: activeLayer(glyph).metrics.width,
       path,
     })
   })

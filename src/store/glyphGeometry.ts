@@ -1,4 +1,11 @@
-import type { GlyphData, PathData, PathNode, NodeType } from 'src/store/types'
+import type {
+  GlyphData,
+  GlyphLayerData,
+  PathData,
+  PathNode,
+  NodeType,
+} from 'src/store/types'
+import { activeLayer } from 'src/store/glyphLayer'
 
 export const isPathEndpointNode = (path: PathData, nodeId: string) => {
   if (path.closed || path.nodes.length === 0) {
@@ -26,8 +33,8 @@ export const getEffectiveNodeType = (
   return node.type
 }
 
-export const findPath = (glyph: GlyphData, pathId: string) =>
-  glyph.paths.find((path) => path.id === pathId)
+export const findPath = (layer: GlyphLayerData, pathId: string) =>
+  layer.paths.find((path) => path.id === pathId)
 
 export const findNode = (path: PathData | undefined, nodeId: string) =>
   path?.nodes.find((node) => node.id === nodeId)
@@ -38,8 +45,8 @@ export const generateId = (prefix: string) =>
 export const lerp = (start: number, end: number, t: number) =>
   start + (end - start) * t
 
-export const getGlyphXBounds = (glyph: GlyphData | undefined) => {
-  const allNodes = glyph?.paths.flatMap((path) => path.nodes) ?? []
+export const getGlyphXBounds = (layer: GlyphLayerData | undefined) => {
+  const allNodes = layer?.paths.flatMap((path) => path.nodes) ?? []
   if (allNodes.length === 0) {
     return null
   }
@@ -51,44 +58,46 @@ export const getGlyphXBounds = (glyph: GlyphData | undefined) => {
 }
 
 export const translateGlyphHorizontally = (
-  glyph: GlyphData | undefined,
+  layer: GlyphLayerData | undefined,
   deltaX: number
 ) => {
-  if (!glyph || deltaX === 0) {
+  if (!layer || deltaX === 0) {
     return
   }
 
-  for (const path of glyph.paths) {
+  for (const path of layer.paths) {
     for (const node of path.nodes) {
       node.x = Math.round(node.x + deltaX)
     }
   }
 
-  for (const componentRef of glyph.componentRefs) {
+  for (const componentRef of layer.componentRefs) {
     componentRef.x = Math.round(componentRef.x + deltaX)
   }
 
-  for (const anchor of glyph.anchors ?? []) {
+  for (const anchor of layer.anchors ?? []) {
     anchor.x = Math.round(anchor.x + deltaX)
   }
 
-  for (const guideline of glyph.guidelines ?? []) {
+  for (const guideline of layer.guidelines ?? []) {
     guideline.x = Math.round(guideline.x + deltaX)
   }
 }
 
-export const recomputeGlyphSidebearings = (glyph: GlyphData | undefined) => {
-  if (!glyph) {
+export const recomputeGlyphSidebearings = (
+  layer: GlyphLayerData | undefined
+) => {
+  if (!layer) {
     return
   }
 
-  const bounds = getGlyphXBounds(glyph)
+  const bounds = getGlyphXBounds(layer)
   if (!bounds) {
     return
   }
 
-  glyph.metrics.lsb = Math.round(bounds.xMin)
-  glyph.metrics.rsb = Math.round(glyph.metrics.width - bounds.xMax)
+  layer.metrics.lsb = Math.round(bounds.xMin)
+  layer.metrics.rsb = Math.round(layer.metrics.width - bounds.xMax)
 }
 
 export const orientOpenPathNodesForConnection = (
@@ -132,7 +141,7 @@ export const wouldCreateComponentCycle = (
     return false
   }
 
-  return componentGlyph.componentRefs.some((componentRef) =>
+  return activeLayer(componentGlyph).componentRefs.some((componentRef) =>
     wouldCreateComponentCycle(
       glyphMap,
       hostGlyphId,

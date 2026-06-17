@@ -5,6 +5,7 @@ import {
 } from 'src/lib/fontFormats/glyphsExport'
 import type { GlyphsDocument } from 'src/lib/fontFormats/glyphsDocument'
 import type { GlyphData } from 'src/store'
+import { activeLayer } from 'src/store/glyphLayer'
 
 interface GlyphBlockRange {
   start: number
@@ -259,12 +260,12 @@ export const patchGlyphText = (
               | string
               | null
               | undefined) ?? layerId,
-          paths: glyph.paths,
-          components: glyph.components,
-          componentRefs: glyph.componentRefs,
-          anchors: glyph.anchors ?? [],
-          guidelines: glyph.guidelines ?? [],
-          metrics: glyph.metrics,
+          paths: activeLayer(glyph).paths,
+          components: activeLayer(glyph).components,
+          componentRefs: activeLayer(glyph).componentRefs,
+          anchors: activeLayer(glyph).anchors ?? [],
+          guidelines: activeLayer(glyph).guidelines ?? [],
+          metrics: activeLayer(glyph).metrics,
         },
       ] as const
     })

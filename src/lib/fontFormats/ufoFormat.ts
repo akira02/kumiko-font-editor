@@ -5,6 +5,7 @@ import type {
   PathData,
   PathNode,
 } from 'src/store'
+import { getGlyphLayer } from 'src/store/glyphLayer'
 import type { ProjectSourceFormat } from 'src/lib/project/projectFormats'
 import { hashString } from 'src/lib/hash'
 import { userNameToFileName } from 'src/lib/fontFormats/ufoFileNames'
@@ -789,62 +790,27 @@ const buildFontDataFromUfoGlyphs = (
       glyphRecords.map((record) => {
         const glyphId = record.glyphName
         const name = getUnicodeDisplayName(record.unicodes, record.glyphName)
-        const bounds = resolveBounds(record.glyphName)
-        const width = record.advance.width ?? 0
-        const lsb = Math.round(bounds?.xMin ?? 0)
-        const metrics: GlyphMetrics = {
-          width,
-          lsb,
-          rsb: Math.round(bounds ? width - bounds.xMax : width - lsb),
-        }
-        const paths: PathData[] = record.contours.map((contour, index) => ({
-          id: `p${index}`,
-          closed: !isOpenContour(contour),
-          nodes: buildPathNodesFromContour(contour),
-        }))
-
-        const components = record.components.map((component) => component.base)
-        const componentRefs = record.components.map((component, index) => ({
-          id: component.identifier ?? `c${index}`,
-          glyphId: component.base,
-          x: component.xOffset ?? 0,
-          y: component.yOffset ?? 0,
-          // The UFO 2x2 matrix maps directly: rotation stays folded into the
-          // off-diagonal shear terms rather than a separate angle.
-          scaleX: component.xScale ?? 1,
-          scaleY: component.yScale ?? 1,
-          xyScale: component.xyScale ?? 0,
-          yxScale: component.yxScale ?? 0,
-          rotation: 0,
-        }))
+        const layerId = metadata.layers[0]?.layerId ?? 'public.default'
 
         return [
           glyphId,
           {
             id: glyphId,
             name,
-            activeLayerId: metadata.layers[0]?.layerId ?? 'public.default',
+            activeLayerId: layerId,
+            layerOrder: [layerId],
+            layers: {
+              [layerId]: {
+                id: layerId,
+                name: layerId,
+                type: 'master',
+                associatedMasterId: layerId,
+                ...glyphRecordToLayerContent(record, resolveBounds),
+              },
+            },
             unicode: record.unicodes[0] ?? null,
             production: postscriptNames[glyphId] ?? null,
             export: true,
-            paths,
-            components,
-            componentRefs,
-            anchors: record.anchors.map((anchor, index) => ({
-              id: anchor.identifier ?? `a${index}`,
-              name: anchor.name,
-              x: anchor.x,
-              y: anchor.y,
-            })),
-            guidelines: record.guidelines.map((guide, index) => ({
-              id: guide.identifier ?? `g${index}`,
-              x: guide.x ?? 0,
-              y: guide.y ?? 0,
-              angle: guide.angle ?? 0,
-              locked: false,
-              name: guide.name ?? undefined,
-            })),
-            metrics,
           } satisfies GlyphData,
         ]
       })
@@ -1258,6 +1224,10 @@ export const syncHotFontDataToUfoRecords = async (input: {
     if (!glyph) {
       continue
     }
+    const layer = getGlyphLayer(glyph, input.activeLayerId)
+    if (!layer) {
+      continue
+    }
     const existingRecord = await loadUfoGlyph(
       makeUfoGlyphKey(
         input.projectId,
@@ -1287,26 +1257,26 @@ export const syncHotFontDataToUfoRecords = async (input: {
       remoteBlobSha: existingRecord?.remoteBlobSha ?? null,
       unicodes: glyph.unicode ? [glyph.unicode.toUpperCase()] : [],
       advance: {
-        width: glyph.metrics.width,
+        width: layer.metrics.width,
         height: null,
       },
-      anchors: (glyph.anchors ?? []).map((anchor) => ({
+      anchors: (layer.anchors ?? []).map((anchor) => ({
         x: anchor.x,
         y: anchor.y,
         name: anchor.name,
         identifier: anchor.id,
       })),
-      guidelines: (glyph.guidelines ?? []).map((guide) => ({
+      guidelines: (layer.guidelines ?? []).map((guide) => ({
         x: guide.x,
         y: guide.y,
         angle: guide.angle,
         name: guide.name ?? null,
         identifier: guide.id,
       })),
-      contours: glyph.paths.map((path) => ({
+      contours: layer.paths.map((path) => ({
         ...pathToUfoContour(path),
       })),
-      components: glyph.componentRefs.map((component) => {
+      components: layer.componentRefs.map((component) => {
         const matrix = getComponentMatrix(component)
         return {
           base: component.glyphId,

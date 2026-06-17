@@ -37,14 +37,14 @@ export const resolveGlyph = (
     activeLayerId?: string | null
   }
 ): ResolvedGlyph => {
-  const layer = getGlyphLayer(glyph, glyph.activeLayerId) ?? glyph
+  const layer = getGlyphLayer(glyph, glyph.activeLayerId)
   return {
     id: glyph.id,
     name: glyph.name,
     unicode: glyph.unicode ?? null,
-    advance: layer.metrics.width,
-    paths: layer.paths,
-    componentRefs: layer.componentRefs,
+    advance: layer?.metrics.width ?? 0,
+    paths: layer?.paths ?? [],
+    componentRefs: layer?.componentRefs ?? [],
   }
 }
 

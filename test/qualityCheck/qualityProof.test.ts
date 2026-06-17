@@ -6,6 +6,7 @@ import {
   buildProofRun,
 } from 'src/features/common/qualityCheck/utils/qualityProof'
 import type { FontData, GlyphData, PathData } from 'src/store/types'
+import { normalizeGlyphToLayers } from 'src/store'
 
 const makePath = (id: string, points: Array<[number, number]>): PathData => ({
   id,
@@ -23,17 +24,18 @@ const makeGlyph = (
   unicode: string,
   width: number,
   paths: PathData[]
-): GlyphData => ({
-  id,
-  name: id,
-  unicode,
-  paths,
-  components: [],
-  componentRefs: [],
-  anchors: [],
-  guidelines: [],
-  metrics: { lsb: 0, rsb: 0, width },
-})
+): GlyphData =>
+  normalizeGlyphToLayers({
+    id,
+    name: id,
+    unicode,
+    paths,
+    components: [],
+    componentRefs: [],
+    anchors: [],
+    guidelines: [],
+    metrics: { lsb: 0, rsb: 0, width },
+  })
 
 const fontData: FontData = {
   unitsPerEm: 1000,

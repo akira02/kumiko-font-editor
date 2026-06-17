@@ -18,6 +18,7 @@ import {
   type OpenTypeFeaturesState,
 } from 'src/lib/openTypeFeatures'
 import type { FontData, GlyphData } from 'src/store'
+import { getGlyphLayer, normalizeGlyphToLayers } from 'src/store'
 
 describe('OpenType behavior facade', () => {
   it('derives glyph-local combination rows from ligature rules', () => {
@@ -108,22 +109,23 @@ describe('OpenType behavior facade', () => {
   it('creates an editable output glyph from source glyph outlines', () => {
     const fontData = makeFontData(createEmptyOpenTypeFeaturesState())
     const glyph = makeCompositeGlyphFromComponents(fontData, 'f_t', ['f', 't'])
+    const layer = getGlyphLayer(glyph ?? undefined, null)
 
-    expect(glyph).toMatchObject({
-      id: 'f_t',
+    expect(glyph).toMatchObject({ id: 'f_t' })
+    expect(layer).toMatchObject({
       components: [],
       componentRefs: [],
       metrics: { width: 900, lsb: 0, rsb: 900 },
     })
-    expect(glyph?.paths.map((path) => path.id)).toEqual([
+    expect(layer?.paths.map((path) => path.id)).toEqual([
       'f_0_f_path',
       't_1_t_path',
     ])
-    expect(glyph?.paths[0]?.nodes[0]).toMatchObject({
+    expect(layer?.paths[0]?.nodes[0]).toMatchObject({
       id: 'f_0_f_node_0',
       x: 0,
     })
-    expect(glyph?.paths[1]?.nodes[0]).toMatchObject({
+    expect(layer?.paths[1]?.nodes[0]).toMatchObject({
       id: 't_1_t_node_0',
       x: 500,
     })
@@ -132,15 +134,12 @@ describe('OpenType behavior facade', () => {
   it('duplicates a source glyph as an editable alternate glyph', () => {
     const fontData = makeFontData(createEmptyOpenTypeFeaturesState())
     const glyph = makeEditableGlyphCopy(fontData, 'f.alt', 'f')
+    const layer = getGlyphLayer(glyph ?? undefined, null)
 
-    expect(glyph).toMatchObject({
-      id: 'f.alt',
-      name: 'f.alt',
-      unicode: null,
-      metrics: { width: 500, lsb: 0, rsb: 500 },
-    })
-    expect(glyph?.paths[0]?.id).toBe('f.alt_f_path')
-    expect(glyph?.paths[0]?.nodes[0]?.id).toBe('f.alt_f_node_0')
+    expect(glyph).toMatchObject({ id: 'f.alt', name: 'f.alt', unicode: null })
+    expect(layer?.metrics).toMatchObject({ width: 500, lsb: 0, rsb: 500 })
+    expect(layer?.paths[0]?.id).toBe('f.alt_f_path')
+    expect(layer?.paths[0]?.nodes[0]?.id).toBe('f.alt_f_node_0')
   })
 
   it('derives and upserts spacing rows through semantic behavior fields', () => {
@@ -384,7 +383,7 @@ describe('OpenType behavior facade', () => {
       y: 700,
     })
 
-    expect(nextFontData.glyphs.f?.anchors).toMatchObject([
+    expect(getGlyphLayer(nextFontData.glyphs.f, null)?.anchors).toMatchObject([
       {
         name: 'top',
         x: 250,
@@ -549,7 +548,7 @@ function makeFontData(openTypeFeatures: OpenTypeFeaturesState): FontData {
 }
 
 function makeGlyph(id: string, width: number): GlyphData {
-  return {
+  return normalizeGlyphToLayers({
     id,
     name: id,
     unicode: null,
@@ -572,5 +571,5 @@ function makeGlyph(id: string, width: number): GlyphData {
       lsb: 0,
       rsb: width,
     },
-  }
+  } as unknown as GlyphData)
 }

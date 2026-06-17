@@ -2,14 +2,33 @@ import { describe, it, expect } from 'vitest'
 import {
   getGlyphLayer,
   getActiveLayer,
-  syncGlyphTopLevelFromLayer,
+  setGlyphActiveLayer,
+  normalizeGlyphToLayers,
 } from './glyphLayer'
 import type { GlyphData, GlyphLayerData } from './types'
 
-// Characterization tests locking the layer-resolution contract before the
-// layers-as-truth migration. getGlyphLayer / getActiveLayer survive the refactor
-// (their content contract must not change); concrete content values are the
-// regression guard.
+// Characterization tests for the layers-as-truth model: layer resolution,
+// active-layer switching (a pointer move, no content copy), and migration of
+// legacy top-level content. Concrete coordinate/metric values are the guard.
+
+const master = (): GlyphLayerData => ({
+  id: 'public.default',
+  name: 'public.default',
+  type: 'master',
+  associatedMasterId: 'public.default',
+  paths: [
+    {
+      id: 'p1',
+      closed: true,
+      nodes: [{ id: 'n1', x: 1, y: 2, type: 'corner' }],
+    },
+  ],
+  components: [],
+  componentRefs: [],
+  anchors: [],
+  guidelines: [],
+  metrics: { lsb: 0, rsb: 0, width: 500 },
+})
 
 const backup = (): GlyphLayerData => ({
   id: 'bk',
@@ -34,31 +53,19 @@ const makeGlyph = (): GlyphData => ({
   id: 'g1',
   name: 'a',
   activeLayerId: 'public.default',
-  paths: [
-    {
-      id: 'p1',
-      closed: true,
-      nodes: [{ id: 'n1', x: 1, y: 2, type: 'corner' }],
-    },
-  ],
-  components: [],
-  componentRefs: [],
-  metrics: { lsb: 0, rsb: 0, width: 500 },
-  layers: { bk: backup() },
-  layerOrder: ['bk'],
+  layerOrder: ['public.default', 'bk'],
+  layers: { 'public.default': master(), bk: backup() },
 })
 
 describe('getGlyphLayer', () => {
-  it('resolves the active layer to the editable content', () => {
-    const glyph = makeGlyph()
-    const layer = getGlyphLayer(glyph, 'public.default')
+  it('resolves the active layer content', () => {
+    const layer = getGlyphLayer(makeGlyph(), 'public.default')
     expect(layer?.paths[0].nodes[0].x).toBe(1)
     expect(layer?.metrics.width).toBe(500)
   })
 
   it('resolves null layerId to the active layer', () => {
-    const layer = getGlyphLayer(makeGlyph(), null)
-    expect(layer?.paths[0].nodes[0].x).toBe(1)
+    expect(getGlyphLayer(makeGlyph(), null)?.paths[0].nodes[0].x).toBe(1)
   })
 
   it('resolves a backup layer id to its own content', () => {
@@ -80,17 +87,61 @@ describe('getActiveLayer', () => {
   })
 
   it('falls back to the active layer when no master id is given', () => {
-    const layer = getActiveLayer(makeGlyph(), null)
-    expect(layer?.paths[0].nodes[0].x).toBe(1)
+    expect(getActiveLayer(makeGlyph(), null)?.paths[0].nodes[0].x).toBe(1)
   })
 })
 
-describe('syncGlyphTopLevelFromLayer', () => {
-  it('copies the chosen layer content onto the glyph and sets activeLayerId', () => {
+describe('setGlyphActiveLayer', () => {
+  it('switches the active layer by pointer move (no content copy)', () => {
     const glyph = makeGlyph()
-    syncGlyphTopLevelFromLayer(glyph, 'bk')
+    setGlyphActiveLayer(glyph, 'bk')
     expect(glyph.activeLayerId).toBe('bk')
-    expect(glyph.paths[0].nodes[0].x).toBe(7)
-    expect(glyph.metrics.width).toBe(700)
+    // resolving the active layer now yields the backup content
+    expect(getGlyphLayer(glyph, null)?.paths[0].nodes[0].x).toBe(7)
+    // the original master layer is untouched (no copy happened)
+    expect(glyph.layers?.['public.default']?.paths[0].nodes[0].x).toBe(1)
+  })
+
+  it('is a no-op for a layer that does not exist here', () => {
+    const glyph = makeGlyph()
+    setGlyphActiveLayer(glyph, 'missing')
+    expect(glyph.activeLayerId).toBe('public.default')
+  })
+})
+
+describe('normalizeGlyphToLayers', () => {
+  it('folds legacy top-level content into the active layer', () => {
+    const legacy = {
+      id: 'g2',
+      name: 'b',
+      activeLayerId: 'public.default',
+      paths: [
+        {
+          id: 'p',
+          closed: true,
+          nodes: [{ id: 'n', x: 5, y: 6, type: 'corner' }],
+        },
+      ],
+      components: [],
+      componentRefs: [],
+      anchors: [],
+      guidelines: [],
+      metrics: { lsb: 0, rsb: 0, width: 333 },
+    } as unknown as GlyphData
+
+    const normalized = normalizeGlyphToLayers(legacy)
+    expect(normalized.layers?.['public.default']?.paths[0].nodes[0].x).toBe(5)
+    expect(normalized.layers?.['public.default']?.metrics.width).toBe(333)
+    expect(normalized.layerOrder).toContain('public.default')
+    // top-level content stripped
+    expect(
+      (normalized as unknown as Record<string, unknown>).paths
+    ).toBeUndefined()
+  })
+
+  it('passes through a glyph already in layer shape', () => {
+    const normalized = normalizeGlyphToLayers(makeGlyph())
+    expect(normalized.layers?.['public.default']?.paths[0].nodes[0].x).toBe(1)
+    expect(normalized.layers?.bk?.paths[0].nodes[0].x).toBe(7)
   })
 })

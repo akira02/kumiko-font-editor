@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { wouldCreateComponentCycle } from 'src/store/glyphGeometry'
+import { normalizeGlyphToLayers } from 'src/store'
 import type { GlyphData } from 'src/store/types'
 
 const makeGlyph = (id: string, componentGlyphIds: string[] = []): GlyphData =>
-  ({
+  normalizeGlyphToLayers({
     id,
     name: id,
     paths: [],
@@ -18,7 +19,7 @@ const makeGlyph = (id: string, componentGlyphIds: string[] = []): GlyphData =>
       rotation: 0,
     })),
     metrics: { width: 1000, lsb: 0, rsb: 0 },
-  }) as unknown as GlyphData
+  } as unknown as GlyphData)
 
 describe('wouldCreateComponentCycle', () => {
   it('rejects self references', () => {

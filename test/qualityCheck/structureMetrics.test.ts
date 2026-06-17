@@ -13,6 +13,7 @@ import { resolveFontGlyphs } from 'src/features/common/qualityCheck/utils/resolv
 import { buildGlyphGeometrySample } from 'src/features/common/qualityCheck/utils/glyphSampling'
 import { analyzeFontPopulation } from 'src/features/common/qualityCheck/hooks/useQualityAnalysis'
 import type { FontData, GlyphData, PathData } from 'src/store/types'
+import { normalizeGlyphToLayers } from 'src/store'
 
 const makePath = (
   id: string,
@@ -34,17 +35,18 @@ const makeGlyph = (
   unicode: string | null,
   paths: PathData[],
   width = 1000
-): GlyphData => ({
-  id,
-  name: id,
-  unicode,
-  paths,
-  components: [],
-  componentRefs: [],
-  anchors: [],
-  guidelines: [],
-  metrics: { lsb: 0, rsb: 0, width },
-})
+): GlyphData =>
+  normalizeGlyphToLayers({
+    id,
+    name: id,
+    unicode,
+    paths,
+    components: [],
+    componentRefs: [],
+    anchors: [],
+    guidelines: [],
+    metrics: { lsb: 0, rsb: 0, width },
+  })
 
 const makeFontData = (glyphs: GlyphData[]): FontData => ({
   glyphs: Object.fromEntries(glyphs.map((glyph) => [glyph.id, glyph])),
@@ -139,20 +141,18 @@ describe('glyph geometry', () => {
         [0, 100],
       ]),
     ])
-    const composite: GlyphData = {
-      ...makeGlyph('composite', null, []),
-      componentRefs: [
-        {
-          id: 'ref',
-          glyphId: 'base',
-          x: 500,
-          y: 200,
-          scaleX: 2,
-          scaleY: 1,
-          rotation: 0,
-        },
-      ],
-    }
+    const composite: GlyphData = makeGlyph('composite', null, [])
+    composite.layers!['public.default']!.componentRefs = [
+      {
+        id: 'ref',
+        glyphId: 'base',
+        x: 500,
+        y: 200,
+        scaleX: 2,
+        scaleY: 1,
+        rotation: 0,
+      },
+    ]
     const resolvedFont = resolveFontGlyphs(makeFontData([base, composite]))
 
     const bounds = getPolygonsBounds(

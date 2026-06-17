@@ -1,4 +1,9 @@
-import { getEffectiveNodeType, type GlyphData } from 'src/store'
+import {
+  getEffectiveNodeType,
+  getActiveLayer,
+  type GlyphData,
+  type GlyphLayerData,
+} from 'src/store'
 
 export interface GlyphSelectionNodeEntry {
   key: string
@@ -6,14 +11,14 @@ export interface GlyphSelectionNodeEntry {
   nodeId: string
   x: number
   y: number
-  type: GlyphData['paths'][number]['nodes'][number]['type']
-  effectiveType: GlyphData['paths'][number]['nodes'][number]['type']
+  type: GlyphLayerData['paths'][number]['nodes'][number]['type']
+  effectiveType: GlyphLayerData['paths'][number]['nodes'][number]['type']
 }
 
 export const buildGlyphSelectionNodeEntries = (
   glyph: GlyphData
 ): GlyphSelectionNodeEntry[] =>
-  glyph.paths.flatMap((path) =>
+  (getActiveLayer(glyph, null)?.paths ?? []).flatMap((path) =>
     path.nodes.map((node) => ({
       key: `${path.id}:${node.id}`,
       pathId: path.id,
@@ -61,7 +66,9 @@ export const getNodeKeysInRect = (
     .map((node) => node.key)
 
 export const getContourNodeKeys = (glyph: GlyphData, pathId: string) => {
-  const path = glyph.paths.find((candidate) => candidate.id === pathId)
+  const path = getActiveLayer(glyph, null)?.paths.find(
+    (candidate) => candidate.id === pathId
+  )
   if (!path) {
     return []
   }

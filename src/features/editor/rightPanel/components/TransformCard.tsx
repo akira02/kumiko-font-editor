@@ -10,7 +10,7 @@ import {
 } from '@chakra-ui/react'
 import { Refresh } from 'iconoir-react'
 import { useMemo, useState } from 'react'
-import type { GlyphData } from 'src/store'
+import { activeLayer, type GlyphData } from 'src/store'
 import type { PathBooleanOperation } from 'src/lib/pathBooleanOperations'
 import {
   ScaleActionGroup,
@@ -61,8 +61,9 @@ export function TransformCard({
   const { t } = useTranslation()
 
   const selectedNodes = useMemo(
-    () => getSelectedNodes(glyph?.paths ?? [], selectedNodeIds),
-    [glyph?.paths, selectedNodeIds]
+    () =>
+      getSelectedNodes(glyph ? activeLayer(glyph).paths : [], selectedNodeIds),
+    [glyph, selectedNodeIds]
   )
   const bounds = useMemo(
     () => getSelectionBounds(selectedNodes),
@@ -75,10 +76,10 @@ export function TransformCard({
         return pathId ? [pathId] : []
       })
     )
-    return (glyph?.paths ?? [])
+    return (glyph ? activeLayer(glyph).paths : [])
       .filter((path) => selectedPathIds.has(path.id) && path.closed)
       .map((path) => path.id)
-  }, [glyph?.paths, selectedNodeIds])
+  }, [glyph, selectedNodeIds])
   const [focusedField, setFocusedField] = useState<TransformField | null>(null)
   const [draftValue, setDraftValue] = useState('')
   const [origin, setOrigin] = useState<TransformOrigin>({

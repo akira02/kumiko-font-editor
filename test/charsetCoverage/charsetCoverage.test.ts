@@ -4,6 +4,7 @@ import {
   computeCharsetCoverage,
 } from 'src/lib/charsetCoverage'
 import type { GlyphData } from 'src/store'
+import { normalizeGlyphToLayers } from 'src/store'
 
 const makeGlyph = (input: {
   id: string
@@ -11,7 +12,7 @@ const makeGlyph = (input: {
   drawn?: boolean
   width?: number
 }): GlyphData =>
-  ({
+  normalizeGlyphToLayers({
     id: input.id,
     name: input.id,
     unicode: input.unicode ?? null,
@@ -85,7 +86,7 @@ describe('computeCharsetCoverage', () => {
 
   it('treats components-only glyphs as drawn', () => {
     const glyph = makeGlyph({ id: 'gou', drawn: false })
-    ;(glyph as { componentRefs: unknown[] }).componentRefs = [{ id: 'c1' }]
+    glyph.layers!['public.default']!.componentRefs = [{ id: 'c1' } as never]
     const lookup = buildGlyphLookupMap(toGlyphMap([glyph]))
     const coverage = computeCharsetCoverage(
       {

@@ -17,7 +17,9 @@ import {
   type UfoWorkspaceEntry,
 } from 'src/lib/fontFormats/ufoFormat'
 import type { UfoGlyphRecord } from 'src/lib/fontFormats/ufoTypes'
-import type { FontData } from 'src/store'
+import type { FontData, GlyphData } from 'src/store'
+import { getGlyphLayer } from 'src/store/glyphLayer'
+const layerOf = (g: GlyphData) => getGlyphLayer(g, null)!
 
 // OpenSourceFont-Light.ufo (OFL) — see test/fixtures/ufo/OFL.txt.
 // happy-dom makes import.meta.url an http URL, so resolve from cwd (project
@@ -86,14 +88,14 @@ describe('UFO import → export → reimport round-trip', () => {
       const afterGlyph = after.glyphs[id]
       expect(afterGlyph, `glyph ${id} missing after round-trip`).toBeDefined()
       expect(afterGlyph.unicode, `unicode for ${id}`).toBe(beforeGlyph.unicode)
-      expect(afterGlyph.metrics.width, `advance for ${id}`).toBe(
-        beforeGlyph.metrics.width
+      expect(layerOf(afterGlyph).metrics.width, `advance for ${id}`).toBe(
+        layerOf(beforeGlyph).metrics.width
       )
-      expect(afterGlyph.paths.length, `contour count for ${id}`).toBe(
-        beforeGlyph.paths.length
+      expect(layerOf(afterGlyph).paths.length, `contour count for ${id}`).toBe(
+        layerOf(beforeGlyph).paths.length
       )
-      beforeGlyph.paths.forEach((path, pathIndex) => {
-        const afterPath = afterGlyph.paths[pathIndex]
+      layerOf(beforeGlyph).paths.forEach((path, pathIndex) => {
+        const afterPath = layerOf(afterGlyph).paths[pathIndex]
         expect(afterPath.closed, `${id} closed@${pathIndex}`).toBe(path.closed)
         expect(afterPath.nodes, `${id} nodes@${pathIndex}`).toEqual(path.nodes)
       })

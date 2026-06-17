@@ -27,7 +27,11 @@ import {
   syncEditorTextFromGlyphIds,
 } from 'src/store/editorLine'
 import { syncFilteredGlyphList } from 'src/store/glyphSearch'
-import { syncGlyphTopLevelFromLayer } from 'src/store/glyphLayer'
+import {
+  activeLayer,
+  ensureActiveLayer,
+  setGlyphActiveLayer,
+} from 'src/store/glyphLayer'
 import {
   markGlyphAdded,
   markGlyphDeleted,
@@ -119,8 +123,10 @@ export const buildGlyphActions = (set: ImmerSet) => ({
         return
       }
 
-      const defaultWidth =
-        Object.values(state.fontData.glyphs)[0]?.metrics.width ?? 1000
+      const firstExistingGlyph = Object.values(state.fontData.glyphs)[0]
+      const defaultWidth = firstExistingGlyph
+        ? activeLayer(firstExistingGlyph).metrics.width
+        : 1000
 
       for (const glyphInput of glyphs) {
         if (state.fontData.glyphs[glyphInput.id]) {
@@ -128,6 +134,7 @@ export const buildGlyphActions = (set: ImmerSet) => ({
         }
 
         const width = glyphInput.width ?? defaultWidth
+        const layerId = state.selectedLayerId ?? 'public.default'
         state.fontData.glyphOrder =
           state.fontData.glyphOrder ?? Object.keys(state.fontData.glyphs)
         state.fontData.glyphs[glyphInput.id] = {
@@ -135,17 +142,22 @@ export const buildGlyphActions = (set: ImmerSet) => ({
           name: glyphInput.name,
           unicode: glyphInput.unicode,
           production: glyphInput.production ?? null,
-          paths: [],
-          components: [],
-          componentRefs: [],
-          anchors: [],
-          guidelines: [],
-          metrics: {
-            width,
-            lsb: 0,
-            rsb: width,
+          activeLayerId: layerId,
+          layerOrder: [layerId],
+          layers: {
+            [layerId]: {
+              id: layerId,
+              name: layerId,
+              type: 'master',
+              associatedMasterId: layerId,
+              paths: [],
+              components: [],
+              componentRefs: [],
+              anchors: [],
+              guidelines: [],
+              metrics: { width, lsb: 0, rsb: width },
+            },
           },
-          activeLayerId: state.selectedLayerId ?? 'public.default',
         }
         if (!state.fontData.glyphOrder.includes(glyphInput.id)) {
           state.fontData.glyphOrder.push(glyphInput.id)
@@ -184,7 +196,7 @@ export const buildGlyphActions = (set: ImmerSet) => ({
         return
       }
 
-      glyph.componentRefs.push({
+      ensureActiveLayer(glyph).componentRefs.push({
         id: generateId('component'),
         glyphId: componentGlyphId,
         x: 0,
@@ -205,7 +217,7 @@ export const buildGlyphActions = (set: ImmerSet) => ({
       state.selectedNodeIds = []
       state.selectedSegment = null
       if (state.selectedGlyphId) {
-        syncGlyphTopLevelFromLayer(
+        setGlyphActiveLayer(
           state.fontData?.glyphs[state.selectedGlyphId],
           state.selectedLayerId
         )
@@ -224,15 +236,16 @@ export const buildGlyphActions = (set: ImmerSet) => ({
       if (!glyph) {
         return
       }
+      const layer = ensureActiveLayer(glyph)
 
-      const node = findNode(findPath(glyph, pathId), nodeId)
+      const node = findNode(findPath(layer, pathId), nodeId)
       if (!node) {
         return
       }
 
       node.x = Math.round(newPos.x)
       node.y = Math.round(newPos.y)
-      recomputeGlyphSidebearings(glyph)
+      recomputeGlyphSidebearings(layer)
       markGlyphDirty(state, glyphId)
     }),
 
@@ -249,9 +262,10 @@ export const buildGlyphActions = (set: ImmerSet) => ({
       if (!glyph) {
         return
       }
+      const layer = ensureActiveLayer(glyph)
 
       for (const update of updates) {
-        const node = findNode(findPath(glyph, update.pathId), update.nodeId)
+        const node = findNode(findPath(layer, update.pathId), update.nodeId)
         if (!node) {
           continue
         }
@@ -259,7 +273,7 @@ export const buildGlyphActions = (set: ImmerSet) => ({
         node.x = Math.round(update.newPos.x)
         node.y = Math.round(update.newPos.y)
       }
-      recomputeGlyphSidebearings(glyph)
+      recomputeGlyphSidebearings(layer)
       markGlyphDirty(state, glyphId)
     }),
 
@@ -279,9 +293,10 @@ export const buildGlyphActions = (set: ImmerSet) => ({
         if (!glyph) {
           continue
         }
+        const layer = ensureActiveLayer(glyph)
 
         for (const update of updates) {
-          const node = findNode(findPath(glyph, update.pathId), update.nodeId)
+          const node = findNode(findPath(layer, update.pathId), update.nodeId)
           if (!node) {
             continue
           }
@@ -289,7 +304,7 @@ export const buildGlyphActions = (set: ImmerSet) => ({
           node.x = Math.round(update.newPos.x)
           node.y = Math.round(update.newPos.y)
         }
-        recomputeGlyphSidebearings(glyph)
+        recomputeGlyphSidebearings(layer)
         markGlyphDirty(state, glyphId)
       }
       // Rebuild the overview list so the glyph grid re-renders with the
@@ -309,8 +324,9 @@ export const buildGlyphActions = (set: ImmerSet) => ({
       if (!glyph) {
         return
       }
+      const layer = ensureActiveLayer(glyph)
 
-      const path = findPath(glyph, pathId)
+      const path = findPath(layer, pathId)
       const node = findNode(path, nodeId)
       if (node) {
         if (node.type === 'offcurve' || node.type === 'qcurve') {
@@ -333,34 +349,35 @@ export const buildGlyphActions = (set: ImmerSet) => ({
       if (!glyph) {
         return
       }
+      const layer = ensureActiveLayer(glyph)
 
       if (typeof metrics.lsb === 'number') {
         const nextLsb = Math.round(metrics.lsb)
-        const deltaX = nextLsb - glyph.metrics.lsb
-        translateGlyphHorizontally(glyph, deltaX)
-        glyph.metrics.width = Math.max(
+        const deltaX = nextLsb - layer.metrics.lsb
+        translateGlyphHorizontally(layer, deltaX)
+        layer.metrics.width = Math.max(
           0,
-          Math.round(glyph.metrics.width + deltaX)
+          Math.round(layer.metrics.width + deltaX)
         )
-        glyph.metrics.lsb = nextLsb
+        layer.metrics.lsb = nextLsb
       }
 
       if (typeof metrics.width === 'number') {
-        glyph.metrics.width = Math.max(0, Math.round(metrics.width))
-        const bounds = getGlyphXBounds(glyph)
-        glyph.metrics.rsb = Math.round(
-          glyph.metrics.width - (bounds?.xMax ?? 0)
+        layer.metrics.width = Math.max(0, Math.round(metrics.width))
+        const bounds = getGlyphXBounds(layer)
+        layer.metrics.rsb = Math.round(
+          layer.metrics.width - (bounds?.xMax ?? 0)
         )
       }
 
       if (typeof metrics.rsb === 'number') {
         const nextRsb = Math.round(metrics.rsb)
-        const bounds = getGlyphXBounds(glyph)
-        glyph.metrics.width = Math.max(
+        const bounds = getGlyphXBounds(layer)
+        layer.metrics.width = Math.max(
           0,
           Math.round((bounds?.xMax ?? 0) + nextRsb)
         )
-        glyph.metrics.rsb = nextRsb
+        layer.metrics.rsb = nextRsb
       }
 
       markGlyphDirty(state, glyphId)

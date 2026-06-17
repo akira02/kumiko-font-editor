@@ -4,7 +4,7 @@ import {
   type EventStream,
   type ToolEvent,
 } from 'src/features/editor/tools/BaseTool'
-import { useStore, type PathData, type PathNode } from 'src/store'
+import { useStore, activeLayer, type PathData, type PathNode } from 'src/store'
 
 interface CutCandidate {
   pathId: string
@@ -97,7 +97,9 @@ export class KnifeTool extends BaseTool {
     }
 
     for (const [pathId, pathCuts] of cutsByPath) {
-      const path = glyph.paths.find((candidate) => candidate.id === pathId)
+      const path = activeLayer(glyph).paths.find(
+        (candidate) => candidate.id === pathId
+      )
       if (!path) {
         continue
       }
@@ -259,7 +261,7 @@ export class KnifeTool extends BaseTool {
     }
 
     const cuts: CutCandidate[] = []
-    for (const path of glyph.paths) {
+    for (const path of activeLayer(glyph).paths) {
       for (const segment of iterPathSegments(path)) {
         const cut = this.findSegmentIntersection(segment, pointA, pointB)
         if (cut) {

@@ -1,5 +1,4 @@
 import {
-  hydrateProjectFontData,
   getProjectArchiveMetadata,
   getProjectArchiveRoundTripFormat,
   getProjectArchiveSourceFormat,
@@ -76,7 +75,7 @@ export const saveDraftSnapshot = async (input: {
         persistedProject?.sourceType ?? projectRecord?.sourceType ?? 'local',
       githubSource:
         persistedProject?.githubSource ?? projectRecord?.githubSource ?? null,
-      fontData: hydrateProjectFontData(input.fontData),
+      fontData: input.fontData,
       projectMetadata: withProjectGlyphEditTimes(
         persistedProject?.projectMetadata ?? projectMetadata,
         input.glyphEditTimes
@@ -112,7 +111,7 @@ export const saveDraftSnapshot = async (input: {
     sourceName: persistedProject?.sourceName ?? null,
     sourceType: persistedProject?.sourceType ?? 'local',
     githubSource: persistedProject?.githubSource ?? null,
-    fontData: hydrateProjectFontData(input.fontData),
+    fontData: input.fontData,
     projectMetadata: withProjectGlyphEditTimes(
       projectMetadata,
       input.glyphEditTimes

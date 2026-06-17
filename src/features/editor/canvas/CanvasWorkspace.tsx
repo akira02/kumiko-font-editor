@@ -212,9 +212,10 @@ export function CanvasWorkspace() {
     }
 
     const [pathId, nodeId] = selectedNodeIds[0].split(':')
-    const path = fontData.glyphs[activeEditorGlyphId]?.paths.find(
-      (candidate) => candidate.id === pathId
-    )
+    const path = getGlyphLayer(
+      fontData.glyphs[activeEditorGlyphId],
+      selectedLayerId
+    )?.paths.find((candidate) => candidate.id === pathId)
     if (!path) {
       return null
     }
@@ -225,7 +226,13 @@ export function CanvasWorkspace() {
     }
 
     return `${pathId}:${path.nodes[currentIndex - 1].id}`
-  }, [activeEditorGlyphId, activeToolId, fontData, selectedNodeIds])
+  }, [
+    activeEditorGlyphId,
+    activeToolId,
+    fontData,
+    selectedLayerId,
+    selectedNodeIds,
+  ])
 
   const resolveGlyphFrameAtPoint = useCallback(
     (point: { x: number; y: number }) =>
@@ -551,7 +558,9 @@ export function CanvasWorkspace() {
       : null
     const char = referenceFontChar || fallbackChar
     const unitsPerEm = fontData?.unitsPerEm ?? 1000
-    const advanceWidth = glyph?.metrics?.width ?? unitsPerEm
+    const advanceWidth =
+      getGlyphLayer(glyph ?? undefined, selectedLayerId)?.metrics.width ??
+      unitsPerEm
 
     sceneController.sceneModel.referencePath =
       referenceFontVisible && referenceFontName && char
@@ -564,6 +573,7 @@ export function CanvasWorkspace() {
     referenceFontChar,
     referenceFontName,
     referenceFontVisible,
+    selectedLayerId,
   ])
 
   useEffect(() => {

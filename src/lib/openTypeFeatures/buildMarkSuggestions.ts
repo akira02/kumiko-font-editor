@@ -9,6 +9,7 @@ import type {
   OpenTypeFeaturesState,
 } from 'src/lib/openTypeFeatures/types'
 import type { FontData, GlyphAnchor, GlyphData } from 'src/store/types'
+import { activeLayer } from 'src/store/glyphLayer'
 
 interface NamedAnchor {
   glyph: string
@@ -24,7 +25,7 @@ const anchorPoint = (anchor: GlyphAnchor): AnchorPoint => ({
 })
 
 const getGlyphAnchors = (glyph: GlyphData): GlyphAnchor[] =>
-  glyph.anchors ?? glyph.layers?.[glyph.activeLayerId ?? '']?.anchors ?? []
+  activeLayer(glyph).anchors ?? []
 
 const collectAnchors = (fontData: FontData) => {
   const baseAnchors = new Map<string, NamedAnchor[]>()

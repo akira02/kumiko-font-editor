@@ -12,6 +12,7 @@ import {
 import { analyzeFontPopulation } from 'src/features/common/qualityCheck/hooks/useQualityAnalysis'
 import type { GlyphGeometrySample } from 'src/features/common/qualityCheck/utils/glyphSampling'
 import type { FontData, GlyphData, PathData } from 'src/store'
+import { normalizeGlyphToLayers } from 'src/store'
 
 const squarePolygon = (
   xMin: number,
@@ -119,7 +120,7 @@ const makeSquarePath = (
 })
 
 const makeHanGlyph = (index: number, path: PathData): GlyphData =>
-  ({
+  normalizeGlyphToLayers({
     id: `g${index}`,
     name: `g${index}`,
     unicode: (0x4e00 + index).toString(16).toUpperCase(),

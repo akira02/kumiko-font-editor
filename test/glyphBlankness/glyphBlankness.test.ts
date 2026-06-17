@@ -4,13 +4,14 @@ import {
   isKnownBlankGlyph,
 } from 'src/lib/glyph/glyphBlankness'
 import type { GlyphData } from 'src/store'
+import { normalizeGlyphToLayers } from 'src/store'
 
 const makeGlyph = (input: {
   id: string
   unicode?: string | null
   drawn?: boolean
 }): GlyphData =>
-  ({
+  normalizeGlyphToLayers({
     id: input.id,
     name: input.id,
     unicode: input.unicode ?? null,

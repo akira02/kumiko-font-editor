@@ -1,4 +1,4 @@
-import type { GlyphData, PathData, PathNode } from 'src/store/types'
+import type { GlyphLayerData, PathData, PathNode } from 'src/store/types'
 import { generateId } from 'src/store/glyphGeometry'
 
 /** Fixed nudge distance (font units) to avoid overlapping closing segments. */
@@ -158,7 +158,7 @@ const extendPieceEndpoints = (nodes: PathNode[]): void => {
  * Returns the new selection keys, or an empty array if no reconnect occurred.
  */
 export const performReconnect = (
-  glyph: GlyphData,
+  layer: GlyphLayerData,
   selectedNodeIds: string[]
 ): string[] => {
   // ── 1. Group selected nodes by path (skip offcurve / qcurve silently) ──
@@ -168,7 +168,7 @@ export const performReconnect = (
     if (!pathId || !nodeId) {
       continue
     }
-    const path = glyph.paths.find((p) => p.id === pathId)
+    const path = layer.paths.find((p) => p.id === pathId)
     const node = path?.nodes.find((n) => n.id === nodeId)
     if (!node || node.type === 'offcurve' || node.type === 'qcurve') {
       continue
@@ -181,7 +181,7 @@ export const performReconnect = (
   // ── 2. Validate ──────────────────────────────────────────────────────────
   let totalSelected = 0
   for (const [pathId, nodeIds] of selectedByPath) {
-    const path = glyph.paths.find((p) => p.id === pathId)
+    const path = layer.paths.find((p) => p.id === pathId)
     if (!path || !path.closed) {
       return []
     }
@@ -200,7 +200,7 @@ export const performReconnect = (
     // SINGLE PATH LOGIC (Preserve existing i + K behavior for perfect Cross shapes)
     const pathId = Array.from(selectedByPath.keys())[0]
     const selectedIds = selectedByPath.get(pathId)!
-    const path = glyph.paths.find((p) => p.id === pathId)!
+    const path = layer.paths.find((p) => p.id === pathId)!
 
     const selectedIndices = path.nodes
       .map((node, index) => (selectedIds.has(node.id) ? index : -1))
@@ -242,8 +242,8 @@ export const performReconnect = (
       }
     }
 
-    glyph.paths = glyph.paths.filter((p) => p.id !== pathId)
-    glyph.paths.push(...pieces)
+    layer.paths = layer.paths.filter((p) => p.id !== pathId)
+    layer.paths.push(...pieces)
     didReconnect = true
   } else {
     // MULTI-PATH LOGIC (Global greedy nearest-endpoint matching)
@@ -256,7 +256,7 @@ export const performReconnect = (
     const pathsToRemove = new Set<string>()
 
     for (const [pathId, selectedIds] of selectedByPath) {
-      const path = glyph.paths.find((p) => p.id === pathId)!
+      const path = layer.paths.find((p) => p.id === pathId)!
       pathsToRemove.add(pathId)
 
       const selectedIndices = path.nodes
@@ -373,8 +373,8 @@ export const performReconnect = (
       })
     }
 
-    glyph.paths = glyph.paths.filter((p) => !pathsToRemove.has(p.id))
-    glyph.paths.push(...pieces)
+    layer.paths = layer.paths.filter((p) => !pathsToRemove.has(p.id))
+    layer.paths.push(...pieces)
     didReconnect = true
   }
 

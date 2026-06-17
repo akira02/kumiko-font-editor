@@ -1,4 +1,5 @@
 import type { PathData, PathNode, NodeType, GlyphData } from 'src/store'
+import { activeLayer } from 'src/store'
 
 export interface ClipboardPathPayload {
   type: 'kumiko-paths'
@@ -81,7 +82,7 @@ export function buildClipboardPayloadFromSelection(
   const paths: ClipboardPathPayload['paths'] = []
 
   if (selectedSegment) {
-    const path = glyph.paths.find(
+    const path = activeLayer(glyph).paths.find(
       (candidate) => candidate.id === selectedSegment.pathId
     )
     if (path) {
@@ -105,7 +106,9 @@ export function buildClipboardPayloadFromSelection(
   const selectedByPath = new Map<string, number[]>()
   for (const selectedNodeId of selectedNodeIds) {
     const [pathId, nodeId] = selectedNodeId.split(':')
-    const path = glyph.paths.find((candidate) => candidate.id === pathId)
+    const path = activeLayer(glyph).paths.find(
+      (candidate) => candidate.id === pathId
+    )
     const nodeIndex = path?.nodes.findIndex((node) => node.id === nodeId) ?? -1
     if (!pathId || nodeIndex < 0) {
       continue
@@ -116,7 +119,9 @@ export function buildClipboardPayloadFromSelection(
   }
 
   for (const [pathId, indices] of selectedByPath) {
-    const path = glyph.paths.find((candidate) => candidate.id === pathId)
+    const path = activeLayer(glyph).paths.find(
+      (candidate) => candidate.id === pathId
+    )
     if (!path || indices.length === 0) {
       continue
     }

@@ -88,7 +88,7 @@ export function useRightPanelModel() {
   const displayedMetrics =
     glyph && previewGlyphMetrics?.glyphId === glyph.id
       ? previewGlyphMetrics.metrics
-      : (glyph?.metrics ?? activeLayer?.metrics)
+      : activeLayer?.metrics
   const availableLayers = glyph ? listGlyphLayers(glyph) : []
   const nodeRef = parseSelectedNode(selectedNodeIds[0])
   const selectedPath =

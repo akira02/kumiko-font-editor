@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { useStore } from 'src/store'
+import { useStore, getGlyphLayer } from 'src/store'
 import type { FontData, GlyphData, PathData } from 'src/store/types'
 
 const makeGlyph = (paths: PathData[]): GlyphData => ({
@@ -45,7 +45,10 @@ describe('path actions', () => {
       .getState()
       .deleteSelectedNodes('glyph-a', ['path-a:n1', 'path-a:n2'])
 
-    expect(useStore.getState().fontData?.glyphs['glyph-a'].paths).toEqual([])
+    expect(
+      getGlyphLayer(useStore.getState().fontData?.glyphs['glyph-a'], null)
+        ?.paths
+    ).toEqual([])
   })
 
   it('keeps unrelated handles when deleting one node from a closed curve path', () => {
@@ -70,9 +73,10 @@ describe('path actions', () => {
     useStore.getState().deleteSelectedNodes('glyph-a', ['path-a:n2'])
 
     expect(
-      useStore
-        .getState()
-        .fontData?.glyphs['glyph-a'].paths[0]?.nodes.map((node) => node.id)
+      getGlyphLayer(
+        useStore.getState().fontData?.glyphs['glyph-a'],
+        null
+      )?.paths[0]?.nodes.map((node) => node.id)
     ).toEqual(['n1', 'n3', 'h5', 'h6'])
   })
 })

@@ -80,16 +80,24 @@ export interface GlyphLayerData {
   metrics: GlyphMetrics
 }
 
+// Content fields of a layer (the fontra StaticGlyph equivalent). All editable
+// glyph content lives in a layer, never on GlyphData directly.
+export type GlyphLayerContent = Pick<
+  GlyphLayerData,
+  | 'paths'
+  | 'components'
+  | 'componentRefs'
+  | 'anchors'
+  | 'guidelines'
+  | 'metrics'
+>
+
 export interface GlyphData {
   id: string
   name: string
+  // Layers are the single source of truth; activeLayerId points at the one being
+  // edited/displayed. Content is read via getGlyphLayer / activeLayer.
   activeLayerId?: string | null
-  paths: PathData[]
-  components: string[]
-  componentRefs: GlyphComponentRef[]
-  anchors?: GlyphAnchor[]
-  guidelines?: GlyphGuideline[]
-  metrics: GlyphMetrics
   layers?: Record<string, GlyphLayerData>
   layerOrder?: string[]
   unicode?: string | null

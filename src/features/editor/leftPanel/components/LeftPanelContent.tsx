@@ -4,7 +4,7 @@ import {
   getFontVerticalBox,
   mapGlyphwikiBoxToFontUnits,
 } from 'src/lib/components/componentAssembly'
-import { useStore, type GlyphData } from 'src/store'
+import { useStore, activeLayer, type GlyphData } from 'src/store'
 import { ComponentSearchSection } from 'src/features/editor/leftPanel/components/ComponentSearchSection'
 import { GlyphPreviewCard } from 'src/features/editor/leftPanel/components/GlyphPreviewCard'
 import { GlyphPreviewStrip } from 'src/features/editor/leftPanel/components/GlyphPreviewStrip'
@@ -51,7 +51,7 @@ export function LeftPanelContent({
       return null
     }
     const advanceWidth =
-      selectedGlyph.metrics.width || fontData.unitsPerEm || 1000
+      activeLayer(selectedGlyph).metrics.width || fontData.unitsPerEm || 1000
     return mapGlyphwikiBoxToFontUnits(
       targetPartBox,
       advanceWidth,

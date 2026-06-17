@@ -1,5 +1,6 @@
 import { VarPackedPath } from 'src/font/VarPackedPath'
-import type { GlyphData } from 'src/store'
+import type { GlyphData, GlyphLayerData } from 'src/store'
+import { activeLayer, getGlyphLayer } from 'src/store/glyphLayer'
 import type { GlyphEditTimes } from 'src/lib/glyph/glyphEditTimes'
 
 export type OverviewGroupBy = 'none' | 'script' | 'block'
@@ -339,12 +340,15 @@ export const getGlyphOverviewSections = (
     }))
 }
 
-export const getGlyphOverviewStats = (glyph: GlyphData) => ({
-  contourCount: glyph.paths.length,
-  componentCount: glyph.componentRefs.length,
-  anchorCount: glyph.anchors?.length ?? 0,
-  guidelineCount: glyph.guidelines?.length ?? 0,
-})
+export const getGlyphOverviewStats = (glyph: GlyphData) => {
+  const layer = activeLayer(glyph)
+  return {
+    contourCount: layer.paths.length,
+    componentCount: layer.componentRefs.length,
+    anchorCount: layer.anchors?.length ?? 0,
+    guidelineCount: layer.guidelines?.length ?? 0,
+  }
+}
 
 export interface GlyphPreviewShape {
   d: string
@@ -370,8 +374,8 @@ const PREVIEW_ASCENDER = 900
 const PREVIEW_DESCENDER = -220
 const PREVIEW_FLIP_BASELINE = 800
 
-const buildPathSvg = (glyph: GlyphData) => {
-  const contours = glyph.paths.map((path) => ({
+const buildPathSvg = (layer: GlyphLayerData) => {
+  const contours = layer.paths.map((path) => ({
     isClosed: path.closed,
     points: path.nodes.map((node) => ({
       x: node.x,
@@ -391,6 +395,7 @@ const buildPathSvg = (glyph: GlyphData) => {
 const buildGlyphPreviewShapes = (
   glyph: GlyphData,
   glyphMap: Record<string, GlyphData>,
+  layerId: string | null = null,
   visited = new Set<string>(),
   depth = 0
 ): GlyphPreviewShape[] => {
@@ -401,12 +406,13 @@ const buildGlyphPreviewShapes = (
   const nextVisited = new Set(visited)
   nextVisited.add(glyph.id)
 
+  const layer = getGlyphLayer(glyph, layerId) ?? activeLayer(glyph)
   const shapes: GlyphPreviewShape[] = []
-  if (glyph.paths.length > 0) {
-    shapes.push({ d: buildPathSvg(glyph) })
+  if (layer.paths.length > 0) {
+    shapes.push({ d: buildPathSvg(layer) })
   }
 
-  for (const component of glyph.componentRefs) {
+  for (const component of layer.componentRefs) {
     const baseGlyph = glyphMap[component.glyphId]
     if (!baseGlyph) {
       continue
@@ -425,6 +431,7 @@ const buildGlyphPreviewShapes = (
     const nestedShapes = buildGlyphPreviewShapes(
       baseGlyph,
       glyphMap,
+      null,
       nextVisited,
       depth + 1
     )
@@ -442,7 +449,8 @@ const buildGlyphPreviewShapes = (
 export const buildGlyphPreviewData = (
   glyph: GlyphData,
   glyphMap: Record<string, GlyphData>,
-  unitsPerEm: number = PREVIEW_UNITS_PER_EM
+  unitsPerEm: number = PREVIEW_UNITS_PER_EM,
+  layerId: string | null = null
 ): GlyphPreviewData => {
   let glyphMapCache = glyphPreviewCache.get(glyphMap)
   if (!glyphMapCache) {
@@ -450,7 +458,9 @@ export const buildGlyphPreviewData = (
     glyphPreviewCache.set(glyphMap, glyphMapCache)
   }
 
-  const cachedPreview = glyphMapCache.get(glyph)
+  // Only the glyph's own active layer is cached (keyed by glyph identity); an
+  // explicitly requested layer bypasses the cache.
+  const cachedPreview = layerId ? undefined : glyphMapCache.get(glyph)
   if (cachedPreview) {
     return cachedPreview
   }
@@ -462,8 +472,9 @@ export const buildGlyphPreviewData = (
   const descender = PREVIEW_DESCENDER * scale
   const headroom = 100 * scale
 
-  const width = Math.max(glyph.metrics.width || 0, 240 * scale)
-  const shapes = buildGlyphPreviewShapes(glyph, glyphMap)
+  const layer = getGlyphLayer(glyph, layerId) ?? activeLayer(glyph)
+  const width = Math.max(layer.metrics.width || 0, 240 * scale)
+  const shapes = buildGlyphPreviewShapes(glyph, glyphMap, layerId)
   const viewBox = `${-paddingX} ${descender} ${width + paddingX * 2} ${ascender - descender + headroom}`
 
   const preview = {
@@ -472,6 +483,8 @@ export const buildGlyphPreviewData = (
     flipY: PREVIEW_FLIP_BASELINE * scale,
     shapes,
   }
-  glyphMapCache.set(glyph, preview)
+  if (!layerId) {
+    glyphMapCache.set(glyph, preview)
+  }
   return preview
 }

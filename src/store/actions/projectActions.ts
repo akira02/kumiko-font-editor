@@ -5,7 +5,6 @@ import type { StateCreator } from 'zustand'
 import type { FontData, GlobalState } from 'src/store/types'
 import {
   clearProjectArchive,
-  getArchivedGlyphLayer,
   getProjectArchiveFirstMasterId,
   ingestProjectData,
 } from 'src/lib/project/projectArchive'
@@ -17,7 +16,11 @@ import type { GlyphEditTimes } from 'src/lib/glyph/glyphEditTimes'
 import { getProjectGlyphEditTimes } from 'src/lib/glyph/glyphEditTimes'
 import { syncEditorTextFromGlyphIds } from 'src/store/editorLine'
 import { syncFilteredGlyphList } from 'src/store/glyphSearch'
-import { syncGlyphTopLevelFromLayer } from 'src/store/glyphLayer'
+import {
+  getGlyphLayer,
+  getActiveLayerId,
+  setGlyphActiveLayer,
+} from 'src/store/glyphLayer'
 
 type ImmerSet = Parameters<
   StateCreator<GlobalState, [['zustand/immer', never]], []>
@@ -64,14 +67,10 @@ export const buildProjectActions = (
       const firstGlyph = Object.values(hotFontData.glyphs)[0]
       const firstMasterId = getProjectArchiveFirstMasterId()
       state.selectedLayerId =
-        (firstMasterId &&
-        firstGlyph &&
-        getArchivedGlyphLayer(firstGlyph.id, firstMasterId)
+        (firstMasterId && firstGlyph && getGlyphLayer(firstGlyph, firstMasterId)
           ? firstMasterId
           : null) ||
-        (firstGlyph
-          ? (getArchivedGlyphLayer(firstGlyph.id, null)?.id ?? null)
-          : null) ||
+        (firstGlyph ? getActiveLayerId(firstGlyph) : null) ||
         null
       syncFilteredGlyphList(state)
 
@@ -87,7 +86,7 @@ export const buildProjectActions = (
         syncEditorTextFromGlyphIds(state)
         state.editorTextCursorIndex = 1
         state.editorActiveGlyphIndex = 0
-        syncGlyphTopLevelFromLayer(
+        setGlyphActiveLayer(
           state.fontData?.glyphs[state.selectedGlyphId],
           state.selectedLayerId
         )

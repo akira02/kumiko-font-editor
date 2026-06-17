@@ -10,7 +10,16 @@ import { buildPathActions } from 'src/store/actions/pathActions'
 import { buildProjectActions } from 'src/store/actions/projectActions'
 import { buildBehaviorActions } from 'src/store/actions/behaviorActions'
 
-export { getGlyphLayer, getActiveLayer } from 'src/store/glyphLayer'
+export {
+  getGlyphLayer,
+  getActiveLayer,
+  activeLayer,
+  ensureActiveLayer,
+  setGlyphActiveLayer,
+  withActiveLayer,
+  getActiveLayerId,
+  normalizeGlyphToLayers,
+} from 'src/store/glyphLayer'
 export {
   getEffectiveNodeType,
   isPathEndpointNode,

@@ -8,6 +8,8 @@ import {
   importBinaryFontFile,
 } from 'src/lib/fontFormats/fontBinaryFormat'
 import type { FontData, GlyphData } from 'src/store'
+import { getGlyphLayer } from 'src/store/glyphLayer'
+const layerOf = (g: GlyphData) => getGlyphLayer(g, null)!
 
 // Public Sans Regular (CFF/OTF, OFL) — see test/fixtures/otf/OFL.txt.
 //
@@ -52,7 +54,7 @@ const reimport = async (blob: Blob, name: string) => {
 }
 
 const nodeCount = (glyph: GlyphData) =>
-  glyph.paths.reduce((sum, path) => sum + path.nodes.length, 0)
+  layerOf(glyph).paths.reduce((sum, path) => sum + path.nodes.length, 0)
 
 describe('OTF import → export round-trip', () => {
   let prepared: FontData
@@ -97,9 +99,10 @@ describe('OTF import → export round-trip', () => {
       if (!isControlGlyph(before)) {
         expect(after.unicode, `unicode for ${before.id}`).toBe(before.unicode)
       }
-      expect(after.metrics.width, `advance width for ${before.id}`).toBe(
-        before.metrics.width
-      )
+      expect(
+        layerOf(after).metrics.width,
+        `advance width for ${before.id}`
+      ).toBe(layerOf(before).metrics.width)
       expect(nodeCount(after), `node count for ${before.id}`).toBe(
         nodeCount(before)
       )
@@ -114,11 +117,11 @@ describe('OTF import → export round-trip', () => {
     for (const id of present) {
       const before = prepared.glyphs[id]
       const after = result.glyphs[id]
-      expect(after.paths.length, `contour count for ${id}`).toBe(
-        before.paths.length
+      expect(layerOf(after).paths.length, `contour count for ${id}`).toBe(
+        layerOf(before).paths.length
       )
-      before.paths.forEach((path, pathIndex) => {
-        const afterPath = after.paths[pathIndex]
+      layerOf(before).paths.forEach((path, pathIndex) => {
+        const afterPath = layerOf(after).paths[pathIndex]
         expect(afterPath.closed).toBe(path.closed)
         path.nodes.forEach((node, nodeIndex) => {
           const afterNode = afterPath.nodes[nodeIndex]

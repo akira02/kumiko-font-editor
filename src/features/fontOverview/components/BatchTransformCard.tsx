@@ -34,7 +34,7 @@ import {
   type SelectionNode,
   type TransformOrigin,
 } from 'src/features/common/transform/utils/transformGeometry'
-import { useStore } from 'src/store'
+import { useStore, activeLayer } from 'src/store'
 
 interface BatchTransformCardProps {
   selectedGlyphIds: string[]
@@ -87,7 +87,7 @@ export function BatchTransformCard({
         return []
       }
 
-      const nodes = getAllNodes(glyph.paths)
+      const nodes = getAllNodes(activeLayer(glyph).paths)
       const bounds = getSelectionBounds(nodes)
       if (!bounds) {
         return []

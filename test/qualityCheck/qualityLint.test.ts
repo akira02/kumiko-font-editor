@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { buildQualityReport } from 'src/features/common/qualityCheck/utils/qualityLint'
 import type { FontData, GlyphData, PathData } from 'src/store/types'
+import { normalizeGlyphToLayers } from 'src/store'
 
 const makePath = (
   id: string,
@@ -17,20 +18,18 @@ const makePath = (
   })),
 })
 
-const makeGlyph = (
-  id: string,
-  overrides: Partial<GlyphData> = {}
-): GlyphData => ({
-  id,
-  name: id,
-  paths: [],
-  components: [],
-  componentRefs: [],
-  anchors: [],
-  guidelines: [],
-  metrics: { lsb: 0, rsb: 0, width: 1000 },
-  ...overrides,
-})
+const makeGlyph = (id: string, overrides: Partial<GlyphData> = {}): GlyphData =>
+  normalizeGlyphToLayers({
+    id,
+    name: id,
+    paths: [],
+    components: [],
+    componentRefs: [],
+    anchors: [],
+    guidelines: [],
+    metrics: { lsb: 0, rsb: 0, width: 1000 },
+    ...overrides,
+  })
 
 const makeFontData = (glyphs: GlyphData[]): FontData => ({
   glyphs: Object.fromEntries(glyphs.map((glyph) => [glyph.id, glyph])),

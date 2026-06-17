@@ -11,7 +11,7 @@ import {
   syncSelectedGlyphFromEditorLine,
 } from 'src/store/editorLine'
 import { syncFilteredGlyphList } from 'src/store/glyphSearch'
-import { syncGlyphTopLevelFromLayer } from 'src/store/glyphLayer'
+import { setGlyphActiveLayer } from 'src/store/glyphLayer'
 
 type ImmerSet = Parameters<
   StateCreator<GlobalState, [['zustand/immer', never]], []>
@@ -38,10 +38,7 @@ export const buildUiActions = (set: ImmerSet) => ({
       state.selectedNodeIds = []
       state.selectedSegment = null
       if (id) {
-        syncGlyphTopLevelFromLayer(
-          state.fontData?.glyphs[id],
-          state.selectedLayerId
-        )
+        setGlyphActiveLayer(state.fontData?.glyphs[id], state.selectedLayerId)
       }
     }),
 
@@ -97,10 +94,7 @@ export const buildUiActions = (set: ImmerSet) => ({
       state.selectedGlyphId = id
       state.selectedNodeIds = []
       state.selectedSegment = null
-      syncGlyphTopLevelFromLayer(
-        state.fontData?.glyphs[id],
-        state.selectedLayerId
-      )
+      setGlyphActiveLayer(state.fontData?.glyphs[id], state.selectedLayerId)
     }),
 
   insertGlyphIntoEditor: (id: string, afterGlyphId: string | null = null) =>
@@ -127,7 +121,7 @@ export const buildUiActions = (set: ImmerSet) => ({
       state.selectedNodeIds = []
       state.selectedSegment = null
       if (state.selectedGlyphId) {
-        syncGlyphTopLevelFromLayer(
+        setGlyphActiveLayer(
           state.fontData?.glyphs[state.selectedGlyphId],
           state.selectedLayerId
         )
@@ -153,7 +147,7 @@ export const buildUiActions = (set: ImmerSet) => ({
         state.selectedNodeIds = []
         state.selectedSegment = null
         if (state.selectedGlyphId) {
-          syncGlyphTopLevelFromLayer(
+          setGlyphActiveLayer(
             state.fontData?.glyphs[state.selectedGlyphId],
             state.selectedLayerId
           )
@@ -173,7 +167,7 @@ export const buildUiActions = (set: ImmerSet) => ({
       state.selectedNodeIds = []
       state.selectedSegment = null
       if (state.selectedGlyphId) {
-        syncGlyphTopLevelFromLayer(
+        setGlyphActiveLayer(
           state.fontData?.glyphs[state.selectedGlyphId],
           state.selectedLayerId
         )
@@ -198,7 +192,7 @@ export const buildUiActions = (set: ImmerSet) => ({
       state.selectedNodeIds = []
       state.selectedSegment = null
       if (state.selectedGlyphId) {
-        syncGlyphTopLevelFromLayer(
+        setGlyphActiveLayer(
           state.fontData?.glyphs[state.selectedGlyphId],
           state.selectedLayerId
         )
