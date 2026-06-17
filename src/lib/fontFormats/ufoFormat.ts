@@ -1,11 +1,18 @@
 import type {
   FontData,
+  FontSource,
   GlyphData,
+  GlyphLayerData,
   GlyphMetrics,
   PathData,
   PathNode,
 } from 'src/store'
 import { getGlyphLayer } from 'src/store/glyphLayer'
+import {
+  designspaceDefaultLocation,
+  designspaceToFontAxes,
+  type Designspace,
+} from 'src/lib/fontFormats/designspace'
 import type { ProjectSourceFormat } from 'src/lib/project/projectFormats'
 import { hashString } from 'src/lib/hash'
 import { userNameToFileName } from 'src/lib/fontFormats/ufoFileNames'
@@ -843,6 +850,186 @@ export const pickDefaultLayer = (metadata: UfoMetadataRecord) =>
     layerId: 'public.default',
     glyphDir: 'glyphs',
   }
+
+const basename = (path: string) => path.split('/').filter(Boolean).pop() ?? path
+
+const locationsEqual = (
+  a: Record<string, number>,
+  b: Record<string, number>
+): boolean => {
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)])
+  for (const key of keys) {
+    if ((a[key] ?? 0) !== (b[key] ?? 0)) {
+      return false
+    }
+  }
+  return true
+}
+
+interface MasterSource {
+  sourceId: string
+  name: string
+  location: Record<string, number>
+  metadata: UfoMetadataRecord
+  resolveBounds: ReturnType<typeof buildBoundsResolver>
+  recordsByName: Map<string, UfoGlyphRecord>
+}
+
+// Merge several UFO sources (one per designspace <source>) into one FontData with
+// one master layer per source. Pure: takes already-parsed records + designspace.
+export const buildMultiMasterFontData = (
+  metadataRecords: UfoMetadataRecord[],
+  glyphRecords: UfoGlyphRecord[],
+  designspace: Designspace
+): FontData => {
+  const usedIds = new Set<string>()
+  const uniqueSourceId = (name: string): string => {
+    const base = name || 'master'
+    let id = base
+    let counter = 2
+    while (usedIds.has(id)) {
+      id = `${base} (${counter})`
+      counter += 1
+    }
+    usedIds.add(id)
+    return id
+  }
+
+  const masters: MasterSource[] = []
+  for (const source of designspace.sources) {
+    const target = basename(source.filename)
+    const metadata = metadataRecords.find(
+      (record) => basename(record.relativePath) === target
+    )
+    if (!metadata) {
+      continue
+    }
+    const defaultLayer = pickDefaultLayer(metadata)
+    const records = glyphRecords.filter(
+      (record) =>
+        record.ufoId === metadata.ufoId &&
+        record.layerId === defaultLayer.layerId
+    )
+    masters.push({
+      sourceId: uniqueSourceId(source.name),
+      name: source.name,
+      location: source.location,
+      metadata,
+      resolveBounds: buildBoundsResolver(records),
+      recordsByName: new Map(
+        records.map((record) => [record.glyphName, record])
+      ),
+    })
+  }
+
+  if (masters.length === 0) {
+    return { glyphs: {} }
+  }
+
+  const defaultLocation = designspaceDefaultLocation(designspace)
+  const defaultMaster =
+    masters.find((master) =>
+      locationsEqual(master.location, defaultLocation)
+    ) ?? masters[0]
+
+  const base = buildFontDataFromUfoGlyphs(
+    [...defaultMaster.recordsByName.values()],
+    defaultMaster.metadata
+  )
+
+  const postscriptNames =
+    defaultMaster.metadata.lib?.['public.postscriptNames'] &&
+    typeof defaultMaster.metadata.lib['public.postscriptNames'] === 'object'
+      ? (defaultMaster.metadata.lib['public.postscriptNames'] as Record<
+          string,
+          string
+        >)
+      : {}
+
+  // Union of glyph names: default source order first, then any extras.
+  const orderedNames: string[] = []
+  const seen = new Set<string>()
+  const push = (name: string) => {
+    if (!seen.has(name)) {
+      seen.add(name)
+      orderedNames.push(name)
+    }
+  }
+  for (const name of defaultMaster.metadata.glyphOrder) {
+    if (masters.some((master) => master.recordsByName.has(name))) {
+      push(name)
+    }
+  }
+  for (const master of masters) {
+    for (const name of master.recordsByName.keys()) {
+      push(name)
+    }
+  }
+
+  const glyphs: Record<string, GlyphData> = {}
+  for (const glyphId of orderedNames) {
+    const layers: Record<string, GlyphLayerData> = {}
+    const layerOrder: string[] = []
+    let representative: UfoGlyphRecord | undefined
+
+    const addLayer = (master: MasterSource) => {
+      const record = master.recordsByName.get(glyphId)
+      if (!record) {
+        return
+      }
+      representative = representative ?? record
+      layers[master.sourceId] = {
+        id: master.sourceId,
+        name: master.name,
+        type: 'master',
+        associatedMasterId: master.sourceId,
+        ...glyphRecordToLayerContent(record, master.resolveBounds),
+      }
+      layerOrder.push(master.sourceId)
+    }
+
+    addLayer(defaultMaster)
+    for (const master of masters) {
+      if (master !== defaultMaster) {
+        addLayer(master)
+      }
+    }
+    if (!representative || layerOrder.length === 0) {
+      continue
+    }
+
+    const activeLayerId = layers[defaultMaster.sourceId]
+      ? defaultMaster.sourceId
+      : layerOrder[0]
+
+    glyphs[glyphId] = {
+      id: glyphId,
+      name: getUnicodeDisplayName(representative.unicodes, glyphId),
+      activeLayerId,
+      layerOrder,
+      layers,
+      unicode: representative.unicodes[0] ?? null,
+      production: postscriptNames[glyphId] ?? null,
+      export: true,
+    }
+  }
+
+  const sources: Record<string, FontSource> = {}
+  for (const master of masters) {
+    sources[master.sourceId] = {
+      id: master.sourceId,
+      name: master.name,
+      location: master.location,
+    }
+  }
+
+  return {
+    ...base,
+    glyphs,
+    axes: designspaceToFontAxes(designspace),
+    sources,
+  }
+}
 
 export const buildWorkspaceFileMapFromEntries = (
   entries: UfoWorkspaceEntry[]
