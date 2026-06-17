@@ -197,11 +197,55 @@ export const buildProjectActions = (
         return
       }
 
+      const prevSources = state.fontData.sources ?? {}
       state.fontData = {
         ...state.fontData,
         ...fontDataUpdate,
         glyphs: state.fontData.glyphs,
       }
+
+      // Keep per-glyph master layers consistent with source CRUD: drop layers for
+      // removed sources, and follow source renames into the layer display name.
+      if (fontDataUpdate.sources) {
+        const nextSources = fontDataUpdate.sources
+        const removed = Object.keys(prevSources).filter(
+          (id) => !nextSources[id]
+        )
+        const renamed = Object.keys(nextSources).filter(
+          (id) =>
+            prevSources[id] && prevSources[id].name !== nextSources[id].name
+        )
+        if (removed.length > 0 || renamed.length > 0) {
+          const removedSet = new Set(removed)
+          for (const glyph of Object.values(state.fontData.glyphs)) {
+            if (!glyph.layers) {
+              continue
+            }
+            for (const id of removed) {
+              delete glyph.layers[id]
+            }
+            for (const id of renamed) {
+              if (glyph.layers[id]) {
+                glyph.layers[id].name = nextSources[id].name
+              }
+            }
+            if (glyph.layerOrder) {
+              glyph.layerOrder = glyph.layerOrder.filter(
+                (id) => !removedSet.has(id)
+              )
+            }
+            if (glyph.activeLayerId && removedSet.has(glyph.activeLayerId)) {
+              glyph.activeLayerId =
+                glyph.layerOrder?.[0] ?? Object.keys(glyph.layers)[0] ?? null
+            }
+          }
+          if (state.activeMasterId && removedSet.has(state.activeMasterId)) {
+            state.activeMasterId = Object.keys(nextSources)[0] ?? null
+            state.selectedLayerId = state.activeMasterId
+          }
+        }
+      }
+
       state.isDirty = true
       state.hasLocalChanges = true
     }),

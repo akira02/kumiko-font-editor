@@ -124,3 +124,40 @@ describe('createGlyphMasterLayer (sparse fill)', () => {
     ).toBe(80)
   })
 })
+
+describe('updateFontSettings source CRUD consistency', () => {
+  afterEach(() => {
+    useStore.getState().closeProjectState()
+  })
+
+  it('drops per-glyph layers and fixes active refs when a source is removed', () => {
+    useStore.getState().loadProjectState('p', 'P', fontData())
+    useStore.getState().setActiveMasterId('Bold')
+    // Remove the Bold source (keep only Light).
+    useStore.getState().updateFontSettings({
+      sources: {
+        Light: { id: 'Light', name: 'Light', location: { Weight: 0 } },
+      },
+    })
+
+    const state = useStore.getState()
+    const glyph = state.fontData?.glyphs.A
+    expect(glyph?.layers?.Bold).toBeUndefined()
+    expect(glyph?.layerOrder).not.toContain('Bold')
+    expect(glyph?.activeLayerId).toBe('Light')
+    expect(state.activeMasterId).toBe('Light')
+  })
+
+  it('follows a source rename into the layer display name', () => {
+    useStore.getState().loadProjectState('p', 'P', fontData())
+    useStore.getState().updateFontSettings({
+      sources: {
+        Light: { id: 'Light', name: 'Light', location: { Weight: 0 } },
+        Bold: { id: 'Bold', name: 'Black', location: { Weight: 100 } },
+      },
+    })
+    expect(useStore.getState().fontData?.glyphs.A.layers?.Bold.name).toBe(
+      'Black'
+    )
+  })
+})
