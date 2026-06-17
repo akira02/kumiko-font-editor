@@ -11,6 +11,7 @@ import { getGlyphLayer } from 'src/store/glyphLayer'
 import {
   designspaceDefaultLocation,
   designspaceToFontAxes,
+  parseDesignspace,
   type Designspace,
 } from 'src/lib/fontFormats/designspace'
 import type { ProjectSourceFormat } from 'src/lib/project/projectFormats'
@@ -41,6 +42,8 @@ import {
   saveUfoMetadata,
   saveUfoMetadataBatch,
   saveUfoProject,
+  saveUfoUiValue,
+  loadUfoUiValue,
   listUfoGlyphsInLayer,
   listUfoMetadataForProject,
   loadUfoProject,
@@ -91,6 +94,13 @@ interface UfoImportSourceOptions {
 }
 
 const normalizePath = (value: string) => value.replace(/\\/g, '/')
+
+// UI-state key: the parsed designspace, persisted so multi-master survives reload
+// (UFO projects are rebuilt from the ufo stores, not the draft fontData).
+export const UFO_DESIGNSPACE_KEY = 'ufo-designspace'
+
+const isDesignspaceFile = (relativePath: string) =>
+  normalizePath(relativePath).toLowerCase().endsWith('.designspace')
 
 export const isRelevantUfoTextFile = (relativePath: string) => {
   const normalized = normalizePath(relativePath).toLowerCase()
@@ -1065,9 +1075,10 @@ export const buildWorkspaceFileMapFromEntries = (
 const buildWorkspaceEntriesFromFiles = async (
   inputFiles: FileList | File[]
 ) => {
-  const candidateFiles = Array.from(inputFiles).filter((file) =>
-    isRelevantUfoTextFile(file.webkitRelativePath || file.name)
-  )
+  const candidateFiles = Array.from(inputFiles).filter((file) => {
+    const path = file.webkitRelativePath || file.name
+    return isRelevantUfoTextFile(path) || isDesignspaceFile(path)
+  })
 
   const entries: UfoTextEntry[] = []
   for (const file of candidateFiles) {
@@ -1095,6 +1106,13 @@ export const importUfoWorkspaceEntries = async (
   if (parsedUfos.length === 0) {
     throw new Error('選到的資料夾裡沒有找到任何 .ufo')
   }
+
+  const designspaceEntry = entries.find((entry) =>
+    isDesignspaceFile(entry.relativePath)
+  )
+  const designspace = designspaceEntry
+    ? parseDesignspace(designspaceEntry.text, designspaceEntry.relativePath)
+    : null
 
   const projectId = `ufo-${Date.now()}`
   const title = options.title
@@ -1235,9 +1253,11 @@ export const importUfoWorkspaceEntries = async (
       record.ufoId === activeUfoId && record.layerId === activeLayer.layerId
   )
 
-  const fontData = activeMetadata
-    ? buildFontDataFromUfoGlyphs(activeGlyphs, activeMetadata)
-    : { glyphs: {} }
+  const fontData = designspace
+    ? buildMultiMasterFontData(metadataRecords, glyphRecords, designspace)
+    : activeMetadata
+      ? buildFontDataFromUfoGlyphs(activeGlyphs, activeMetadata)
+      : { glyphs: {} }
   const projectMetadata = {
     activeUfoId,
     ufoIds: project.ufoIds,
@@ -1257,6 +1277,9 @@ export const importUfoWorkspaceEntries = async (
   await saveUfoProject(project)
   await saveUfoMetadataBatch(metadataRecords)
   await saveUfoGlyphBatch(glyphRecords)
+  if (designspace) {
+    await saveUfoUiValue(projectId, UFO_DESIGNSPACE_KEY, designspace)
+  }
 
   return {
     project,
@@ -1291,6 +1314,50 @@ export const loadUfoProjectIntoFontData = async (projectId: string) => {
     metadataRecords[0]
   if (!activeMetadata) {
     return null
+  }
+
+  // Multi-master project: rebuild from every source ufo using the stored
+  // designspace, so the master layers survive reload.
+  const designspace = await loadUfoUiValue<Designspace>(
+    projectId,
+    UFO_DESIGNSPACE_KEY
+  )
+  if (designspace) {
+    const allRecords: UfoGlyphRecord[] = []
+    for (const record of metadataRecords) {
+      const sourceLayer = pickDefaultLayer(record)
+      allRecords.push(
+        ...(await listUfoGlyphsInLayer(
+          projectId,
+          record.ufoId,
+          sourceLayer.layerId
+        ))
+      )
+    }
+    return {
+      project,
+      metadata: activeMetadata,
+      fontData: buildMultiMasterFontData(
+        metadataRecords,
+        allRecords,
+        designspace
+      ),
+      projectMetadata: {
+        activeUfoId: activeMetadata.ufoId,
+        ufoIds: project.ufoIds,
+        sourceType: project.sourceType ?? 'local',
+        githubSource: project.githubSource ?? null,
+        ufos: metadataRecords.map((record) => ({
+          ufoId: record.ufoId,
+          relativePath: record.relativePath,
+          familyName: record.fontinfo?.familyName ?? record.ufoId,
+          styleName: record.fontinfo?.styleName ?? null,
+          layerIds: record.layers.map((layer) => layer.layerId),
+        })),
+        fontinfo: activeMetadata.fontinfo ?? {},
+        metainfo: activeMetadata.metainfo ?? {},
+      },
+    }
   }
 
   const activeLayer = pickDefaultLayer(activeMetadata)

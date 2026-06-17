@@ -63,7 +63,7 @@ export function LocalImportCard({
         ref={fileInputRef}
         type="file"
         multiple
-        accept=".ufo,.ttf,.otf,.woff,.woff2"
+        accept=".ufo,.designspace,.ttf,.otf,.woff,.woff2"
         onChange={onFileUpload}
         style={{ display: 'none' }}
         id="package-file-upload"
