@@ -2,135 +2,52 @@
 
 # Kumiko Font Editor
 
-Language: [English](README.md) | 繁體中文
+[English](README.md) | 繁體中文
 
-Kumiko Font Editor 是一個開源、以瀏覽器為核心的字體編輯器，專注於 CJK 字體設計。它支援 UFO 專案匯入、IndexedDB 草稿儲存，以及透過 GitHub OAuth 與 Cloudflare Pages Functions 載入 GitHub 上的 UFO repo。
+**一個全新的、以瀏覽器為核心的字體編輯軟體——目前專注於作為以 GitHub 為核心的 CJK 補字工具。**
 
-CJK 字體經常涉及數萬個 glyph，因此 Kumiko 以可擴展的生產流程為核心：component-aware 編輯、智慧 component 建議，以及適合大型字集的可量化品質檢查。
+**線上試用 → [kumiko.chiaki.ch](https://kumiko.chiaki.ch)**
+
+Kumiko 是一套從頭打造、零安裝、完全在瀏覽器裡運行的字體編輯器。目前它專注於一件事：直接對著 GitHub repo 補齊缺少的 CJK 字。貢獻者從 repo 載入 UFO 專案、在瀏覽器裡編輯 glyph，再以 pull request 推回去——不需要本地工具鏈、不需要跑後端、不需要設定環境。
+
+## 為什麼做 Kumiko？
+
+雖然已有 [Fontra](https://github.com/googlefonts/fontra) 這類優秀工具，Kumiko 專注於解決開源 CJK 字體開發特有的摩擦點。我們透過四個核心原則達成：
+
+1. **真正的零安裝體驗**：不同於仍需在本地架設後端伺服器的現有 web 字體工具，Kumiko 是純前端應用。貢獻者只要開啟瀏覽器、用 GitHub 登入，就能馬上開始設計。零摩擦意味著更多社群貢獻。
+2. **現代且可持續的架構**：完全以 React、TypeScript、Vite 建構。Kumiko 元件驅動的架構讓它高度可客製，也對前端開發者極為友善、容易參與。
+3. **IDS 驅動的組字工作流**：CJK 字體動輒數萬個 glyph。Kumiko 內建 Ideographic Description Characters（IDS）拆字引擎，讓設計者能透過可重用的 component 快速組字、補齊缺字。
+4. **量化品質建議**：為了在去中心化的開源環境裡維持專業水準，Kumiko 扮演「字體排印的 Linter」，把即時灰階測試與統計式設計建議直接整合進編輯畫布。（建議引擎目前為初版，仍在持續精進。）
 
 ## 功能
 
-- 匯入本地 UFO 專案資料夾並解析 `.ufo` 內容到 IndexedDB。
-- 從 GitHub repo 載入 UFO 專案，透過 Cloudflare Pages Functions 代理 archive 下載。
-- 透過 GitHub OAuth web flow 登入，檢查使用者 fork、列出 branch、推送 commit，並跳轉到 GitHub compare 頁建立 PR。
-- 編輯 glyph 路徑、節點、metrics，並保留 dirty glyph 狀態。
-- 將草稿保存在瀏覽器 IndexedDB，方便重新開啟。
+- **從任何地方開啟**：匯入本地 `.ufo` 專案資料夾，或直接從 GitHub repo 載入 UFO 專案（透過 Cloudflare Pages Functions 代理 archive 下載）。
+- **GitHub 原生工作流**：用 GitHub OAuth 登入、檢查 fork、列出 branch、推送 commit，並跳轉到 compare 頁建立 pull request。
+- **component-aware 字形編輯**：在畫布上編輯路徑、節點與 metrics，並以 IDS 引擎用可重用 component 組出 CJK 字形。
+- **內建品質檢查**：即時灰階預覽與統計式設計洞察，直接呈現在編輯器內。
+- **離線友善草稿**：工作成果保存在瀏覽器 IndexedDB，方便日後重新開啟。
 
-## 本地開發
+## 開發路線
 
-這個專案使用 pnpm 10。`package.json` 的 `packageManager` 欄位提供 Corepack 的預設版本；`.npmrc` 會要求使用 pnpm，但允許 pnpm 10.x，避免不同 major 版本重寫 `pnpm-lock.yaml`。
+Kumiko 近期聚焦在**協作補字工作流**，貢獻者流程與體驗優先，編輯器完整度次之。重點：
 
-第一次開發前：
+- 穩固的 GitHub 同步（per-glyph 衝突解決；以 server-side session storage 取代 signed cookie）。
+- 錨定 UFO 模型（`groups.plist` / `kerning.plist`）的 kerning，匯出為 FEA。
+- 擴充更多 UFO metadata 與非 glyph 檔案的 GitHub 回寫。
+- 嘗試解決 OpenType features
 
-```bash
-corepack enable
-corepack prepare pnpm@10.33.3 --activate
-```
+完整方向與已議定路線見 [docs/product-direction.md](docs/product-direction.md)。
 
-如果你的系統上有 Homebrew 或其他方式安裝的舊版 pnpm，可能會蓋過 Corepack shim。這時請優先使用 `corepack pnpm ...`，或移除/升級舊的全域 pnpm。
+## 文件
 
-只測前端 UI：
+- **[CONTRIBUTING.md](CONTRIBUTING.md)**（英文）— 如何安裝、在本地執行、設定環境變數與提交變更。
+- **[docs/architecture.md](docs/architecture.md)**（英文）— 技術選型、狀態管理策略與專案結構。
+- **[docs/](docs/README.md)** — 設計決策的開發者筆記（CJK 組字策略、品質檢查、glyph 命名、variable font 等）。
 
-```bash
-pnpm install
-pnpm dev
-```
+### 與 Fontra 的關係
 
-若 `pnpm-lock.yaml` 因本機舊版 pnpm 產生大幅格式變更，請先確認：
+Kumiko 參考了許多 [Fontra](https://github.com/googlefonts/fontra) 的設計，並逐檔移植部分純演算法模組到 `src/font/fontra-ported/`。但兩者技術棧分歧到無法直接 fork：Fontra 以 web UI 搭配 Python WebSocket 後端，Kumiko 則盡可能維持純前端。跟進策略、目前對齊的 Fontra baseline SHA 與 re-sync 流程見 [docs/fontra-parity.md](docs/fontra-parity.md)。
 
-```bash
-corepack pnpm --version
-```
+## 授權
 
-版本應為 `10.x`。請不要用 pnpm 8/9 或其他舊版 pnpm 更新依賴。
-
-提交前建議執行：
-
-```bash
-pnpm lint
-pnpm build
-```
-
-如果要測 GitHub 登入、GitHub 載入或任何 `/functions` 路由，請用 Cloudflare Pages Functions 本地模式：
-
-```bash
-cp .dev.vars.example .dev.vars
-# 編輯 .dev.vars，填入 GitHub OAuth App 的值
-pnpm cf:preview
-```
-
-`.dev.vars` 需要至少這些值：
-
-```bash
-GITHUB_CLIENT_ID=...
-GITHUB_CLIENT_SECRET=...
-GITHUB_SESSION_SECRET=...
-GITHUB_OAUTH_SCOPE=public_repo read:user user:email
-```
-
-`GITHUB_SESSION_SECRET` 請使用夠長的隨機字串，Functions 會用它來簽署 GitHub session cookie。
-
-## 專案結構
-
-### 前端 `src/`
-
-- `src/features/home/`: 首頁、專案匯入入口、最近專案列表，以及本地 UFO / GitHub 匯入流程。
-- `src/features/editor/`: editor 的整體版面組合與功能入口，例如 editor 三欄 layout。
-- `src/features/editor/canvas/`: 字形編輯主畫布、canvas lifecycle、工具快捷鍵、剪貼簿與文字輸入整合。
-- `src/features/editor/leftPanel/`: editor 左側 glyph / component 搜尋、預覽與加入編輯列的 UI。
-- `src/features/editor/tools/`: editor 專用互動工具，例如 pointer、pen、brush、hand、text 與 scene controller。
-- `src/features/fontOverview/`: 全字庫總覽、分組、搜尋、新增 glyph 與 overview grid。
-- `src/features/common/`: 跨主要 feature 共用的 feature-level UI 與 hooks。
-- `src/features/common/glyphInspector/`: editor 與 overview 共用的 glyph inspector，包括 glyph summary、node inspector、metrics、儲存與 GitHub commit flow。
-- `src/canvas/`: 底層 canvas controller、scene view 與 rendering layers，不直接承擔 React UI。
-- `src/store/`: Zustand 全域狀態、glyph 編輯資料模型與 mutation actions。
-  - `src/store/index.ts`: store 建立、actions 組合、temporal undo/redo 入口。
-  - `src/store/types.ts`: glyph、font、selection、viewport 與 global state 型別。
-  - `src/store/glyphGeometry.ts`: path/node 幾何 helper，例如 endpoint 判斷、node lookup、sidebearing recompute。
-  - `src/store/glyphLayer.ts`: active/archive glyph layer 讀取與 top-level glyph 同步。
-  - `src/store/glyphSearch.ts`: glyph overview/search filtering 與 IDS dictionary。
-  - `src/store/editorLine.ts`: editor glyph line、cursor、active glyph index 的同步 helper。
-  - `src/store/dirtyState.ts`: dirty/local dirty flags 更新 helper。
-- `src/lib/`: 可被多個 feature 共用的資料處理與整合邏輯，例如 UFO/Glyphs 格式、GitHub API、IndexedDB persistence、export worker client。
-- `src/workers/`: Web Worker entry points，用於搜尋與大量匯出等較重的背景工作。
-- `src/hooks/`: 跨 feature 可共用的 React hooks。
-- `src/icons/`: 專案內共用 icon component。
-- `src/font/`: 字形路徑資料結構與 font-specific helper。
-  - `src/font/fontra-ported/`: 自 fontra 逐檔移植的純演算法模組（曲線擬合、variable font 插值等），見該資料夾 README 與 `docs/fontra-parity.md`。
-- `src/assets/`: 前端靜態資源。
-
-### 後端與公開資源
-
-- `functions/api/github/`: Cloudflare Pages Functions，負責 GitHub OAuth、viewer、repo metadata、archive proxy、fork/commit/merge 等 API。
-- `public/`: 不經 bundler 處理的公開靜態檔，例如 manifest、favicon、Hanseeker 資料。
-
-### 放置原則
-
-- 新增頁面或使用者流程時，優先放進對應的 `src/features/<feature>/`。
-- 只有跨多個 feature 共用且承擔資料處理、外部整合或 domain 規則的邏輯，才放進 `src/lib/`。
-- 若只是 feature 內部使用的 helper，優先留在該 feature，例如 canvas 剪貼簿格式放在 `src/features/editor/canvas/`。
-- Canvas rendering 放在 `src/canvas/`；editor 互動工具放在 `src/features/editor/tools/`；React component 不應直接塞進 `src/canvas/`。
-- 全域狀態集中在 `src/store/`；feature 內若只是整理資料給 UI，優先用 feature-local hook。
-
-## 資料管線腳本
-
-`scripts/` 下的腳本把外部資料來源轉成 `public/` 內供 runtime fetch 的 TSV 檔。來源皆會不定期更新，需手動重跑同步：
-
-| 指令                         | 來源                                                                                           | 輸出                                                                               |
-| ---------------------------- | ---------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| `pnpm data:glyphdata`        | Glyphs [GlyphData.xml](https://github.com/schriftgestalt/GlyphsInfo)（自動下載，BSD 3-Clause） | `public/glyphsdata/glyphdata.txt`：glyph name / altName → unicode、production name |
-| `pnpm data:ids`              | BabelStone [IDS.TXT](https://www.babelstone.co.uk/CJK/IDS.TXT)（自動下載）                     | `public/ids/ids_babelstone.txt`                                                    |
-| `pnpm data:glyphwiki <dump>` | GlyphWiki dump（需先自行下載 `dump_newest_only.txt`）                                          | `public/glyphwiki/composition.txt`、`variants.txt`                                 |
-
-`glyphdata.txt` 用來把 jf 等 Glyphs 字集清單的 nice name（如 `leftArrow`）正確對應到 Unicode 與匯出用的 production name（`arrowleft`）；CJK 漢字不在該表內，由 `uniXXXX` 慣例演算法解析。詳見 [docs/glyph-naming.md](docs/glyph-naming.md)。
-
-更多設計決策與架構筆記見 [docs/](docs/README.md)。
-
-## 與 fontra 的關係
-
-Kumiko 參考許多 [fontra](https://github.com/googlefonts/fontra) 的設計，但技術棧分歧（盡可能保持純前端 React vs. Python WebSocket backend），無法直接 fork。跟進策略分三層：UFO/designspace 檔案層互通、純演算法逐檔移植到 `src/font/fontra-ported/`、UI 與 backend 只追蹤不跟進。完整策略、目前對齊的 fontra baseline SHA 與 re-sync 流程見 [docs/fontra-parity.md](docs/fontra-parity.md)。
-
-## 下一步
-
-- 將 GitHub token 改成更完整的 server-side session storage，而不只依賴 signed cookie。
-- 擴充更多 UFO metadata 與非 glyph 檔案的 GitHub 回寫流程。
+[MIT](LICENSE) © Chiaki.C。第三方資料與字型授權列於 [CREDITS.md](CREDITS.md)。

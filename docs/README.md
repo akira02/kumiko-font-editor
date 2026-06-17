@@ -2,6 +2,7 @@
 
 記錄專案的設計決策、架構與容易踩的坑——程式碼或 git history 看不出「為什麼這樣做」的部分。
 
+- [架構總覽](architecture.md)（英文）— 技術選型、狀態管理策略與專案結構；這裡的深入筆記都從這份總覽導航
 - [產品定位與開發路線](product-direction.md) — Kumiko 是協作補字平台而非通用編輯器，已議定的同步／kerning／IDS 路線
 - [CJK 組字策略與資料管線](cjk-component-strategy.md) — 為何複製輪廓而非 component 引用，BabelStone／GlyphWiki 管線與座標約定
 - [品質檢查模組架構](quality-check-architecture.md) — qualityCheck 分層、ResolvedGlyph 解耦、worker 邊界、編輯頁 insight
