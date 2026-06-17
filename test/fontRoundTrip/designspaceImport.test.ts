@@ -1,6 +1,5 @@
-// @vitest-environment happy-dom
-// parseDesignspace uses DOMParser, which needs a DOM; scope it to this file.
 import { describe, expect, it } from 'vitest'
+import { Window } from 'happy-dom'
 import { strFromU8, unzipSync } from 'fflate'
 import {
   parseDesignspace,
@@ -18,6 +17,11 @@ import type {
   UfoGlyphRecord,
   UfoMetadataRecord,
 } from 'src/lib/fontFormats/ufoTypes'
+
+const testWindow = new Window()
+globalThis.DOMParser ??= testWindow.DOMParser as typeof globalThis.DOMParser
+globalThis.Node ??= testWindow.Node as typeof globalThis.Node
+globalThis.Element ??= testWindow.Element as typeof globalThis.Element
 
 const DESIGNSPACE = `<?xml version="1.0" encoding="UTF-8"?>
 <designspace format="4.1">

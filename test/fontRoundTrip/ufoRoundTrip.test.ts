@@ -1,12 +1,10 @@
-// @vitest-environment happy-dom
-// UFO import parses plist/glif XML via DOMParser + querySelector, which need a
-// DOM. happy-dom is scoped to this file so other suites keep the node env.
 import 'fake-indexeddb/auto'
 
 import { readFile, readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 
 import { unzipSync, strFromU8 } from 'fflate'
+import { Window } from 'happy-dom'
 import { describe, expect, it } from 'vitest'
 
 import { exportFontDataAsUfoZip } from 'src/lib/fontFormats/fontUfoZipExport'
@@ -20,6 +18,11 @@ import type { UfoGlyphRecord } from 'src/lib/fontFormats/ufoTypes'
 import type { FontData, GlyphData } from 'src/store'
 import { getGlyphLayer } from 'src/store/glyphLayer'
 const layerOf = (g: GlyphData) => getGlyphLayer(g, null)!
+
+const testWindow = new Window()
+globalThis.DOMParser ??= testWindow.DOMParser as typeof globalThis.DOMParser
+globalThis.Node ??= testWindow.Node as typeof globalThis.Node
+globalThis.Element ??= testWindow.Element as typeof globalThis.Element
 
 // OpenSourceFont-Light.ufo (OFL) — see test/fixtures/ufo/OFL.txt.
 // happy-dom makes import.meta.url an http URL, so resolve from cwd (project
