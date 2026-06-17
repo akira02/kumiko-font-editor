@@ -5,7 +5,11 @@ import {
   parseDesignspace,
   designspaceToFontAxes,
 } from 'src/lib/fontFormats/designspace'
-import { buildMultiMasterFontData } from 'src/lib/fontFormats/ufoFormat'
+import {
+  buildMultiMasterFontData,
+  resolveSourceRefs,
+  resolveDefaultSourceRef,
+} from 'src/lib/fontFormats/ufoFormat'
 import { getGlyphLayer } from 'src/store/glyphLayer'
 import type {
   UfoGlyphRecord,
@@ -125,5 +129,38 @@ describe('buildMultiMasterFontData', () => {
 
   it('points activeLayerId at the default-location source', () => {
     expect(build().glyphs.A.activeLayerId).toBe('Light')
+  })
+})
+
+describe('resolveSourceRefs (save-path routing)', () => {
+  const refs = () =>
+    resolveSourceRefs(
+      [metadata('sources/Light.ufo'), metadata('sources/Bold.ufo')],
+      parseDesignspace(DESIGNSPACE)
+    )
+
+  it('maps each source id to its UFO and default layer', () => {
+    expect(refs()).toEqual([
+      {
+        sourceId: 'Light',
+        name: 'Light',
+        location: { Weight: 0 },
+        ufoId: 'sources/Light.ufo',
+        layerId: 'public.default',
+      },
+      {
+        sourceId: 'Bold',
+        name: 'Bold',
+        location: { Weight: 100 },
+        ufoId: 'sources/Bold.ufo',
+        layerId: 'public.default',
+      },
+    ])
+  })
+
+  it('resolves the default source by default location', () => {
+    expect(
+      resolveDefaultSourceRef(refs(), parseDesignspace(DESIGNSPACE))?.sourceId
+    ).toBe('Light')
   })
 })

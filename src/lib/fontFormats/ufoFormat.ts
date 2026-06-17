@@ -876,22 +876,21 @@ const locationsEqual = (
   return true
 }
 
-interface MasterSource {
+export interface SourceRef {
   sourceId: string
   name: string
   location: Record<string, number>
-  metadata: UfoMetadataRecord
-  resolveBounds: ReturnType<typeof buildBoundsResolver>
-  recordsByName: Map<string, UfoGlyphRecord>
+  ufoId: string
+  layerId: string
 }
 
-// Merge several UFO sources (one per designspace <source>) into one FontData with
-// one master layer per source. Pure: takes already-parsed records + designspace.
-export const buildMultiMasterFontData = (
+// Match designspace <source> entries to parsed UFOs (by filename) and assign a
+// stable source id + layer id per source. Shared by the multi-master builder and
+// the save path so both agree on which UFO a source writes to.
+export const resolveSourceRefs = (
   metadataRecords: UfoMetadataRecord[],
-  glyphRecords: UfoGlyphRecord[],
   designspace: Designspace
-): FontData => {
+): SourceRef[] => {
   const usedIds = new Set<string>()
   const uniqueSourceId = (name: string): string => {
     const base = name || 'master'
@@ -905,7 +904,7 @@ export const buildMultiMasterFontData = (
     return id
   }
 
-  const masters: MasterSource[] = []
+  const refs: SourceRef[] = []
   for (const source of designspace.sources) {
     const target = basename(source.filename)
     const metadata = metadataRecords.find(
@@ -914,33 +913,66 @@ export const buildMultiMasterFontData = (
     if (!metadata) {
       continue
     }
-    const defaultLayer = pickDefaultLayer(metadata)
-    const records = glyphRecords.filter(
-      (record) =>
-        record.ufoId === metadata.ufoId &&
-        record.layerId === defaultLayer.layerId
-    )
-    masters.push({
+    refs.push({
       sourceId: uniqueSourceId(source.name),
       name: source.name,
       location: source.location,
+      ufoId: metadata.ufoId,
+      layerId: pickDefaultLayer(metadata).layerId,
+    })
+  }
+  return refs
+}
+
+export const resolveDefaultSourceRef = (
+  refs: SourceRef[],
+  designspace: Designspace
+): SourceRef | undefined => {
+  const defaultLocation = designspaceDefaultLocation(designspace)
+  return (
+    refs.find((ref) => locationsEqual(ref.location, defaultLocation)) ?? refs[0]
+  )
+}
+
+interface MasterSource extends SourceRef {
+  metadata: UfoMetadataRecord
+  resolveBounds: ReturnType<typeof buildBoundsResolver>
+  recordsByName: Map<string, UfoGlyphRecord>
+}
+
+// Merge several UFO sources (one per designspace <source>) into one FontData with
+// one master layer per source. Pure: takes already-parsed records + designspace.
+export const buildMultiMasterFontData = (
+  metadataRecords: UfoMetadataRecord[],
+  glyphRecords: UfoGlyphRecord[],
+  designspace: Designspace
+): FontData => {
+  const refs = resolveSourceRefs(metadataRecords, designspace)
+  const masters: MasterSource[] = refs.map((ref) => {
+    const metadata = metadataRecords.find(
+      (record) => record.ufoId === ref.ufoId
+    )!
+    const records = glyphRecords.filter(
+      (record) => record.ufoId === ref.ufoId && record.layerId === ref.layerId
+    )
+    return {
+      ...ref,
       metadata,
       resolveBounds: buildBoundsResolver(records),
       recordsByName: new Map(
         records.map((record) => [record.glyphName, record])
       ),
-    })
-  }
+    }
+  })
 
   if (masters.length === 0) {
     return { glyphs: {} }
   }
 
-  const defaultLocation = designspaceDefaultLocation(designspace)
+  const defaultRef = resolveDefaultSourceRef(refs, designspace)
   const defaultMaster =
-    masters.find((master) =>
-      locationsEqual(master.location, defaultLocation)
-    ) ?? masters[0]
+    masters.find((master) => master.sourceId === defaultRef?.sourceId) ??
+    masters[0]
 
   const base = buildFontDataFromUfoGlyphs(
     [...defaultMaster.recordsByName.values()],
@@ -1432,7 +1464,32 @@ export const syncHotFontDataToUfoRecords = async (input: {
 }) => {
   const records: UfoGlyphRecord[] = []
   const timestamp = Date.now()
-  const metadata = await loadUfoMetadata(input.projectId, input.activeUfoId)
+
+  // Multi-master: the active layer id is a source id; resolve which UFO it writes
+  // to and store under that UFO's own layer (so reload via designspace reads it).
+  // readLayerId is the layer to read from the in-memory glyph (the source id).
+  const readLayerId = input.activeLayerId
+  let writeUfoId = input.activeUfoId
+  let writeLayerId = input.activeLayerId
+  const designspace = await loadUfoUiValue<Designspace>(
+    input.projectId,
+    UFO_DESIGNSPACE_KEY
+  )
+  if (designspace) {
+    const refs = resolveSourceRefs(
+      await listUfoMetadataForProject(input.projectId),
+      designspace
+    )
+    const ref =
+      refs.find((candidate) => candidate.sourceId === input.activeLayerId) ??
+      resolveDefaultSourceRef(refs, designspace)
+    if (ref) {
+      writeUfoId = ref.ufoId
+      writeLayerId = ref.layerId
+    }
+  }
+
+  const metadata = await loadUfoMetadata(input.projectId, writeUfoId)
   const nextContents = { ...(metadata?.contents ?? {}) }
   const existingFileNames = new Set(
     Object.values(nextContents).map((fileName) => fileName.toLowerCase())
@@ -1445,7 +1502,7 @@ export const syncHotFontDataToUfoRecords = async (input: {
     const fileName = metadata?.contents?.[glyphId]
     if (fileName) {
       for (const layer of metadata?.layers ?? [
-        { layerId: input.activeLayerId, glyphDir: 'glyphs' },
+        { layerId: writeLayerId, glyphDir: 'glyphs' },
       ]) {
         deletedFilePaths.push(
           `${metadata.relativePath}/${layer.glyphDir}/${fileName}`
@@ -1460,15 +1517,10 @@ export const syncHotFontDataToUfoRecords = async (input: {
       nextGlyphOrder.splice(glyphOrderIndex, 1)
     }
     for (const layer of metadata?.layers ?? [
-      { layerId: input.activeLayerId, glyphDir: 'glyphs' },
+      { layerId: writeLayerId, glyphDir: 'glyphs' },
     ]) {
       deletedKeys.push(
-        makeUfoGlyphKey(
-          input.projectId,
-          input.activeUfoId,
-          layer.layerId,
-          glyphId
-        )
+        makeUfoGlyphKey(input.projectId, writeUfoId, layer.layerId, glyphId)
       )
     }
   }
@@ -1478,17 +1530,12 @@ export const syncHotFontDataToUfoRecords = async (input: {
     if (!glyph) {
       continue
     }
-    const layer = getGlyphLayer(glyph, input.activeLayerId)
+    const layer = getGlyphLayer(glyph, readLayerId)
     if (!layer) {
       continue
     }
     const existingRecord = await loadUfoGlyph(
-      makeUfoGlyphKey(
-        input.projectId,
-        input.activeUfoId,
-        input.activeLayerId,
-        glyph.id
-      )
+      makeUfoGlyphKey(input.projectId, writeUfoId, writeLayerId, glyph.id)
     )
     const nextFileName =
       existingRecord?.fileName ??
@@ -1503,8 +1550,8 @@ export const syncHotFontDataToUfoRecords = async (input: {
     }
     records.push({
       projectId: input.projectId,
-      ufoId: input.activeUfoId,
-      layerId: input.activeLayerId,
+      ufoId: writeUfoId,
+      layerId: writeLayerId,
       glyphName: glyph.id,
       fileName: nextFileName,
       sourceHash: existingRecord?.sourceHash ?? null,
@@ -1556,7 +1603,7 @@ export const syncHotFontDataToUfoRecords = async (input: {
   // Backup layers: write each dirty glyph's backups as their own layer records,
   // and reconcile (delete) backups the glyph no longer has.
   const existingBackupLayerIds = (metadata?.layers ?? [])
-    .filter((layer) => layer.layerId !== input.activeLayerId)
+    .filter((layer) => layer.layerId !== writeLayerId)
     .map((layer) => layer.layerId)
   const seenBackupLayerIds = new Set<string>()
 
@@ -1571,17 +1618,17 @@ export const syncHotFontDataToUfoRecords = async (input: {
     const glyphBackupIds = new Set<string>()
 
     for (const [layerId, layer] of Object.entries(glyph.layers ?? {})) {
-      if (layerId === input.activeLayerId || layer.type === 'master') {
+      if (layerId === readLayerId || layer.type === 'master') {
         continue
       }
       glyphBackupIds.add(layerId)
       seenBackupLayerIds.add(layerId)
       const existing = await loadUfoGlyph(
-        makeUfoGlyphKey(input.projectId, input.activeUfoId, layerId, glyph.id)
+        makeUfoGlyphKey(input.projectId, writeUfoId, layerId, glyph.id)
       )
       records.push({
         projectId: input.projectId,
-        ufoId: input.activeUfoId,
+        ufoId: writeUfoId,
         layerId,
         glyphName: glyph.id,
         fileName: existing?.fileName ?? fileName,
@@ -1628,7 +1675,7 @@ export const syncHotFontDataToUfoRecords = async (input: {
     for (const layerId of existingBackupLayerIds) {
       if (!glyphBackupIds.has(layerId)) {
         deletedKeys.push(
-          makeUfoGlyphKey(input.projectId, input.activeUfoId, layerId, glyph.id)
+          makeUfoGlyphKey(input.projectId, writeUfoId, layerId, glyph.id)
         )
       }
     }
