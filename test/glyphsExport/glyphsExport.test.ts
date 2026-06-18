@@ -105,6 +105,36 @@ describe('serializeGlyphsFileToBlob glyph matching', () => {
     expect(glyphs3).toContain('(0,0,l)')
   })
 
+  it('uses glyph id, not display name, as exported glyphname', async () => {
+    const fontData = {
+      glyphs: {
+        arrowleft: {
+          ...glyph('arrowleft', '←', '2190'),
+          layers: {
+            M1: {
+              id: 'M1',
+              name: 'Regular',
+              associatedMasterId: 'M1',
+              paths: [],
+              components: [],
+              componentRefs: [],
+              anchors: [],
+              guidelines: [],
+              metrics: { width: 500, lsb: 0, rsb: 500 },
+            },
+          },
+          layerOrder: ['M1'],
+          activeLayerId: 'M1',
+        },
+      },
+    } as unknown as FontData
+
+    const text = await serializeGlyphsFileToBlob(fontData, null, null, 3).text()
+
+    expect(text).toContain('glyphname = arrowleft')
+    expect(text).not.toContain('glyphname = "←"')
+  })
+
   it('emits a Glyphs 3 transform matrix for sheared components', async () => {
     const fontData = {
       glyphs: {

@@ -170,7 +170,7 @@ export const listDeletedKumikoGlyphRecords = async (projectId: string) => {
 
 export const updateKumikoGlyphExportDirtyState = async (
   keys: KumikoGlyphPrimaryKey[],
-  exportDirty: boolean
+  exportDirty: boolean | 0 | 1
 ) => {
   if (keys.length === 0) {
     return
@@ -180,6 +180,7 @@ export const updateKumikoGlyphExportDirtyState = async (
   const transaction = database.transaction(KUMIKO_GLYPHS_STORE, 'readwrite')
   const store = transaction.objectStore(KUMIKO_GLYPHS_STORE)
   const timestamp = Date.now()
+  const exportDirtyValue = exportDirty ? 1 : 0
 
   for (const key of keys) {
     const record = (await requestToPromise(store.get(key))) as
@@ -190,8 +191,7 @@ export const updateKumikoGlyphExportDirtyState = async (
     }
     store.put({
       ...record,
-      exportDirty,
-      exportDirtyIndex: exportDirty ? 1 : 0,
+      exportDirty: exportDirtyValue,
       updatedAt: timestamp,
     })
   }
@@ -201,7 +201,7 @@ export const updateKumikoGlyphExportDirtyState = async (
 
 export const updateKumikoGlyphSyncDirtyState = async (
   keys: KumikoGlyphPrimaryKey[],
-  syncDirty: boolean
+  syncDirty: boolean | 0 | 1
 ) => {
   if (keys.length === 0) {
     return
@@ -211,6 +211,7 @@ export const updateKumikoGlyphSyncDirtyState = async (
   const transaction = database.transaction(KUMIKO_GLYPHS_STORE, 'readwrite')
   const store = transaction.objectStore(KUMIKO_GLYPHS_STORE)
   const timestamp = Date.now()
+  const syncDirtyValue = syncDirty ? 1 : 0
 
   for (const key of keys) {
     const record = (await requestToPromise(store.get(key))) as
@@ -221,8 +222,7 @@ export const updateKumikoGlyphSyncDirtyState = async (
     }
     store.put({
       ...record,
-      syncDirty,
-      syncDirtyIndex: syncDirty ? 1 : 0,
+      syncDirty: syncDirtyValue,
       updatedAt: timestamp,
     })
   }

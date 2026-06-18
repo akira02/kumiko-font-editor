@@ -16,9 +16,13 @@ const fontData = {
     A: {
       id: 'A',
       name: 'A',
+      unicodes: ['u+0041', '41'],
       unicode: '0041',
       production: 'A',
       export: true,
+      note: 'keep me',
+      leftMetricsKey: 'H',
+      customData: { glyphFlag: true },
       activeLayerId: 'M1',
       layerOrder: ['M1', 'backup-1'],
       layers: {
@@ -47,6 +51,12 @@ const fontData = {
           anchors: [{ id: 'a1', name: 'top', x: 250, y: 700 }],
           guidelines: [],
           metrics: { width: 500, lsb: 0, rsb: 500 },
+          image: {
+            fileName: 'sketch.png',
+            xScale: 1,
+            yScale: 1,
+          },
+          customData: { layerFlag: true },
         },
         'backup-1': {
           id: 'backup-1',
@@ -106,15 +116,18 @@ describe('kumikoFontDataAdapter', () => {
       schemaVersion: 1,
       projectId: 'project-1',
       glyphId: 'A',
-      displayName: 'A',
       unicodes: ['0041'],
-      deleted: false,
-      exportDirty: true,
-      exportDirtyIndex: 1,
-      syncDirty: true,
-      syncDirtyIndex: 1,
+      displayName: null,
+      deleted: 0,
+      exportDirty: 1,
+      syncDirty: 1,
       layerOrder: ['M1', 'backup-1'],
+      note: 'keep me',
+      leftMetricsKey: 'H',
+      customData: { glyphFlag: true },
     })
+    expect(glyphs[0].layers.M1.image?.fileName).toBe('sketch.png')
+    expect(glyphs[0].layers.M1.customData).toEqual({ layerFlag: true })
     expect(glyphs[0].layers['backup-1'].componentRefs[0]).toMatchObject({
       glyphId: 'base',
       x: 10,
@@ -142,11 +155,19 @@ describe('kumikoFontDataAdapter', () => {
     expect(rebuilt.glyphOrder).toEqual(['A'])
     expect(rebuilt.sources?.M1.location).toEqual({ Weight: 400 })
     expect(rebuilt.glyphs.A.unicode).toBe('0041')
+    expect(rebuilt.glyphs.A.unicodes).toEqual(['0041'])
+    expect(rebuilt.glyphs.A.note).toBe('keep me')
+    expect(rebuilt.glyphs.A.leftMetricsKey).toBe('H')
+    expect(rebuilt.glyphs.A.customData).toEqual({ glyphFlag: true })
     expect(rebuilt.glyphs.A.layerOrder).toEqual(['M1', 'backup-1'])
     expect(rebuilt.glyphs.A.layers?.M1.anchors[0]).toMatchObject({
       name: 'top',
       x: 250,
       y: 700,
+    })
+    expect(rebuilt.glyphs.A.layers?.M1.image?.fileName).toBe('sketch.png')
+    expect(rebuilt.glyphs.A.layers?.M1.customData).toEqual({
+      layerFlag: true,
     })
   })
 })

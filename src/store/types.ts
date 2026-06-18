@@ -19,10 +19,18 @@ export type NodeType = OnCurveNodeType
 export type PathNodeKind = 'oncurve' | 'offcurve'
 export type PathSegmentType = 'line' | 'cubic' | 'quadratic'
 
+export type GlyphCustomData = Record<string, unknown>
+export type GlyphSourceData = Record<string, unknown>
+
 interface BasePathNode {
   id: string
   x: number
   y: number
+  identifier?: string | null
+  name?: string | null
+  color?: string | null
+  customData?: GlyphCustomData
+  sourceData?: GlyphSourceData
 }
 
 export interface OnCurvePathNode extends BasePathNode {
@@ -43,10 +51,17 @@ export interface PathData {
   id: string
   nodes: PathNode[]
   closed: boolean
+  identifier?: string | null
+  name?: string | null
+  color?: string | null
+  customData?: GlyphCustomData
+  sourceData?: GlyphSourceData
 }
 
 export interface GlyphComponentRef {
   id: string
+  identifier?: string | null
+  name?: string | null
   glyphId: string
   x: number
   y: number
@@ -57,28 +72,57 @@ export interface GlyphComponentRef {
   // scaleX/scaleY they carry the full UFO/Glyphs component transform.
   xyScale?: number
   yxScale?: number
+  color?: string | null
+  customData?: GlyphCustomData
+  sourceData?: GlyphSourceData
 }
 
 export interface GlyphAnchor {
   id: string
+  identifier?: string | null
   name: string
   x: number
   y: number
+  color?: string | null
+  customData?: GlyphCustomData
+  sourceData?: GlyphSourceData
 }
 
 export interface GlyphGuideline {
   id: string
+  identifier?: string | null
   x: number
   y: number
   angle: number
   locked?: boolean
   name?: string
+  color?: string | null
+  customData?: GlyphCustomData
+  sourceData?: GlyphSourceData
 }
 
 export interface GlyphMetrics {
   lsb: number
   rsb: number
   width: number
+}
+
+export interface GlyphVerticalMetrics {
+  height?: number | null
+  tsb?: number | null
+  bsb?: number | null
+}
+
+export interface GlyphImage {
+  fileName: string
+  xScale?: number
+  xyScale?: number
+  yxScale?: number
+  yScale?: number
+  xOffset?: number
+  yOffset?: number
+  color?: string | null
+  customData?: GlyphCustomData
 }
 
 export interface GlyphLayerData {
@@ -94,6 +138,14 @@ export interface GlyphLayerData {
   anchors: GlyphAnchor[]
   guidelines: GlyphGuideline[]
   metrics: GlyphMetrics
+  verticalMetrics?: GlyphVerticalMetrics
+  color?: string | number | null
+  visible?: boolean
+  locked?: boolean
+  background?: GlyphLayerContent | null
+  image?: GlyphImage | null
+  customData?: GlyphCustomData
+  sourceData?: GlyphSourceData
 }
 
 // Content fields of a layer (the fontra StaticGlyph equivalent). All editable
@@ -111,16 +163,25 @@ export type GlyphLayerContent = Pick<
 export interface GlyphData {
   id: string
   name: string
+  displayName?: string | null
   // Layers are the single source of truth; activeLayerId points at the one being
   // edited/displayed. Content is read via getGlyphLayer / activeLayer.
   activeLayerId?: string | null
   layers?: Record<string, GlyphLayerData>
   layerOrder?: string[]
+  unicodes?: string[]
   unicode?: string | null
   export?: boolean
   category?: string | null
   subCategory?: string | null
   production?: string | null
+  note?: string | null
+  color?: string | number | null
+  leftMetricsKey?: string | null
+  rightMetricsKey?: string | null
+  widthMetricsKey?: string | null
+  customData?: GlyphCustomData
+  sourceData?: GlyphSourceData
 }
 
 export interface FontData {

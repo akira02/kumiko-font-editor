@@ -345,7 +345,7 @@ export const createGlyphsRecordFromFontDataGlyph = (
 ) => {
   const patchedGlyph: Record<string, unknown> = {
     ...(rawGlyph ?? {}),
-    glyphname: glyph.name,
+    glyphname: glyph.id,
     unicode: glyph.unicode ?? undefined,
     export: glyph.export === false ? 0 : 1,
     category: glyph.category ?? undefined,
@@ -438,8 +438,8 @@ const serializeGlyphsArrayToChunks = (
   const childIndent = '  '.repeat(indentLevel + 1)
   const glyphValues = Object.values(fontData.glyphs)
   const glyphsById = new Map(glyphValues.map((glyph) => [glyph.id, glyph]))
-  // Match keys → unique glyph id. id/name are unique; the first glyph to claim
-  // a shared unicode wins, the rest still match by their own id/name.
+  // Match keys → unique glyph id. glyph.id is the canonical glyphname; unicode
+  // can be shared, so the first glyph to claim it wins.
   const idByMatchKey = new Map<string, string>()
   for (const glyph of glyphValues) {
     const register = (key: string) => {
@@ -448,7 +448,6 @@ const serializeGlyphsArrayToChunks = (
       }
     }
     register(glyph.id.toLowerCase())
-    register(glyph.name.toLowerCase())
     if (glyph.unicode) {
       register(`uni${glyph.unicode}`.toLowerCase())
     }
@@ -464,7 +463,11 @@ const serializeGlyphsArrayToChunks = (
       .find((id): id is string => Boolean(id))
     const editedGlyph = matchedId ? glyphsById.get(matchedId) : undefined
     const valueToWrite = editedGlyph
-      ? createGlyphsRecordFromFontDataGlyph(rawGlyph, editedGlyph, formatVersion)
+      ? createGlyphsRecordFromFontDataGlyph(
+          rawGlyph,
+          editedGlyph,
+          formatVersion
+        )
       : rawGlyph
 
     chunks.push(childIndent)

@@ -21,7 +21,7 @@ export type ProjectSummary = KumikoProjectSummary
 
 export const openDatabase = async () => {
   return new Promise<IDBDatabase>((resolve, reject) => {
-    const request = globalThis.indexedDB.open(DB_NAME, 8)
+    const request = globalThis.indexedDB.open(DB_NAME, 9)
 
     request.onupgradeneeded = () => {
       const database = request.result
@@ -46,15 +46,13 @@ export const openDatabase = async () => {
         store.createIndex('byProject', 'projectId', { unique: false })
         store.createIndex(
           'byProjectExportDirty',
-          ['projectId', 'exportDirtyIndex'],
+          ['projectId', 'exportDirty'],
           { unique: false }
         )
-        store.createIndex(
-          'byProjectSyncDirty',
-          ['projectId', 'syncDirtyIndex'],
-          { unique: false }
-        )
-        store.createIndex('byProjectDeleted', ['projectId', 'deletedIndex'], {
+        store.createIndex('byProjectSyncDirty', ['projectId', 'syncDirty'], {
+          unique: false,
+        })
+        store.createIndex('byProjectDeleted', ['projectId', 'deleted'], {
           unique: false,
         })
         store.createIndex('byUnicode', 'unicodes', {
@@ -73,29 +71,34 @@ export const openDatabase = async () => {
         if (store && store.indexNames.contains('byName')) {
           store.deleteIndex('byName')
         }
+        if (store && store.indexNames.contains('byProjectExportDirty')) {
+          store.deleteIndex('byProjectExportDirty')
+        }
+        if (store && store.indexNames.contains('byProjectSyncDirty')) {
+          store.deleteIndex('byProjectSyncDirty')
+        }
+        if (store && store.indexNames.contains('byProjectDeleted')) {
+          store.deleteIndex('byProjectDeleted')
+        }
         if (store && !store.indexNames.contains('byProject')) {
           store.createIndex('byProject', 'projectId', { unique: false })
         }
-        if (store && !store.indexNames.contains('byProjectExportDirty')) {
+        if (store) {
           store.createIndex(
             'byProjectExportDirty',
-            ['projectId', 'exportDirtyIndex'],
+            ['projectId', 'exportDirty'],
             {
               unique: false,
             }
           )
         }
-        if (store && !store.indexNames.contains('byProjectSyncDirty')) {
-          store.createIndex(
-            'byProjectSyncDirty',
-            ['projectId', 'syncDirtyIndex'],
-            {
-              unique: false,
-            }
-          )
+        if (store) {
+          store.createIndex('byProjectSyncDirty', ['projectId', 'syncDirty'], {
+            unique: false,
+          })
         }
-        if (store && !store.indexNames.contains('byProjectDeleted')) {
-          store.createIndex('byProjectDeleted', ['projectId', 'deletedIndex'], {
+        if (store) {
+          store.createIndex('byProjectDeleted', ['projectId', 'deleted'], {
             unique: false,
           })
         }

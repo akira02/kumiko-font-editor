@@ -9,17 +9,12 @@ import type {
   FontInfo,
   FontProjectSettings,
   FontSource,
-  GlyphAnchor,
-  GlyphComponentRef,
-  GlyphGuideline,
-  GlyphLayerContent,
+  GlyphImage,
   GlyphLayerData,
-  GlyphMetrics,
   KerningGroup,
   KerningPair,
   OpenTypeFeatures,
   OpenTypeFeaturesState,
-  PathData,
 } from 'src/store'
 
 export type KumikoProjectSourceFormat =
@@ -84,58 +79,9 @@ export interface KumikoProjectRecord {
   settings?: FontProjectSettings
   lineMetricsHorizontalLayout?: FontData['lineMetricsHorizontalLayout']
   glyphOrder: string[]
-  exportDirty: boolean
-  exportDirtyIndex: 0 | 1
-  syncDirty: boolean
-  syncDirtyIndex: 0 | 1
+  exportDirty: 0 | 1
+  syncDirty: 0 | 1
   sourceData?: KumikoProjectSourceData
-}
-
-export interface KumikoElementSourceData {
-  glyphs?: Record<string, unknown>
-  ufo?: Record<string, unknown>
-}
-
-export interface KumikoPathData extends PathData {
-  identifier?: string | null
-  name?: string | null
-  color?: string | null
-  customData?: Record<string, unknown>
-  sourceData?: KumikoElementSourceData
-}
-
-export interface KumikoGlyphComponentRef extends GlyphComponentRef {
-  identifier?: string | null
-  name?: string | null
-  color?: string | null
-  customData?: Record<string, unknown>
-  sourceData?: KumikoElementSourceData
-}
-
-export interface KumikoGlyphAnchor extends GlyphAnchor {
-  identifier?: string | null
-  color?: string | null
-  customData?: Record<string, unknown>
-  sourceData?: KumikoElementSourceData
-}
-
-export interface KumikoGlyphGuideline extends GlyphGuideline {
-  identifier?: string | null
-  color?: string | null
-  customData?: Record<string, unknown>
-  sourceData?: KumikoElementSourceData
-}
-
-export interface KumikoGlyphImage {
-  fileName: string
-  xScale?: number
-  xyScale?: number
-  yxScale?: number
-  yScale?: number
-  xOffset?: number
-  yOffset?: number
-  color?: string | null
-  customData?: Record<string, unknown>
 }
 
 export interface KumikoLayerSourceData {
@@ -150,31 +96,16 @@ export interface KumikoLayerSourceData {
     sourceHash?: string | null
     remoteBlobSha?: string | null
     note?: string | null
-    image?: KumikoGlyphImage | null
+    image?: GlyphImage | null
     lib?: Record<string, unknown> | null
   }
 }
 
 export interface KumikoGlyphLayerRecord extends Omit<
   GlyphLayerData,
-  'paths' | 'components' | 'componentRefs' | 'anchors' | 'guidelines'
+  'components' | 'type' | 'sourceData'
 > {
   type: 'master' | 'backup' | 'background'
-  paths: KumikoPathData[]
-  componentRefs: KumikoGlyphComponentRef[]
-  anchors: KumikoGlyphAnchor[]
-  guidelines: KumikoGlyphGuideline[]
-  metrics: GlyphMetrics
-  verticalMetrics?: {
-    height?: number | null
-    tsb?: number | null
-    bsb?: number | null
-  }
-  color?: string | number | null
-  visible?: boolean
-  locked?: boolean
-  background?: GlyphLayerContent | null
-  customData?: Record<string, unknown>
   sourceData?: KumikoLayerSourceData
 }
 
@@ -211,12 +142,9 @@ export interface KumikoGlyphRecord {
   layers: Record<string, KumikoGlyphLayerRecord>
   customData?: Record<string, unknown>
   sourceData?: KumikoGlyphSourceData
-  deleted: false
-  deletedIndex: 0
-  exportDirty: boolean
-  exportDirtyIndex: 0 | 1
-  syncDirty: boolean
-  syncDirtyIndex: 0 | 1
+  deleted: 0
+  exportDirty: 0 | 1
+  syncDirty: 0 | 1
   updatedAt: number
 }
 
@@ -227,13 +155,10 @@ export interface KumikoGlyphTombstoneRecord {
   displayName?: string | null
   unicodes: string[]
   sourceData?: KumikoGlyphSourceData
-  deleted: true
-  deletedIndex: 1
+  deleted: 1
   deletedAt: number
-  exportDirty: boolean
-  exportDirtyIndex: 0 | 1
-  syncDirty: boolean
-  syncDirtyIndex: 0 | 1
+  exportDirty: 0 | 1
+  syncDirty: 0 | 1
   updatedAt: number
 }
 

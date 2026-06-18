@@ -19,10 +19,10 @@ make duplicated outline storage unacceptable.
 
 Use three format-independent stores:
 
-| Store             | Key                    | Purpose                                                                                  |
-| ----------------- | ---------------------- | ---------------------------------------------------------------------------------------- |
-| `kumiko_projects` | `projectId`            | Project metadata, font-level data, source hints, and timestamps.                         |
-| `kumiko_glyphs`   | `[projectId, glyphId]` | One canonical glyph record containing all layers for that glyph.                         |
+| Store             | Key                    | Purpose                                                                                                                       |
+| ----------------- | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `kumiko_projects` | `projectId`            | Project metadata, font-level data, source hints, and timestamps.                                                              |
+| `kumiko_glyphs`   | `[projectId, glyphId]` | One canonical glyph record containing all layers for that glyph.                                                              |
 | `kumiko_ui_state` | `[projectId, key]`     | Editor UI state, selected glyph/layer, and non-font user state. The persistence queue is runtime-only and is not stored here. |
 
 Recommended `kumiko_glyphs` indexes:
@@ -37,9 +37,9 @@ Recommended `kumiko_glyphs` indexes:
 Dirty and deletion flags are stored as a single `0 | 1` numeric field
 (`exportDirty`, `syncDirty`, `deleted`) rather than a boolean plus a mirrored
 index field. IndexedDB cannot index booleans, so the numeric value is both the
-stored flag and the index key; helpers derive a boolean at read time. `deleted`
-also doubles as the discriminated-union tag separating live records (`0`) from
-tombstones (`1`).
+stored flag and the index key; callers can treat `1` as true and `0` as false.
+`deleted` also doubles as the discriminated-union tag separating live records
+(`0`) from tombstones (`1`).
 
 `byDisplayName` only indexes records whose `displayName` is set; glyphs without
 one are absent from that index. Lookup by canonical name uses the
@@ -309,11 +309,11 @@ Consequences:
 
 A glyph carries three distinct names; they must not be collapsed:
 
-| Name                  | Field         | Role                                                                                       | Persisted        |
-| --------------------- | ------------- | ------------------------------------------------------------------------------------------ | ---------------- |
-| glyphname (nice name) | `glyphId`     | Portable identity. Keys `glyphOrder`, component refs, UFO `contents.plist`, Glyphs glyphname. | Yes (record key) |
-| production name       | `production`  | PostScript name for the binary `post` table only.                                          | Yes, optional    |
-| display character     | —             | UI label such as `←`, derived from `unicodes` at render time.                              | No               |
+| Name                  | Field        | Role                                                                                          | Persisted        |
+| --------------------- | ------------ | --------------------------------------------------------------------------------------------- | ---------------- |
+| glyphname (nice name) | `glyphId`    | Portable identity. Keys `glyphOrder`, component refs, UFO `contents.plist`, Glyphs glyphname. | Yes (record key) |
+| production name       | `production` | PostScript name for the binary `post` table only.                                             | Yes, optional    |
+| display character     | —            | UI label such as `←`, derived from `unicodes` at render time.                                 | No               |
 
 Rules:
 
@@ -437,10 +437,10 @@ In the target model, split those meanings:
 
 Initial flag state after import depends on the source:
 
-| Import source                        | `exportDirty` | `syncDirty`              |
-| ------------------------------------ | ------------- | ----------------------- |
-| Local file (`.glyphs`, UFO, binary)  | `0`           | `0` (no sync target)    |
-| GitHub                               | `0`           | `0` (matches the commit) |
+| Import source                       | `exportDirty` | `syncDirty`              |
+| ----------------------------------- | ------------- | ------------------------ |
+| Local file (`.glyphs`, UFO, binary) | `0`           | `0` (no sync target)     |
+| GitHub                              | `0`           | `0` (matches the commit) |
 
 A freshly imported project equals the source it came from, so nothing is dirty
 until the user edits. `exportDirty` is `0` after import because the records match
