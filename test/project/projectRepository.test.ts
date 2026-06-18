@@ -7,8 +7,11 @@ import {
 } from 'src/lib/project/projectRepository'
 import {
   listExportDirtyKumikoGlyphRecords,
+  loadKumikoGlyphRecord,
   loadKumikoProjectRecord,
+  makeKumikoGlyphKey,
 } from 'src/lib/project/kumikoProjectPersistence'
+import { saveDraftSnapshot } from 'src/lib/project/draftSave'
 import { openDatabase } from 'src/lib/project/persistence'
 import type { FontData } from 'src/store'
 
@@ -79,5 +82,71 @@ describe('projectRepository canonical storage', () => {
       'kumiko_projects',
       'kumiko_ui_state',
     ])
+  })
+
+  it('autosaves only dirty and deleted glyph records', async () => {
+    const twoGlyphFontData: FontData = {
+      glyphOrder: ['A', 'B'],
+      glyphs: {
+        ...fontData.glyphs,
+        B: {
+          ...fontData.glyphs.A,
+          id: 'B',
+          name: 'B',
+          unicode: '0042',
+          unicodes: ['0042'],
+        },
+      },
+    }
+    await saveProjectDraft({
+      id: 'project-incremental',
+      title: 'Incremental',
+      lastModified: 20,
+      createdAt: 10,
+      updatedAt: 20,
+      sourceName: 'Incremental.ufo',
+      sourceType: 'local',
+      fontData: twoGlyphFontData,
+      projectMetadata: null,
+      projectSourceData: null,
+      projectSourceFormat: 'ufo',
+    })
+
+    const nextFontData: FontData = {
+      ...twoGlyphFontData,
+      glyphOrder: ['A'],
+      glyphs: {
+        A: {
+          ...twoGlyphFontData.glyphs.A,
+          layers: {
+            'public.default': {
+              ...twoGlyphFontData.glyphs.A.layers!['public.default']!,
+              metrics: { width: 640, lsb: 0, rsb: 640 },
+            },
+          },
+        },
+      },
+    }
+
+    await saveDraftSnapshot({
+      projectId: 'project-incremental',
+      projectTitle: 'Incremental',
+      fontData: nextFontData,
+      dirtyGlyphIds: ['A'],
+      deletedGlyphIds: ['B'],
+      glyphEditTimes: { A: 30 },
+      selectedLayerId: 'public.default',
+    })
+
+    const [project, glyphA, glyphB] = await Promise.all([
+      loadKumikoProjectRecord('project-incremental'),
+      loadKumikoGlyphRecord(makeKumikoGlyphKey('project-incremental', 'A')),
+      loadKumikoGlyphRecord(makeKumikoGlyphKey('project-incremental', 'B')),
+    ])
+
+    expect(project?.glyphOrder).toEqual(['A'])
+    expect(glyphA?.layers['public.default']?.metrics.width).toBe(640)
+    expect(glyphA?.exportDirty).toBe(1)
+    expect(glyphB).toBeUndefined()
   })
 })

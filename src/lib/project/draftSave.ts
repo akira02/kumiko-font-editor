@@ -1,13 +1,18 @@
 import {
   getProjectArchiveMetadata,
-  getProjectArchiveRoundTripFormat,
   getProjectArchiveSourceFormat,
 } from 'src/lib/project/projectArchive'
-import { saveKumikoUiValue } from 'src/lib/project/kumikoProjectPersistence'
 import {
-  loadProjectDraft,
-  saveProjectDraft,
-} from 'src/lib/project/projectRepository'
+  fontDataToKumikoProjectRecord,
+  glyphDataToKumikoGlyphRecord,
+} from 'src/lib/project/kumikoFontDataAdapter'
+import {
+  loadKumikoGlyphRecord,
+  loadKumikoProjectRecord,
+  loadKumikoUiValue,
+  makeKumikoGlyphKey,
+  patchKumikoProjectData,
+} from 'src/lib/project/kumikoProjectPersistence'
 import type { FontData } from 'src/store'
 import type { GlyphEditTimes } from 'src/lib/glyph/glyphEditTimes'
 import {
@@ -24,39 +29,77 @@ export const saveDraftSnapshot = async (input: {
   glyphEditTimes: GlyphEditTimes
   selectedLayerId: string | null
 }) => {
-  const projectSourceFormat = getProjectArchiveSourceFormat()
-  const projectRoundTripFormat = getProjectArchiveRoundTripFormat()
-  const persistedProject = await loadProjectDraft(input.projectId)
-  const projectMetadata = getProjectArchiveMetadata()
+  const persistedProject = await loadKumikoProjectRecord(input.projectId)
+  const projectSourceFormat =
+    getProjectArchiveSourceFormat() ?? persistedProject?.sourceFormat ?? null
+  const projectMetadata =
+    (await loadKumikoUiValue<Record<string, unknown>>(
+      input.projectId,
+      'projectMetadata'
+    )) ?? getProjectArchiveMetadata()
   const now = Date.now()
-  await saveProjectDraft({
-    id: input.projectId,
+
+  const projectChanged =
+    input.dirtyGlyphIds.length > 0 ||
+    input.deletedGlyphIds.length > 0 ||
+    Boolean(persistedProject)
+  const project = fontDataToKumikoProjectRecord({
+    projectId: input.projectId,
     title: input.projectTitle,
-    lastModified: now,
+    fontData: input.fontData,
     createdAt: persistedProject?.createdAt ?? now,
     updatedAt: now,
     sourceName: persistedProject?.sourceName ?? null,
     sourceType: persistedProject?.sourceType ?? 'local',
+    sourceFormat: projectSourceFormat,
     githubSource: persistedProject?.githubSource ?? null,
-    fontData: input.fontData,
-    projectMetadata: withProjectGlyphEditTimes(
-      persistedProject?.projectMetadata ?? projectMetadata,
-      input.glyphEditTimes
-    ),
-    projectSourceData: persistedProject?.projectSourceData ?? null,
-    projectSourceFormat,
-    projectRoundTripFormat,
-    projectGlyphsPackage: persistedProject?.projectGlyphsPackage ?? null,
-    projectExportDirty:
-      input.dirtyGlyphIds.length > 0 || input.deletedGlyphIds.length > 0,
-    projectSyncDirty:
-      input.dirtyGlyphIds.length > 0 || input.deletedGlyphIds.length > 0,
-    exportDirtyGlyphIds: input.dirtyGlyphIds,
-    syncDirtyGlyphIds: input.dirtyGlyphIds,
+    sourceData: persistedProject?.sourceData,
+    exportDirty: Boolean(persistedProject?.exportDirty) || projectChanged,
+    syncDirty: Boolean(persistedProject?.syncDirty) || projectChanged,
   })
-  await saveKumikoUiValue(
-    input.projectId,
-    UFO_GLYPH_EDIT_TIMES_KEY,
-    input.glyphEditTimes
+  project.exportedDigest = persistedProject?.exportedDigest ?? null
+  project.syncedDigest = persistedProject?.syncedDigest ?? null
+
+  const glyphsToSave = await Promise.all(
+    [...new Set(input.dirtyGlyphIds)]
+      .map((glyphId) => input.fontData.glyphs[glyphId])
+      .filter((glyph): glyph is NonNullable<typeof glyph> => Boolean(glyph))
+      .map(async (glyph) => {
+        const existing = await loadKumikoGlyphRecord(
+          makeKumikoGlyphKey(input.projectId, glyph.id)
+        )
+        const record = glyphDataToKumikoGlyphRecord({
+          projectId: input.projectId,
+          glyph,
+          updatedAt: now,
+          exportDirty: true,
+          syncDirty: true,
+        })
+        return {
+          ...record,
+          exportedDigest: existing?.exportedDigest ?? null,
+          syncedDigest: existing?.syncedDigest ?? null,
+        }
+      })
   )
+
+  await patchKumikoProjectData({
+    project,
+    glyphsToSave,
+    glyphKeysToDelete: [...new Set(input.deletedGlyphIds)].map((glyphId) =>
+      makeKumikoGlyphKey(input.projectId, glyphId)
+    ),
+    uiStateToSave: [
+      {
+        projectId: input.projectId,
+        key: UFO_GLYPH_EDIT_TIMES_KEY,
+        value: input.glyphEditTimes,
+      },
+      {
+        projectId: input.projectId,
+        key: 'projectMetadata',
+        value: withProjectGlyphEditTimes(projectMetadata, input.glyphEditTimes),
+      },
+    ],
+  })
 }

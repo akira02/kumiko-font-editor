@@ -75,6 +75,35 @@ export const replaceKumikoProjectData = async (
   await transactionDone(transaction)
 }
 
+export const patchKumikoProjectData = async (input: {
+  project: KumikoProjectRecord
+  glyphsToSave?: KumikoGlyphRecord[]
+  glyphKeysToDelete?: KumikoGlyphPrimaryKey[]
+  uiStateToSave?: KumikoUiStateRecord[]
+}) => {
+  const database = await openDatabase()
+  const transaction = database.transaction(
+    [KUMIKO_PROJECTS_STORE, KUMIKO_GLYPHS_STORE, KUMIKO_UI_STATE_STORE],
+    'readwrite'
+  )
+  const projectStore = transaction.objectStore(KUMIKO_PROJECTS_STORE)
+  const glyphStore = transaction.objectStore(KUMIKO_GLYPHS_STORE)
+  const uiStore = transaction.objectStore(KUMIKO_UI_STATE_STORE)
+
+  projectStore.put(input.project)
+  for (const glyph of input.glyphsToSave ?? []) {
+    glyphStore.put(glyph)
+  }
+  for (const key of input.glyphKeysToDelete ?? []) {
+    glyphStore.delete(key)
+  }
+  for (const record of input.uiStateToSave ?? []) {
+    uiStore.put(record)
+  }
+
+  await transactionDone(transaction)
+}
+
 export const renameKumikoProjectRecord = async (
   projectId: string,
   title: string
