@@ -4,7 +4,9 @@ import { describe, expect, it, vi } from 'vitest'
 import { Window } from 'happy-dom'
 import {
   applyKumikoRemoteSnapshot,
+  buildKumikoUfoExportState,
   markKumikoGitHubCommitSynced,
+  markKumikoUfoExportClean,
   prepareKumikoGitHubCommit,
 } from 'src/lib/github/sync/kumikoUfoSync'
 import { saveProjectDraft } from 'src/lib/project/projectRepository'
@@ -151,7 +153,9 @@ const saveCanonicalGitHubProject = async (projectId: string) => {
     projectSourceFormat: 'ufo',
     projectRoundTripFormat: 'ufo',
     projectGlyphsPackage: null,
+    projectExportDirty: true,
     projectSyncDirty: true,
+    exportDirtyGlyphIds: ['A'],
     syncDirtyGlyphIds: ['A'],
   })
 }
@@ -243,5 +247,34 @@ describe('Kumiko GitHub UFO sync', () => {
       A: 'A.glif',
     })
     expect(project?.sourceData?.ufo?.lastSync?.ref).toBe('kumiko/a')
+  })
+
+  it('builds UFO export state and marks canonical glyphs export-clean', async () => {
+    await saveCanonicalGitHubProject('github-sync-export')
+
+    const exportState = await buildKumikoUfoExportState('github-sync-export')
+    const glyph = exportState.ufos[0]?.layers[0]?.glyphs[0]
+
+    expect(exportState.ufos[0]?.metadata.relativePath).toBe('Kumiko.ufo')
+    expect(glyph?.glyphName).toBe('A')
+    expect(glyph?.fileName).toBe('A.glif')
+
+    await markKumikoUfoExportClean('github-sync-export', [
+      {
+        activeUfoId: 'Kumiko.ufo',
+        glyphId: 'A',
+        fileName: 'A.glif',
+        sourceHash: 'export-hash',
+      },
+    ])
+
+    const storedGlyph = await loadKumikoGlyphRecord(
+      makeKumikoGlyphKey('github-sync-export', 'A')
+    )
+    const project = await loadKumikoProjectRecord('github-sync-export')
+
+    expect(storedGlyph?.exportDirty).toBe(0)
+    expect(storedGlyph?.exportedDigest).toBe('export-hash')
+    expect(project?.exportDirty).toBe(0)
   })
 })

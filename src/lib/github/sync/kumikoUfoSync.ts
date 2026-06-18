@@ -86,6 +86,23 @@ export interface ApplyRemoteResult {
   remainingConflicts: number
 }
 
+export interface KumikoUfoExportLayer {
+  layer: UfoLayerRecord
+  glyphs: UfoGlyphRecord[]
+}
+
+export interface KumikoUfoExportUfo {
+  metadata: UfoMetadataRecord
+  layers: KumikoUfoExportLayer[]
+}
+
+export interface KumikoUfoExportStateUpdate {
+  activeUfoId: string
+  glyphId: string
+  fileName: string
+  sourceHash: string | null
+}
+
 const getUfoSource = (project: KumikoProjectRecord, activeUfoId: string) => {
   const source = project.sourceData?.ufo?.ufos?.find(
     (candidate) => candidate.ufoId === activeUfoId
@@ -346,6 +363,50 @@ const buildMetadata = (
   }
 }
 
+export const buildKumikoUfoExportState = async (projectId: string) => {
+  const project = await loadKumikoProjectRecord(projectId)
+  if (!project) {
+    throw new Error('找不到 Kumiko 專案')
+  }
+  const ufoSources = project.sourceData?.ufo?.ufos
+  if (!ufoSources || ufoSources.length === 0) {
+    throw new Error('這個專案沒有可匯出的 UFO source metadata')
+  }
+
+  const glyphs = await listKumikoGlyphRecordsForProject(projectId)
+  return {
+    project,
+    ufos: ufoSources.map((source) => {
+      const contents = makeContents(project, glyphs, source.ufoId)
+      const metadata = buildMetadata(project, source.ufoId, contents)
+      const defaultLayer =
+        source.layers.find(
+          (layer) => layer.layerId === source.defaultLayerId
+        ) ??
+        source.layers[0] ??
+        ({
+          layerId: 'public.default',
+          glyphDir: 'glyphs',
+        } satisfies UfoLayerRecord)
+      const defaultGlyphs = glyphs.map((glyph) =>
+        toUfoGlyphRecord({
+          project,
+          glyph,
+          activeUfoId: source.ufoId,
+          fileName: contents[glyph.glyphId] ?? `${glyph.glyphId}.glif`,
+        })
+      )
+      return {
+        metadata,
+        layers: metadata.layers.map((layer) => ({
+          layer,
+          glyphs: layer.layerId === defaultLayer.layerId ? defaultGlyphs : [],
+        })),
+      } satisfies KumikoUfoExportUfo
+    }),
+  }
+}
+
 export const prepareKumikoGitHubCommit = async (input: {
   projectId: string
   projectTitle: string
@@ -531,6 +592,54 @@ export const markKumikoGitHubCommitSynced = async (
           }
         : project.sourceData?.ufo,
     },
+    updatedAt: timestamp,
+  })
+}
+
+export const markKumikoUfoExportClean = async (
+  projectId: string,
+  updates: KumikoUfoExportStateUpdate[]
+) => {
+  if (updates.length === 0) {
+    return
+  }
+  const [project, glyphs] = await Promise.all([
+    loadKumikoProjectRecord(projectId),
+    listKumikoGlyphRecordsForProject(projectId),
+  ])
+  if (!project) {
+    return
+  }
+  const updateByGlyphId = new Map(
+    updates.map((update) => [update.glyphId, update])
+  )
+  const timestamp = Date.now()
+  await saveKumikoGlyphRecordBatch(
+    glyphs.map((glyph) => {
+      const update = updateByGlyphId.get(glyph.glyphId)
+      if (!update) {
+        return glyph
+      }
+      return {
+        ...glyph,
+        exportDirty: 0,
+        exportedDigest: update.sourceHash,
+        sourceData: {
+          ...glyph.sourceData,
+          ufo: {
+            ...glyph.sourceData?.ufo,
+            fileName: update.fileName,
+            sourceHash: update.sourceHash,
+          },
+        },
+        updatedAt: timestamp,
+      }
+    })
+  )
+
+  await saveKumikoProjectRecord({
+    ...project,
+    exportDirty: 0,
     updatedAt: timestamp,
   })
 }

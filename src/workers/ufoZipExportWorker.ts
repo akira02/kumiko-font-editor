@@ -4,15 +4,12 @@ import { hashString } from 'src/lib/hash'
 import {
   serializeGlifRecord,
   serializeXmlPlist,
-  pickDefaultLayer,
 } from 'src/lib/fontFormats/adapters/ufo'
 import {
-  listUfoGlyphsInLayer,
-  listUfoMetadataForProject,
-  loadUfoProject,
-  updateUfoGlyphExportState,
-} from 'src/lib/fontFormats/ufoPersistence'
-import type { UfoGlyphPrimaryKey } from 'src/lib/fontFormats/ufoTypes'
+  buildKumikoUfoExportState,
+  markKumikoUfoExportClean,
+  type KumikoUfoExportStateUpdate,
+} from 'src/lib/github/sync/kumikoUfoSync'
 
 interface ZipExportRequest {
   type: 'zip-export'
@@ -128,12 +125,7 @@ self.onmessage = async (event: MessageEvent<ZipExportRequest>) => {
       fixedConcurrency = 8,
     } = event.data.payload
 
-    const project = await loadUfoProject(projectId)
-    if (!project) {
-      throw new Error('找不到 UFO 專案')
-    }
-
-    const metadataRecords = await listUfoMetadataForProject(projectId)
+    const exportState = await buildKumikoUfoExportState(projectId)
     const stagingRoot = await ensureOpfsDir(opfsRoot, OPFS_STAGING_DIR)
 
     // --- Phase 1: write all UFO files into OPFS staging ---
@@ -141,21 +133,12 @@ self.onmessage = async (event: MessageEvent<ZipExportRequest>) => {
     let completedGlyphs = 0
     const concurrency = Math.max(1, fixedConcurrency)
 
-    const exportStateUpdates: Array<{
-      key: UfoGlyphPrimaryKey
-      dirty: boolean
-      sourceHash: string | null
-    }> = []
+    const exportStateUpdates: KumikoUfoExportStateUpdate[] = []
 
     // First pass: count total glyphs
-    for (const metadata of metadataRecords) {
-      for (const layer of metadata.layers) {
-        const layerGlyphs = await listUfoGlyphsInLayer(
-          projectId,
-          metadata.ufoId,
-          layer.layerId
-        )
-        totalGlyphs += layerGlyphs.length
+    for (const ufo of exportState.ufos) {
+      for (const layer of ufo.layers) {
+        totalGlyphs += layer.glyphs.length
       }
     }
 
@@ -173,9 +156,9 @@ self.onmessage = async (event: MessageEvent<ZipExportRequest>) => {
 
     progressWrite()
 
-    for (const metadata of metadataRecords) {
+    for (const ufo of exportState.ufos) {
+      const metadata = ufo.metadata
       const ufoDir = await ensureOpfsDir(stagingRoot, metadata.relativePath)
-      const defaultLayer = pickDefaultLayer(metadata)
 
       // Write metadata files
       await writeOpfsFile(
@@ -219,20 +202,9 @@ self.onmessage = async (event: MessageEvent<ZipExportRequest>) => {
       }
 
       // Write glyph layers
-      for (const layer of metadata.layers) {
-        const layerDir = await ensureOpfsDir(ufoDir, layer.glyphDir)
-        const layerGlyphs =
-          layer.layerId === defaultLayer.layerId
-            ? await listUfoGlyphsInLayer(
-                projectId,
-                metadata.ufoId,
-                defaultLayer.layerId
-              )
-            : await listUfoGlyphsInLayer(
-                projectId,
-                metadata.ufoId,
-                layer.layerId
-              )
+      for (const layerExport of ufo.layers) {
+        const layerDir = await ensureOpfsDir(ufoDir, layerExport.layer.glyphDir)
+        const layerGlyphs = layerExport.glyphs
 
         // contents.plist
         const contents = Object.fromEntries(
@@ -256,13 +228,9 @@ self.onmessage = async (event: MessageEvent<ZipExportRequest>) => {
 
               if (markClean) {
                 exportStateUpdates.push({
-                  key: [
-                    glyph.projectId,
-                    glyph.ufoId,
-                    glyph.layerId,
-                    glyph.glyphName,
-                  ],
-                  dirty: false,
+                  activeUfoId: glyph.ufoId,
+                  glyphId: glyph.glyphName,
+                  fileName: glyph.fileName,
                   sourceHash: nextHash,
                 })
               }
@@ -333,7 +301,7 @@ self.onmessage = async (event: MessageEvent<ZipExportRequest>) => {
 
     // Mark clean in IndexedDB
     if (markClean && exportStateUpdates.length > 0) {
-      await updateUfoGlyphExportState(exportStateUpdates)
+      await markKumikoUfoExportClean(projectId, exportStateUpdates)
     }
 
     // Transfer the zip data to the main thread via transferable
