@@ -21,7 +21,7 @@ import {
 import { syncHotFontDataToUfoRecords } from 'src/lib/fontFormats/adapters/ufo'
 import { exportUfoAsZipBlob } from 'src/lib/fontFormats/ufoZipExportClient'
 import { serializeGlyphsFileToBlob } from 'src/lib/fontFormats/glyphsExport'
-import { patchGlyphsPackageData } from 'src/lib/fontFormats/glyphsPackage'
+import { createGlyphsPackageDataFromFontData } from 'src/lib/fontFormats/glyphsPackage'
 import { loadProjectDraft } from 'src/lib/project/projectRepository'
 import { useStore } from 'src/store'
 import type { FontExportFormat } from 'src/features/common/fontExport/ExportFontModal'
@@ -137,14 +137,12 @@ export function useFontExport() {
       const buildExportAsset = async (
         format: FontExportFormat
       ): Promise<ExportAsset> => {
-        // Glyphs export: re-serialize stored source metadata when present, but
-        // force the target file format so any project can export Glyphs 2 or 3.
+        // Glyphs export always emits from Kumiko's canonical in-memory model.
         if (format === 'glyphs2' || format === 'glyphs3') {
-          const draft = await loadProjectDraft(projectId)
           const blob = serializeGlyphsFileToBlob(
             fontData,
             getProjectArchiveMetadata(),
-            draft?.projectGlyphsDocument ?? null,
+            null,
             format === 'glyphs3' ? 3 : 2
           )
           return {
@@ -157,19 +155,18 @@ export function useFontExport() {
 
         if (format === 'glyphspackage') {
           const draft = await loadProjectDraft(projectId)
-          if (!draft?.projectGlyphsPackage) {
-            throw new Error('找不到 .glyphspackage 來源資料')
-          }
-          // Patch every current glyph into the stored package, preserving the
-          // glyphs and files the user never touched.
-          const patched = patchGlyphsPackageData({
-            packageData: draft.projectGlyphsPackage,
-            dirtyGlyphs: fontData.glyphs,
+          const packageData = createGlyphsPackageDataFromFontData({
+            fontData,
+            projectMetadata: getProjectArchiveMetadata(),
+            packageName:
+              draft?.projectGlyphsPackage?.packageName ??
+              `${baseFileName}.glyphspackage`,
           })
           const files: Record<string, Uint8Array> = {}
           const encoder = new TextEncoder()
-          for (const [innerPath, text] of Object.entries(patched.files)) {
-            files[`${patched.packageName}/${innerPath}`] = encoder.encode(text)
+          for (const [innerPath, text] of Object.entries(packageData.files)) {
+            files[`${packageData.packageName}/${innerPath}`] =
+              encoder.encode(text)
           }
           return {
             blob: makeZipBlob(files),

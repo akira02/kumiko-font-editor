@@ -294,7 +294,7 @@ const buildLayerMap = (layers: Array<Record<string, unknown>>) =>
     ])
   )
 
-const createBaseGlyphsDocument = (
+export const createBaseGlyphsDocument = (
   fontData: FontData,
   projectMetadata: Record<string, unknown> | null
 ): GlyphsDocument => ({
@@ -338,7 +338,7 @@ const createBaseGlyphsDocument = (
     {},
 })
 
-const createPatchedGlyphRecord = (
+export const createGlyphsRecordFromFontDataGlyph = (
   rawGlyph: Record<string, unknown> | undefined,
   glyph: GlyphData,
   formatVersion: GlyphsFormatVersion = 2
@@ -410,6 +410,23 @@ const createPatchedGlyphRecord = (
   return patchedGlyph
 }
 
+export const createGlyphsDocumentFromFontData = (
+  fontData: FontData,
+  projectMetadata: Record<string, unknown> | null,
+  formatVersion: GlyphsFormatVersion
+): GlyphsDocument => {
+  const document = createBaseGlyphsDocument(fontData, projectMetadata)
+  if (formatVersion >= 3) {
+    document['.formatVersion'] = 3
+  } else {
+    delete document['.formatVersion']
+  }
+  document.glyphs = Object.values(fontData.glyphs).map((glyph) =>
+    createGlyphsRecordFromFontDataGlyph(undefined, glyph, formatVersion)
+  ) as GlyphsDocument['glyphs']
+  return document
+}
+
 const serializeGlyphsArrayToChunks = (
   rawGlyphs: Array<Record<string, unknown>>,
   fontData: FontData,
@@ -447,7 +464,7 @@ const serializeGlyphsArrayToChunks = (
       .find((id): id is string => Boolean(id))
     const editedGlyph = matchedId ? glyphsById.get(matchedId) : undefined
     const valueToWrite = editedGlyph
-      ? createPatchedGlyphRecord(rawGlyph, editedGlyph, formatVersion)
+      ? createGlyphsRecordFromFontDataGlyph(rawGlyph, editedGlyph, formatVersion)
       : rawGlyph
 
     chunks.push(childIndent)
@@ -466,7 +483,7 @@ const serializeGlyphsArrayToChunks = (
 
     chunks.push(childIndent)
     serializeOpenStepValueToChunks(
-      createPatchedGlyphRecord(undefined, glyph, formatVersion),
+      createGlyphsRecordFromFontDataGlyph(undefined, glyph, formatVersion),
       chunks,
       indentLevel + 1
     )

@@ -1,5 +1,4 @@
 import type { FontData } from 'src/store'
-import type { GlyphsDocument } from 'src/lib/fontFormats/glyphsDocument'
 import type { GlyphsPackageData } from 'src/lib/fontFormats/glyphsPackage'
 import type {
   ProjectRoundTripFormat,
@@ -32,8 +31,6 @@ export interface KumikoProjectDraft {
   projectMetadata?: Record<string, unknown> | null
   projectSourceFormat?: ProjectSourceFormat | null
   projectRoundTripFormat?: ProjectRoundTripFormat | null
-  projectGlyphsText?: string | null
-  projectGlyphsDocument?: GlyphsDocument | null
   projectGlyphsPackage?: GlyphsPackageData | null
 }
 

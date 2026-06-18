@@ -17,8 +17,6 @@ export interface ImportedGlyphsProject {
   fontData: FontData
   projectMetadata: Record<string, unknown>
   projectSourceFormat: ProjectSourceFormat
-  projectGlyphsText: string | null
-  projectGlyphsDocument: GlyphsDocument | null
   projectGlyphsPackage: GlyphsPackageData | null
 }
 
@@ -30,8 +28,8 @@ const familyTitle = (document: GlyphsDocument, fallback: string) =>
     ? document.familyName
     : fallback
 
-// Single-file .glyphs: parse the OpenStep document, keep the raw text for
-// patch-free full round-trip export, and build the multi-master FontData.
+// Single-file .glyphs: parse the OpenStep document, then keep only Kumiko's
+// canonical FontData plus compact non-vector metadata.
 export const importGlyphsFile = async (
   file: File
 ): Promise<ImportedGlyphsProject> => {
@@ -47,15 +45,13 @@ export const importGlyphsFile = async (
     fontData: buildFontDataFromGlyphsDocument(document),
     projectMetadata: extractGlyphsMetadata(document) ?? {},
     projectSourceFormat: 'glyphs',
-    projectGlyphsText: text,
-    projectGlyphsDocument: document,
     projectGlyphsPackage: null,
   }
 }
 
 // .glyphspackage folder: readGlyphsPackageFromFiles already assembles the
-// document (fontinfo.plist + per-glyph .glyph files in order); build FontData
-// from it and keep the package files for round-trip export.
+// document (fontinfo.plist + per-glyph .glyph files in order). Persist only the
+// internal FontData, extracted metadata, and package naming hint.
 export const importGlyphsPackage = async (
   files: FileList | File[]
 ): Promise<ImportedGlyphsProject> => {
@@ -68,8 +64,6 @@ export const importGlyphsPackage = async (
     fontData: buildFontDataFromGlyphsDocument(document),
     projectMetadata,
     projectSourceFormat: 'glyphspackage',
-    projectGlyphsText: null,
-    projectGlyphsDocument: document,
     projectGlyphsPackage: packageData,
   }
 }

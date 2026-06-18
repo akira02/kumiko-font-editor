@@ -67,8 +67,6 @@ const saveImportedGlyphsProject = async (
     // Glyphs projects reload straight from the draft fontData (no per-source
     // rebuild like UFO), so there is no separate round-trip format.
     projectRoundTripFormat: null,
-    projectGlyphsText: imported.projectGlyphsText,
-    projectGlyphsDocument: imported.projectGlyphsDocument,
     projectGlyphsPackage: imported.projectGlyphsPackage,
   })
 
@@ -101,8 +99,6 @@ export const saveImportedUfoWorkspaceAsProject = async (
     projectMetadata: importedProject.projectMetadata,
     projectSourceFormat: importedProject.projectSourceFormat,
     projectRoundTripFormat: 'ufo',
-    projectGlyphsText: null,
-    projectGlyphsDocument: null,
     projectGlyphsPackage: null,
   })
 
@@ -146,8 +142,6 @@ export const importLocalProjectFiles = async (
       projectMetadata: { importedFrom: extension },
       projectSourceFormat: importedBinary.sourceFormat,
       projectRoundTripFormat: null,
-      projectGlyphsText: null,
-      projectGlyphsDocument: null,
       projectGlyphsPackage: null,
     })
 

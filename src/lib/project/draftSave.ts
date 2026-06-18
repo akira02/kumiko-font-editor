@@ -81,9 +81,7 @@ export const saveDraftSnapshot = async (input: {
       ),
       projectSourceFormat,
       projectRoundTripFormat,
-      projectGlyphsText: persistedProject?.projectGlyphsText ?? null,
-      projectGlyphsDocument: persistedProject?.projectGlyphsDocument ?? null,
-      projectGlyphsPackage: persistedProject?.projectGlyphsPackage ?? null,
+      projectGlyphsPackage: null,
     })
     await saveUfoUiValue(
       input.projectId,
@@ -98,8 +96,6 @@ export const saveDraftSnapshot = async (input: {
     return
   }
 
-  // Load the full draft (not just the summary) so glyphs round-trip sources
-  // (text / document / package) survive an edit-and-save cycle.
   const persistedProject = await loadProjectDraft(input.projectId)
   const projectMetadata = getProjectArchiveMetadata()
   const now = Date.now()
@@ -119,8 +115,6 @@ export const saveDraftSnapshot = async (input: {
     ),
     projectSourceFormat,
     projectRoundTripFormat,
-    projectGlyphsText: persistedProject?.projectGlyphsText ?? null,
-    projectGlyphsDocument: persistedProject?.projectGlyphsDocument ?? null,
     projectGlyphsPackage: persistedProject?.projectGlyphsPackage ?? null,
   })
 }

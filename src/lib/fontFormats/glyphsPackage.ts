@@ -2,19 +2,19 @@ import {
   extractGlyphsMetadata,
   type GlyphsDocument,
 } from 'src/lib/fontFormats/glyphsDocument'
-import { serializeOpenStepValue } from 'src/lib/fontFormats/glyphsExport'
-import { patchGlyphText } from 'src/lib/fontFormats/glyphsPatchExport'
+import {
+  createGlyphsDocumentFromFontData,
+  serializeOpenStepValue,
+} from 'src/lib/fontFormats/glyphsExport'
 import { parseOpenStep } from 'src/lib/fontFormats/openstepParser'
-import type { GlyphData } from 'src/store'
+import type { FontData } from 'src/store'
 
 export interface GlyphsPackageData {
   packageName: string
-  files: Record<string, string>
-  glyphFileMap: Record<string, string>
 }
 
-export interface PatchedGlyphsPackageData extends GlyphsPackageData {
-  changedPaths: string[]
+export interface GeneratedGlyphsPackageData extends GlyphsPackageData {
+  files: Record<string, string>
 }
 
 interface ParsedGlyphFileEntry {
@@ -44,31 +44,6 @@ const findPackageRoot = (relativePath: string) => {
   }
 
   return null
-}
-
-const getGlyphKeysFromRawGlyph = (glyph: Record<string, unknown>) => {
-  const keys = new Set<string>()
-  const glyphName = typeof glyph.glyphname === 'string' ? glyph.glyphname : null
-  const unicode = typeof glyph.unicode === 'string' ? glyph.unicode : null
-
-  if (glyphName) {
-    keys.add(glyphName.toLowerCase())
-  }
-  if (unicode) {
-    keys.add(`uni${unicode}`.toLowerCase())
-  }
-
-  return [...keys]
-}
-
-const getGlyphKeysFromHotGlyph = (glyph: GlyphData) => {
-  const keys = new Set<string>()
-  keys.add(glyph.id.toLowerCase())
-  keys.add(glyph.name.toLowerCase())
-  if (glyph.unicode) {
-    keys.add(`uni${glyph.unicode}`.toLowerCase())
-  }
-  return [...keys]
 }
 
 const sortGlyphEntries = (
@@ -171,15 +146,6 @@ export const readGlyphsPackageFromFiles = async (
     }))
 
   const sortedGlyphEntries = sortGlyphEntries(glyphEntries, orderedGlyphNames)
-  const glyphFileMap: Record<string, string> = {}
-  for (const entry of sortedGlyphEntries) {
-    for (const key of getGlyphKeysFromRawGlyph(entry.glyph)) {
-      if (!glyphFileMap[key]) {
-        glyphFileMap[key] = entry.relativePath
-      }
-    }
-  }
-
   const document = {
     ...baseDocument,
     glyphs: sortedGlyphEntries.map((entry) => entry.glyph),
@@ -189,8 +155,6 @@ export const readGlyphsPackageFromFiles = async (
     document,
     packageData: {
       packageName,
-      files: fileMap,
-      glyphFileMap,
     },
     projectMetadata: extractGlyphsMetadata(document) ?? {},
   }
@@ -200,64 +164,66 @@ const sanitizeGlyphFileName = (glyphName: string) =>
   glyphName.replace(/[^A-Za-z0-9._-]+/g, '_').replace(/^_+|_+$/g, '') ||
   'untitled'
 
-export const patchGlyphsPackageData = (input: {
-  packageData: GlyphsPackageData
-  dirtyGlyphs: Record<string, GlyphData>
-}) => {
-  const files = { ...input.packageData.files }
-  const glyphFileMap = { ...input.packageData.glyphFileMap }
-  const changedPaths = new Set<string>()
-  let appendedGlyph = false
+const ensureGlyphsPackageName = (value: string | null | undefined) => {
+  const packageName = value?.trim() || 'Untitled.glyphspackage'
+  return packageName.toLowerCase().endsWith('.glyphspackage')
+    ? packageName
+    : `${packageName}.glyphspackage`
+}
 
-  for (const glyph of Object.values(input.dirtyGlyphs)) {
-    if (!glyph) {
-      continue
+const getUniqueGlyphPath = (glyphName: string, usedPaths: Set<string>) => {
+  const baseName = sanitizeGlyphFileName(glyphName)
+  let index = 0
+  while (true) {
+    const suffix = index === 0 ? '' : `_${index + 1}`
+    const relativePath = `glyphs/${baseName}${suffix}.glyph`
+    if (!usedPaths.has(relativePath)) {
+      usedPaths.add(relativePath)
+      return relativePath
     }
+    index += 1
+  }
+}
 
-    const relativePath =
-      getGlyphKeysFromHotGlyph(glyph)
-        .map((key) => glyphFileMap[key])
-        .find((value): value is string => Boolean(value)) ??
-      `glyphs/${sanitizeGlyphFileName(glyph.name)}.glyph`
+export const createGlyphsPackageDataFromFontData = (input: {
+  fontData: FontData
+  projectMetadata: Record<string, unknown> | null
+  packageName?: string | null
+}): GeneratedGlyphsPackageData => {
+  const document = createGlyphsDocumentFromFontData(
+    input.fontData,
+    input.projectMetadata,
+    3
+  )
+  const fontInfoDocument = { ...document }
+  delete fontInfoDocument.glyphs
 
-    if (!files[relativePath]) {
-      appendedGlyph = true
-    }
+  const files: Record<string, string> = {
+    'fontinfo.plist': `${serializeOpenStepValue(fontInfoDocument)}\n`,
+  }
+  const usedPaths = new Set<string>()
+  const orderedGlyphNames: string[] = []
 
-    // .glyphspackage is a Glyphs 3 container: emit G3 native geometry even when
-    // appending a brand-new glyph that has no existing layer to detect from.
-    const patchedText = `${patchGlyphText(glyph, files[relativePath], 3).trim()}\n`
-    files[relativePath] = patchedText
-    changedPaths.add(relativePath)
-
-    for (const key of getGlyphKeysFromHotGlyph(glyph)) {
-      glyphFileMap[key] = relativePath
-    }
+  for (const glyph of document.glyphs ?? []) {
+    const glyphName =
+      typeof glyph.glyphname === 'string' && glyph.glyphname.length > 0
+        ? glyph.glyphname
+        : 'untitled'
+    const relativePath = getUniqueGlyphPath(glyphName, usedPaths)
+    files[relativePath] = `${serializeOpenStepValue(glyph)}\n`
+    orderedGlyphNames.push(glyphName)
   }
 
-  if (appendedGlyph && files['order.plist']) {
-    const orderedGlyphNames = Object.values(glyphFileMap)
-      .map((relativePath) => files[relativePath])
-      .filter((text): text is string => Boolean(text))
-      .map((text) => parseOpenStep(text) as Record<string, unknown>)
-      .map((glyph) =>
-        typeof glyph.glyphname === 'string' ? glyph.glyphname : null
-      )
-      .filter((glyphName): glyphName is string => Boolean(glyphName))
-    files['order.plist'] = `${serializeOpenStepValue(orderedGlyphNames)}\n`
-    changedPaths.add('order.plist')
-  }
+  files['order.plist'] = `${serializeOpenStepValue(orderedGlyphNames)}\n`
 
   return {
-    packageName: input.packageData.packageName,
+    packageName: ensureGlyphsPackageName(input.packageName),
     files,
-    glyphFileMap,
-    changedPaths: [...changedPaths],
-  } satisfies PatchedGlyphsPackageData
+  }
 }
 
 export const writeGlyphsPackageToDirectory = async (
-  packageData: PatchedGlyphsPackageData
+  packageData: GeneratedGlyphsPackageData
 ) => {
   const picker = (
     window as Window & {
@@ -277,7 +243,7 @@ export const writeGlyphsPackageToDirectory = async (
     { create: true }
   )
 
-  for (const relativePath of packageData.changedPaths) {
+  for (const relativePath of Object.keys(packageData.files)) {
     const text = packageData.files[relativePath]
     if (typeof text !== 'string') {
       continue

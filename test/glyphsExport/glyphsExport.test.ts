@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { serializeGlyphsFileToBlob } from 'src/lib/fontFormats/glyphsExport'
+import { createGlyphsPackageDataFromFontData } from 'src/lib/fontFormats/glyphsPackage'
 import type { GlyphsDocument } from 'src/lib/fontFormats/glyphsDocument'
 import type { FontData, GlyphData } from 'src/store'
 
@@ -175,5 +176,75 @@ describe('serializeGlyphsFileToBlob glyph matching', () => {
     expect(text).toContain('ref = base')
     expect(text).toContain('transform = (1,0.2,0,1,20,30)')
     expect(text).not.toContain('scale = (1,1)')
+  })
+
+  it('generates a Glyphs package from canonical fontData', () => {
+    const fontData = {
+      unitsPerEm: 1000,
+      glyphs: {
+        A: {
+          ...glyph('A', 'A', '0041'),
+          layers: {
+            M1: {
+              id: 'M1',
+              name: 'Regular',
+              associatedMasterId: 'M1',
+              paths: [
+                {
+                  id: 'p1',
+                  closed: true,
+                  nodes: [
+                    {
+                      id: 'n1',
+                      x: 0,
+                      y: 0,
+                      kind: 'oncurve',
+                      segmentType: 'line',
+                    },
+                    {
+                      id: 'n2',
+                      x: 100,
+                      y: 0,
+                      kind: 'oncurve',
+                      segmentType: 'line',
+                    },
+                  ],
+                },
+              ],
+              components: [],
+              componentRefs: [],
+              anchors: [],
+              guidelines: [],
+              metrics: { width: 500, lsb: 0, rsb: 400 },
+            },
+          },
+          layerOrder: ['M1'],
+          activeLayerId: 'M1',
+        },
+      },
+    } as unknown as FontData
+
+    const packageData = createGlyphsPackageDataFromFontData({
+      fontData,
+      projectMetadata: {
+        familyName: 'Canon',
+        fontMasters: [{ id: 'M1', name: 'Regular' }],
+      },
+      packageName: 'Canon',
+    })
+
+    expect(packageData.packageName).toBe('Canon.glyphspackage')
+    expect(Object.keys(packageData.files).sort()).toEqual([
+      'fontinfo.plist',
+      'glyphs/A.glyph',
+      'order.plist',
+    ])
+    expect(packageData.files['fontinfo.plist']).toContain('.formatVersion = 3')
+    expect(packageData.files['fontinfo.plist']).toContain('familyName = Canon')
+    expect(packageData.files['fontinfo.plist']).not.toContain('glyphs =')
+    expect(packageData.files['glyphs/A.glyph']).toContain('glyphname = A')
+    expect(packageData.files['glyphs/A.glyph']).toContain('shapes')
+    expect(packageData.files['glyphs/A.glyph']).toContain('(0,0,l)')
+    expect(packageData.files['order.plist']).toContain('A')
   })
 })
