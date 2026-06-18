@@ -21,7 +21,7 @@ export type ProjectSummary = KumikoProjectSummary
 
 export const openDatabase = async () => {
   return new Promise<IDBDatabase>((resolve, reject) => {
-    const request = globalThis.indexedDB.open(DB_NAME, 7)
+    const request = globalThis.indexedDB.open(DB_NAME, 8)
 
     request.onupgradeneeded = () => {
       const database = request.result
@@ -44,22 +44,58 @@ export const openDatabase = async () => {
           keyPath: ['projectId', 'glyphId'],
         })
         store.createIndex('byProject', 'projectId', { unique: false })
-        store.createIndex('byProjectDirty', ['projectId', 'dirtyIndex'], {
+        store.createIndex(
+          'byProjectExportDirty',
+          ['projectId', 'exportDirtyIndex'],
+          { unique: false }
+        )
+        store.createIndex(
+          'byProjectSyncDirty',
+          ['projectId', 'syncDirtyIndex'],
+          { unique: false }
+        )
+        store.createIndex('byProjectDeleted', ['projectId', 'deletedIndex'], {
           unique: false,
         })
         store.createIndex('byUnicode', 'unicodes', {
           unique: false,
           multiEntry: true,
         })
-        store.createIndex('byName', ['projectId', 'name'], { unique: false })
+        store.createIndex('byDisplayName', ['projectId', 'displayName'], {
+          unique: false,
+        })
       } else {
         const transaction = request.transaction
         const store = transaction?.objectStore(KUMIKO_GLYPHS_STORE)
+        if (store && store.indexNames.contains('byProjectDirty')) {
+          store.deleteIndex('byProjectDirty')
+        }
+        if (store && store.indexNames.contains('byName')) {
+          store.deleteIndex('byName')
+        }
         if (store && !store.indexNames.contains('byProject')) {
           store.createIndex('byProject', 'projectId', { unique: false })
         }
-        if (store && !store.indexNames.contains('byProjectDirty')) {
-          store.createIndex('byProjectDirty', ['projectId', 'dirtyIndex'], {
+        if (store && !store.indexNames.contains('byProjectExportDirty')) {
+          store.createIndex(
+            'byProjectExportDirty',
+            ['projectId', 'exportDirtyIndex'],
+            {
+              unique: false,
+            }
+          )
+        }
+        if (store && !store.indexNames.contains('byProjectSyncDirty')) {
+          store.createIndex(
+            'byProjectSyncDirty',
+            ['projectId', 'syncDirtyIndex'],
+            {
+              unique: false,
+            }
+          )
+        }
+        if (store && !store.indexNames.contains('byProjectDeleted')) {
+          store.createIndex('byProjectDeleted', ['projectId', 'deletedIndex'], {
             unique: false,
           })
         }
@@ -69,8 +105,8 @@ export const openDatabase = async () => {
             multiEntry: true,
           })
         }
-        if (store && !store.indexNames.contains('byName')) {
-          store.createIndex('byName', ['projectId', 'name'], {
+        if (store && !store.indexNames.contains('byDisplayName')) {
+          store.createIndex('byDisplayName', ['projectId', 'displayName'], {
             unique: false,
           })
         }

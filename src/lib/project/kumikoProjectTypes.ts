@@ -84,6 +84,10 @@ export interface KumikoProjectRecord {
   settings?: FontProjectSettings
   lineMetricsHorizontalLayout?: FontData['lineMetricsHorizontalLayout']
   glyphOrder: string[]
+  exportDirty: boolean
+  exportDirtyIndex: 0 | 1
+  syncDirty: boolean
+  syncDirtyIndex: 0 | 1
   sourceData?: KumikoProjectSourceData
 }
 
@@ -153,7 +157,7 @@ export interface KumikoLayerSourceData {
 
 export interface KumikoGlyphLayerRecord extends Omit<
   GlyphLayerData,
-  'paths' | 'componentRefs' | 'anchors' | 'guidelines'
+  'paths' | 'components' | 'componentRefs' | 'anchors' | 'guidelines'
 > {
   type: 'master' | 'backup' | 'background'
   paths: KumikoPathData[]
@@ -188,8 +192,10 @@ export interface KumikoGlyphSourceData {
 export interface KumikoGlyphRecord {
   schemaVersion: 1
   projectId: string
+  // Stable canonical glyph name used by glyphOrder, components, UFO contents,
+  // and Glyphs glyphname. User-facing labels belong in displayName.
   glyphId: string
-  name: string
+  displayName?: string | null
   unicodes: string[]
   production?: string | null
   export?: boolean
@@ -205,10 +211,35 @@ export interface KumikoGlyphRecord {
   layers: Record<string, KumikoGlyphLayerRecord>
   customData?: Record<string, unknown>
   sourceData?: KumikoGlyphSourceData
-  dirty: boolean
-  dirtyIndex: 0 | 1
+  deleted: false
+  deletedIndex: 0
+  exportDirty: boolean
+  exportDirtyIndex: 0 | 1
+  syncDirty: boolean
+  syncDirtyIndex: 0 | 1
   updatedAt: number
 }
+
+export interface KumikoGlyphTombstoneRecord {
+  schemaVersion: 1
+  projectId: string
+  glyphId: string
+  displayName?: string | null
+  unicodes: string[]
+  sourceData?: KumikoGlyphSourceData
+  deleted: true
+  deletedIndex: 1
+  deletedAt: number
+  exportDirty: boolean
+  exportDirtyIndex: 0 | 1
+  syncDirty: boolean
+  syncDirtyIndex: 0 | 1
+  updatedAt: number
+}
+
+export type KumikoGlyphStoreRecord =
+  | KumikoGlyphRecord
+  | KumikoGlyphTombstoneRecord
 
 export interface KumikoUiStateRecord {
   projectId: string

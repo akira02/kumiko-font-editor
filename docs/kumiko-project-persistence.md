@@ -19,18 +19,20 @@ make duplicated outline storage unacceptable.
 
 Use three format-independent stores:
 
-| Store             | Key                    | Purpose                                                                      |
-| ----------------- | ---------------------- | ---------------------------------------------------------------------------- |
-| `kumiko_projects` | `projectId`            | Project metadata, font-level data, source hints, and timestamps.             |
-| `kumiko_glyphs`   | `[projectId, glyphId]` | One canonical glyph record containing all layers for that glyph.             |
-| `kumiko_ui_state` | `[projectId, key]`     | Editor UI state, dirty lists, selected glyph/layer, and non-font user state. |
+| Store             | Key                    | Purpose                                                                                  |
+| ----------------- | ---------------------- | ---------------------------------------------------------------------------------------- |
+| `kumiko_projects` | `projectId`            | Project metadata, font-level data, source hints, and timestamps.                         |
+| `kumiko_glyphs`   | `[projectId, glyphId]` | One canonical glyph record containing all layers for that glyph.                         |
+| `kumiko_ui_state` | `[projectId, key]`     | Editor UI state, persistence queue state, selected glyph/layer, and non-font user state. |
 
 Recommended `kumiko_glyphs` indexes:
 
 - `byProject`: `projectId`
-- `byProjectDirty`: `[projectId, dirtyIndex]`
+- `byProjectExportDirty`: `[projectId, exportDirtyIndex]`
+- `byProjectSyncDirty`: `[projectId, syncDirtyIndex]`
+- `byProjectDeleted`: `[projectId, deletedIndex]`
 - `byUnicode`: `unicodes`, `multiEntry: true`
-- `byName`: `[projectId, name]`
+- `byDisplayName`: `[projectId, displayName]`
 
 ## Project Record
 
@@ -70,6 +72,10 @@ interface KumikoProjectRecord {
   settings?: FontProjectSettings
   lineMetricsHorizontalLayout?: FontData['lineMetricsHorizontalLayout']
   glyphOrder: string[]
+  exportDirty: boolean
+  exportDirtyIndex: 0 | 1
+  syncDirty: boolean
+  syncDirtyIndex: 0 | 1
 
   sourceData?: KumikoProjectSourceData
 }
@@ -117,12 +123,17 @@ interface KumikoProjectSourceData {
 `KumikoGlyphRecord` should preserve every editable glyph datum in Kumiko-native
 shape. It stores one glyph and all of its master/backup/background layers.
 
+`glyphId` is the stable canonical glyph name. It is the key used by
+`glyphOrder`, components, UFO `contents.plist`, and Glyphs `glyphname` export.
+It must not be replaced by a CJK character label or any UI-only nice name.
+`displayName` is optional presentation text for the editor UI.
+
 ```ts
 interface KumikoGlyphRecord {
   schemaVersion: 1
   projectId: string
   glyphId: string
-  name: string
+  displayName?: string | null
   unicodes: string[]
   production?: string | null
   export?: boolean
@@ -138,14 +149,42 @@ interface KumikoGlyphRecord {
   layers: Record<string, KumikoGlyphLayerRecord>
   customData?: Record<string, unknown>
   sourceData?: KumikoGlyphSourceData
-  dirty: boolean
-  dirtyIndex: 0 | 1
+  deleted: false
+  deletedIndex: 0
+  exportDirty: boolean
+  exportDirtyIndex: 0 | 1
+  syncDirty: boolean
+  syncDirtyIndex: 0 | 1
   updatedAt: number
 }
 ```
 
 `unicodes` is an array even though the current editor often uses one codepoint;
 UFO and Glyphs can both carry multiple unicode values.
+
+Deleted glyphs should remain as tombstones until export/sync has reconciled the
+deletion. Otherwise autosave would remove the record and later code would not
+know which UFO GLIF file, Glyphs package glyph file, or remote blob should be
+deleted.
+
+```ts
+interface KumikoGlyphTombstoneRecord {
+  schemaVersion: 1
+  projectId: string
+  glyphId: string
+  displayName?: string | null
+  unicodes: string[]
+  sourceData?: KumikoGlyphSourceData
+  deleted: true
+  deletedIndex: 1
+  deletedAt: number
+  exportDirty: boolean
+  exportDirtyIndex: 0 | 1
+  syncDirty: boolean
+  syncDirtyIndex: 0 | 1
+  updatedAt: number
+}
+```
 
 ## Layer Record
 
@@ -198,6 +237,8 @@ Examples that belong in source data:
   layer directory names, `contents.plist` file names, GLIF image records, note,
   point identifiers, colors, source hashes, and remote blob SHAs.
 - Binary source format hint.
+- Tombstone source hints needed to delete an external glyph file or remote blob
+  after the live glyph record has been deleted.
 
 Examples that must not be stored in source data:
 
@@ -292,18 +333,20 @@ The current store fields mix several concepts:
 
 In the target model, split those meanings:
 
-| Target concept        | Lifetime                   | Meaning                                                            |
-| --------------------- | -------------------------- | ------------------------------------------------------------------ |
-| `pendingPersistence`  | Runtime only               | Changes exist in memory but have not flushed to IndexedDB yet.     |
-| `persistenceStatus`   | Runtime/UI                 | `idle`, `queued`, `saving`, `saved`, or `error`.                   |
-| `exportDirtyGlyphIds` | Persisted/indexed          | Canonical local glyph differs from the last exported target state. |
-| `syncDirtyGlyphIds`   | Persisted/indexed          | Canonical local glyph differs from the last Git/source sync point. |
-| `deletedGlyphIds`     | Persisted until reconciled | Canonical tombstones needed for export/sync deletion.              |
+| Target concept       | Lifetime                   | Meaning                                                                    |
+| -------------------- | -------------------------- | -------------------------------------------------------------------------- |
+| `pendingPersistence` | Runtime only               | Changes exist in memory but have not flushed to IndexedDB yet.             |
+| `persistenceStatus`  | Runtime/UI                 | `idle`, `queued`, `saving`, `saved`, or `error`.                           |
+| `exportDirty`        | Persisted/indexed          | Canonical local project/glyph differs from the last exported target state. |
+| `syncDirty`          | Persisted/indexed          | Canonical local project/glyph differs from the last Git/source sync point. |
+| `deleted`            | Persisted until reconciled | Canonical tombstones needed for export/sync deletion.                      |
 
 The important distinction: "saved locally" and "synced/exported externally" are
 not the same state. After autosave succeeds, a glyph should no longer be
 pending local persistence, but it may still be dirty relative to UFO/Glyphs
-export or GitHub sync.
+export or GitHub sync. The same applies to project-level data such as font info,
+axes, sources, features, kerning, settings, and glyph order; those changes set
+`KumikoProjectRecord.exportDirty` / `syncDirty` rather than a glyph dirty flag.
 
 Recommended UI wording follows that split:
 

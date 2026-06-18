@@ -89,7 +89,8 @@ describe('kumikoFontDataAdapter', () => {
       projectId: 'project-1',
       fontData,
       updatedAt: 20,
-      dirtyGlyphIds: ['A'],
+      exportDirtyGlyphIds: ['A'],
+      syncDirtyGlyphIds: ['A'],
     })
 
     expect(project).toMatchObject({
@@ -105,9 +106,13 @@ describe('kumikoFontDataAdapter', () => {
       schemaVersion: 1,
       projectId: 'project-1',
       glyphId: 'A',
+      displayName: 'A',
       unicodes: ['0041'],
-      dirty: true,
-      dirtyIndex: 1,
+      deleted: false,
+      exportDirty: true,
+      exportDirtyIndex: 1,
+      syncDirty: true,
+      syncDirtyIndex: 1,
       layerOrder: ['M1', 'backup-1'],
     })
     expect(glyphs[0].layers['backup-1'].componentRefs[0]).toMatchObject({
@@ -115,6 +120,7 @@ describe('kumikoFontDataAdapter', () => {
       x: 10,
       y: 20,
     })
+    expect('components' in glyphs[0].layers['backup-1']).toBe(false)
   })
 
   it('rebuilds runtime FontData from canonical records', () => {
