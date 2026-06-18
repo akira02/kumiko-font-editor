@@ -4,11 +4,13 @@ import { describe, expect, it, vi } from 'vitest'
 import { Window } from 'happy-dom'
 import {
   applyKumikoRemoteSnapshot,
+  markKumikoGitHubCommitSynced,
   prepareKumikoGitHubCommit,
 } from 'src/lib/github/sync/kumikoUfoSync'
 import { saveProjectDraft } from 'src/lib/project/projectRepository'
 import {
   loadKumikoGlyphRecord,
+  loadKumikoProjectRecord,
   makeKumikoGlyphKey,
 } from 'src/lib/project/kumikoProjectPersistence'
 import type { FontData } from 'src/store'
@@ -206,5 +208,40 @@ describe('Kumiko GitHub UFO sync', () => {
     expect(glyph?.layers['public.default']?.metrics.width).toBe(700)
     expect(glyph?.syncDirty).toBe(0)
     expect(glyph?.sourceData?.ufo?.remoteBlobSha).toBeTruthy()
+  })
+
+  it('marks committed glyphs and project UFO contents as synced', async () => {
+    await saveCanonicalGitHubProject('github-sync-mark')
+
+    await markKumikoGitHubCommitSynced(
+      [
+        {
+          activeUfoId: 'Kumiko.ufo',
+          glyphId: 'A',
+          fileName: 'A.glif',
+          sourceHash: 'next-hash',
+          remoteBlobSha: 'next-sha',
+        },
+      ],
+      {
+        projectId: 'github-sync-mark',
+        activeUfoId: 'Kumiko.ufo',
+        headOwner: 'fork-owner',
+        branchName: 'kumiko/a',
+        commitSha: 'commit-sha',
+      }
+    )
+
+    const [project, glyph] = await Promise.all([
+      loadKumikoProjectRecord('github-sync-mark'),
+      loadKumikoGlyphRecord(makeKumikoGlyphKey('github-sync-mark', 'A')),
+    ])
+
+    expect(glyph?.syncDirty).toBe(0)
+    expect(glyph?.sourceData?.ufo?.remoteBlobSha).toBe('next-sha')
+    expect(project?.sourceData?.ufo?.ufos?.[0]?.contents).toEqual({
+      A: 'A.glif',
+    })
+    expect(project?.sourceData?.ufo?.lastSync?.ref).toBe('kumiko/a')
   })
 })

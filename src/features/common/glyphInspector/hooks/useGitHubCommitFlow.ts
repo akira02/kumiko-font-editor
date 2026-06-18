@@ -449,6 +449,7 @@ export const useGitHubCommitFlow = ({
       })
       await markGitHubCommitSynced(preparedCommit.exportStateUpdates, {
         projectId,
+        activeUfoId,
         headOwner: result.headOwner,
         branchName: result.branchName,
         commitSha: result.commitSha,

@@ -67,7 +67,9 @@ export interface GitHubPreparedCommit {
   request: GitHubCommitRequestInput
   changedGlyphNames: string[]
   exportStateUpdates: Array<{
+    activeUfoId: string
     glyphId: string
+    fileName: string
     sourceHash: string | null
     remoteBlobSha: string | null
   }>
@@ -387,7 +389,9 @@ export const prepareKumikoGitHubCommit = async (input: {
       content: glifText,
     })
     exportStateUpdates.push({
+      activeUfoId: input.activeUfoId,
       glyphId: glyph.glyphId,
+      fileName,
       sourceHash: hashString(glifText),
       remoteBlobSha: await gitBlobShaFromText(glifText),
     })
@@ -441,6 +445,7 @@ export const markKumikoGitHubCommitSynced = async (
   updates: GitHubPreparedCommit['exportStateUpdates'],
   commitTarget?: {
     projectId: string
+    activeUfoId: string
     headOwner: string
     branchName: string
     commitSha: string
@@ -461,6 +466,17 @@ export const markKumikoGitHubCommitSynced = async (
   const updateByGlyphId = new Map(
     updates.map((update) => [update.glyphId, update])
   )
+  const activeUfoId = commitTarget.activeUfoId
+  const { source } = getUfoSource(project, activeUfoId)
+  const liveContents = Object.fromEntries(
+    glyphs.map((glyph) => [
+      glyph.glyphId,
+      updateByGlyphId.get(glyph.glyphId)?.fileName ??
+        glyph.sourceData?.ufo?.fileName ??
+        source.contents[glyph.glyphId] ??
+        `${glyph.glyphId}.glif`,
+    ])
+  )
   const timestamp = Date.now()
   await saveKumikoGlyphRecordBatch(
     glyphs.map((glyph) => {
@@ -478,6 +494,7 @@ export const markKumikoGitHubCommitSynced = async (
           ...glyph.sourceData,
           ufo: {
             ...glyph.sourceData?.ufo,
+            fileName: update.fileName,
             sourceHash: update.sourceHash,
             remoteBlobSha: update.remoteBlobSha,
           },
@@ -495,6 +512,15 @@ export const markKumikoGitHubCommitSynced = async (
       ufo: project.sourceData?.ufo
         ? {
             ...project.sourceData.ufo,
+            ufos: project.sourceData.ufo.ufos?.map((ufo) =>
+              ufo.ufoId === activeUfoId
+                ? {
+                    ...ufo,
+                    contents: liveContents,
+                    glyphOrder: project.glyphOrder,
+                  }
+                : ufo
+            ),
             lastSync: {
               owner: commitTarget.headOwner,
               repo: project.githubSource?.repo ?? commitTarget.headOwner,
