@@ -645,7 +645,7 @@ const unionBounds = (
   }
 }
 
-const buildBoundsResolver = (glyphRecords: UfoGlyphRecord[]) => {
+export const buildBoundsResolver = (glyphRecords: UfoGlyphRecord[]) => {
   const recordMap = new Map(
     glyphRecords.map((record) => [record.glyphName, record])
   )
@@ -684,7 +684,7 @@ const buildBoundsResolver = (glyphRecords: UfoGlyphRecord[]) => {
 
 // Build the interpolatable content (outline + metrics) of one glyph layer from
 // its UFO record. Shared by the master layer and backup layers.
-const glyphRecordToLayerContent = (
+export const glyphRecordToLayerContent = (
   record: UfoGlyphRecord,
   resolveBounds: (glyphName: string) => GlyphBounds | null
 ) => {

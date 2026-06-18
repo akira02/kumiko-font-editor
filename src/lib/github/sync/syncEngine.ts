@@ -1,4 +1,7 @@
-import { buildKumikoProjectSyncReport } from 'src/lib/github/sync/kumikoUfoSync'
+import {
+  applyKumikoRemoteSnapshot,
+  buildKumikoProjectSyncReport,
+} from 'src/lib/github/sync/kumikoUfoSync'
 import type {
   ProjectSyncReport,
   SyncConflictResolution,
@@ -21,7 +24,4 @@ export const applyRemoteSnapshot = async (input: {
   activeUfoId: string
   report: ProjectSyncReport
   resolutions?: Record<string, SyncConflictResolution>
-}): Promise<ApplyRemoteResult> => {
-  void input
-  throw new Error('套用遠端更新尚未接上 Kumiko canonical storage')
-}
+}): Promise<ApplyRemoteResult> => applyKumikoRemoteSnapshot(input)
