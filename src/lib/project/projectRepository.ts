@@ -12,6 +12,10 @@ import {
   deleteUfoProjectData,
   renameUfoProject,
 } from 'src/lib/fontFormats/ufoPersistence'
+import {
+  deleteKumikoProjectRecord,
+  renameKumikoProjectRecord,
+} from 'src/lib/project/kumikoProjectPersistence'
 
 export const listProjectSummaries = async () => {
   const projects = await getAllProjects()
@@ -29,12 +33,14 @@ export const saveProjectDraft = async (draft: ProjectDraft) => {
 
 export const renameKumikoProject = async (projectId: string, title: string) => {
   const summary = await renameProject(projectId, title)
+  await renameKumikoProjectRecord(projectId, title)
   await renameUfoProject(projectId, title)
   return summary
 }
 
 export const deleteKumikoProject = async (projectId: string) => {
   await deleteProject(projectId)
+  await deleteKumikoProjectRecord(projectId)
   await deleteUfoProjectData(projectId)
 }
 
