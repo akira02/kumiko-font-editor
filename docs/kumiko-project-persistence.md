@@ -238,6 +238,116 @@ This means path order or textual formatting may differ from the original source,
 but outlines, components, metrics, anchors, guidelines, features, masters, and
 format metadata should remain semantically equivalent.
 
+## Runtime State vs IndexedDB
+
+IndexedDB is the local source of truth. Zustand `FontData` is the editor runtime
+view assembled from that source of truth.
+
+| Concern       | IndexedDB canonical records                                      | In-memory Zustand state                                                               |
+| ------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| Ownership     | Durable local project source of truth.                           | Active editing session and UI responsiveness.                                         |
+| Shape         | `KumikoProjectRecord` plus per-glyph `KumikoGlyphRecord`s.       | `FontData` plus selection, viewport, search, editor-line, and transient UI state.     |
+| Granularity   | Project metadata and one record per glyph.                       | One convenient object graph for canvas/editor operations.                             |
+| Writes        | Debounced/batched background writes, ideally worker-driven.      | Immediate synchronous mutations for interaction latency and undo/redo.                |
+| Size strategy | No duplicated vectors; glyph records are independently writable. | May hold loaded glyphs for the active session, but should not be persisted wholesale. |
+| Undo/redo     | Not stored as font data history.                                 | Zundo tracks runtime `fontData` changes for the session.                              |
+
+This difference is intentional. `FontData` is ergonomically shaped for the
+editor: canvas tools, overview filtering, component lookup, feature validation,
+and export code can read it without IndexedDB round trips. `KumikoProjectRecord`
+and `KumikoGlyphRecord` are shaped for storage: compact project metadata,
+independent glyph writes, per-glyph dirty/sync indexes, and lazy loading for CJK
+scale.
+
+The bridge between the two shapes is `kumikoFontDataAdapter`:
+
+- `fontDataToKumikoProjectRecord(...)`
+- `fontDataToKumikoGlyphRecords(...)`
+- `kumikoRecordsToFontData(...)`
+
+As the persistence migration progresses, direct long-term writes of
+`projects.fontData` should disappear. The old `projects` draft store may remain
+temporarily as a compatibility shell while the app is still being refactored,
+but it must not remain the authoritative glyph-vector store.
+
+## Autosave and Dirty Semantics
+
+Once canonical per-glyph IndexedDB storage is in place, manual "save draft" is
+not the primary persistence model. Edits should autosave locally:
+
+1. A user action mutates runtime Zustand state immediately.
+2. The action enqueues affected project/glyph ids for persistence.
+3. A debounce window coalesces rapid edits.
+4. A background task writes changed `KumikoProjectRecord` /
+   `KumikoGlyphRecord`s to IndexedDB.
+5. The UI reports `saving`, `saved`, or `save-error` local persistence state.
+6. Closing a project or tab flushes pending writes immediately when possible.
+
+The current store fields mix several concepts:
+
+- `isDirty` currently means "draft needs manual save".
+- `dirtyGlyphIds` / `deletedGlyphIds` currently feed draft save.
+- `hasLocalChanges`, `localDirtyGlyphIds`, and `localDeletedGlyphIds` currently
+  also drive export/GitHub sync flows.
+
+In the target model, split those meanings:
+
+| Target concept        | Lifetime                   | Meaning                                                            |
+| --------------------- | -------------------------- | ------------------------------------------------------------------ |
+| `pendingPersistence`  | Runtime only               | Changes exist in memory but have not flushed to IndexedDB yet.     |
+| `persistenceStatus`   | Runtime/UI                 | `idle`, `queued`, `saving`, `saved`, or `error`.                   |
+| `exportDirtyGlyphIds` | Persisted/indexed          | Canonical local glyph differs from the last exported target state. |
+| `syncDirtyGlyphIds`   | Persisted/indexed          | Canonical local glyph differs from the last Git/source sync point. |
+| `deletedGlyphIds`     | Persisted until reconciled | Canonical tombstones needed for export/sync deletion.              |
+
+The important distinction: "saved locally" and "synced/exported externally" are
+not the same state. After autosave succeeds, a glyph should no longer be
+pending local persistence, but it may still be dirty relative to UFO/Glyphs
+export or GitHub sync.
+
+Recommended UI wording follows that split:
+
+- `Saving...` / `Saved locally` / `Local save failed` for IndexedDB
+  persistence.
+- `Has export changes` for changes not yet written to a target font format.
+- `Has GitHub changes` for changes not yet committed or pushed.
+
+This lets the editor remove or de-emphasize a manual "save draft" button while
+keeping explicit user actions for export, commit, push, and PR creation.
+
+## Background Persistence Queue
+
+The autosave layer should not save the entire font after every edit. It should
+operate on queues:
+
+```ts
+interface PersistenceQueueState {
+  projectQueued: boolean
+  glyphIds: Set<string>
+  deletedGlyphIds: Set<string>
+  status: 'idle' | 'queued' | 'saving' | 'saved' | 'error'
+  lastError?: string | null
+}
+```
+
+Glyph-editing actions enqueue only affected glyph ids. Font-level actions such
+as editing family info, axes, sources, features, kerning, settings, or glyph
+order enqueue the project record. Operations that add, rename, or delete glyphs
+enqueue both project metadata and the affected glyph/tombstone records.
+
+The queue can start on the main thread using `requestIdleCallback` or a short
+debounce. If serialization or IndexedDB writes become visible in profiling, move
+record conversion and writes to a worker. The worker boundary should exchange
+canonical records, not raw source format records.
+
+Flush rules:
+
+- Flush before closing a project.
+- Flush before export or GitHub commit so external output uses the latest local
+  canonical records.
+- Flush immediately for destructive operations such as glyph deletion.
+- Keep failed records in the queue and surface retry UI.
+
 ## Migration Plan
 
 The project has not shipped yet, so no old draft compatibility is required.
@@ -251,4 +361,6 @@ The project has not shipped yet, so no old draft compatibility is required.
    buffers from long-term project state unless explicitly needed for debugging.
 6. Change project load/save so `projects.fontData` no longer stores full glyph
    vectors.
-7. Keep `FontData` as the editor runtime view assembled from canonical records.
+7. Replace manual draft save with debounced local autosave into canonical
+   records.
+8. Keep `FontData` as the editor runtime view assembled from canonical records.
