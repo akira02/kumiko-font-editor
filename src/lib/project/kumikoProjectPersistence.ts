@@ -5,6 +5,10 @@ import {
   openDatabase,
 } from 'src/lib/project/persistence'
 import { normalizeUnicodeHex } from 'src/lib/project/unicode'
+import {
+  createKumikoGlyphDigest,
+  findGeometryBearingSourceDataKey,
+} from 'src/lib/project/kumikoFontDataAdapter'
 import type {
   KumikoGlyphPrimaryKey,
   KumikoGlyphRecord,
@@ -29,6 +33,38 @@ export const makeKumikoGlyphKey = (
   projectId: string,
   glyphId: string
 ): KumikoGlyphPrimaryKey => [projectId, glyphId]
+
+const storageIndexKey = (projectId: string, value: string) =>
+  `${projectId}\0${value}`
+
+export type KumikoGlyphMetadataPatch = Partial<
+  Pick<
+    KumikoGlyphRecord,
+    | 'displayName'
+    | 'unicodes'
+    | 'production'
+    | 'export'
+    | 'category'
+    | 'subCategory'
+    | 'status'
+    | 'color'
+    | 'note'
+    | 'leftMetricsKey'
+    | 'rightMetricsKey'
+    | 'widthMetricsKey'
+    | 'customData'
+    | 'sourceData'
+  >
+>
+
+const normalizeGlyphRecordUnicodes = (
+  unicodes: KumikoGlyphRecord['unicodes']
+) => {
+  const normalized = unicodes
+    .map((unicode) => normalizeUnicodeHex(unicode))
+    .filter((unicode): unicode is string => Boolean(unicode))
+  return [...new Set(normalized)]
+}
 
 export const saveKumikoProjectRecord = async (record: KumikoProjectRecord) => {
   const database = await openDatabase()
@@ -166,6 +202,77 @@ export const loadKumikoGlyphRecord = async (key: KumikoGlyphPrimaryKey) => {
   return requestToPromise(
     transaction.objectStore(KUMIKO_GLYPHS_STORE).get(key)
   ) as Promise<KumikoGlyphRecord | undefined>
+}
+
+export const patchKumikoGlyphMetadata = async (input: {
+  projectId: string
+  glyphId: string
+  patch: KumikoGlyphMetadataPatch
+  updatedAt?: number
+  exportDirty?: boolean | 0 | 1
+  syncDirty?: boolean | 0 | 1
+}) => {
+  const database = await openDatabase()
+  const transaction = database.transaction(KUMIKO_GLYPHS_STORE, 'readwrite')
+  const store = transaction.objectStore(KUMIKO_GLYPHS_STORE)
+  const key = makeKumikoGlyphKey(input.projectId, input.glyphId)
+  const record = (await requestToPromise(store.get(key))) as
+    | KumikoGlyphRecord
+    | undefined
+
+  if (!record) {
+    await transactionDone(transaction)
+    return null
+  }
+
+  const geometrySourceDataKey = findGeometryBearingSourceDataKey(
+    input.patch.sourceData,
+    `glyph(${record.glyphId}).sourceData`
+  )
+  if (geometrySourceDataKey) {
+    throw new Error(
+      `Kumiko sourceData cannot contain geometry key: ${geometrySourceDataKey}`
+    )
+  }
+
+  const unicodes = input.patch.unicodes
+    ? normalizeGlyphRecordUnicodes(input.patch.unicodes)
+    : record.unicodes
+  const exportDirty =
+    input.exportDirty === undefined
+      ? record.exportDirty
+      : input.exportDirty
+        ? 1
+        : 0
+  const syncDirty =
+    input.syncDirty === undefined ? record.syncDirty : input.syncDirty ? 1 : 0
+  const nextRecord: KumikoGlyphRecord = {
+    ...record,
+    ...input.patch,
+    glyphId: record.glyphId,
+    projectId: record.projectId,
+    layerOrder: record.layerOrder,
+    layers: record.layers,
+    componentGlyphIds: record.componentGlyphIds,
+    componentRefKeys: record.componentRefKeys,
+    unicodes,
+    unicodeKeys: unicodes.map((unicode) =>
+      storageIndexKey(record.projectId, unicode)
+    ),
+    exportDirty,
+    syncDirty,
+    updatedAt: input.updatedAt ?? Date.now(),
+  }
+  const digest = createKumikoGlyphDigest(nextRecord)
+  const persistedRecord: KumikoGlyphRecord = {
+    ...nextRecord,
+    exportedDigest: nextRecord.exportDirty ? null : digest,
+    syncedDigest: nextRecord.syncDirty ? null : digest,
+  }
+
+  store.put(persistedRecord)
+  await transactionDone(transaction)
+  return persistedRecord
 }
 
 export const listKumikoGlyphRecordsForProject = async (projectId: string) => {

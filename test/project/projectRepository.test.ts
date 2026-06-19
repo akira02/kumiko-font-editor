@@ -11,6 +11,7 @@ import {
   loadKumikoGlyphRecord,
   loadKumikoProjectRecord,
   makeKumikoGlyphKey,
+  patchKumikoGlyphMetadata,
 } from 'src/lib/project/kumikoProjectPersistence'
 import { saveDraftSnapshot } from 'src/lib/project/draftSave'
 import { openDatabase } from 'src/lib/project/persistence'
@@ -310,5 +311,133 @@ describe('projectRepository canonical storage', () => {
     expect(project?.syncDirty).toBe(0)
     expect(glyphA?.exportDirty).toBe(1)
     expect(glyphA?.syncDirty).toBe(1)
+  })
+
+  it('patches glyph metadata without replacing canonical geometry', async () => {
+    const compositeFontData: FontData = {
+      glyphOrder: ['A', 'B'],
+      glyphs: {
+        A: fontData.glyphs.A,
+        B: {
+          ...fontData.glyphs.A,
+          id: 'B',
+          name: 'B',
+          unicodes: ['0042'],
+          layers: {
+            'public.default': {
+              ...fontData.glyphs.A.layers!['public.default']!,
+              paths: [
+                {
+                  id: 'path-1',
+                  closed: true,
+                  nodes: [
+                    {
+                      id: 'node-1',
+                      kind: 'oncurve',
+                      segmentType: 'line',
+                      x: 1,
+                      y: 2,
+                    },
+                  ],
+                },
+              ],
+              componentRefs: [
+                {
+                  id: 'component-1',
+                  glyphId: 'A',
+                  x: 0,
+                  y: 0,
+                  scaleX: 1,
+                  scaleY: 1,
+                  rotation: 0,
+                },
+              ],
+            },
+          },
+        },
+      },
+    }
+    await saveProjectDraft({
+      id: 'project-metadata-patch',
+      title: 'Metadata Patch',
+      lastModified: 20,
+      createdAt: 10,
+      updatedAt: 20,
+      sourceName: 'MetadataPatch.ufo',
+      sourceType: 'local',
+      fontData: compositeFontData,
+      projectMetadata: null,
+      projectSourceData: null,
+      projectSourceFormat: 'ufo',
+    })
+
+    await patchKumikoGlyphMetadata({
+      projectId: 'project-metadata-patch',
+      glyphId: 'B',
+      patch: {
+        unicodes: ['u+62'],
+        status: 2,
+        note: 'metadata only',
+      },
+      updatedAt: 40,
+      exportDirty: true,
+      syncDirty: true,
+    })
+
+    const glyph = await loadKumikoGlyphRecord(
+      makeKumikoGlyphKey('project-metadata-patch', 'B')
+    )
+    const unicodeGlyphs = await findKumikoGlyphRecordsByUnicode(
+      'project-metadata-patch',
+      '0062'
+    )
+
+    expect(glyph?.unicodes).toEqual(['0062'])
+    expect(glyph?.unicodeKeys).toEqual([`project-metadata-patch\0${'0062'}`])
+    expect(glyph?.status).toBe(2)
+    expect(glyph?.note).toBe('metadata only')
+    expect(glyph?.layers['public.default']?.paths[0].nodes[0].x).toBe(1)
+    expect(glyph?.componentGlyphIds).toEqual(['A'])
+    expect(glyph?.componentRefKeys).toEqual(['project-metadata-patch\0A'])
+    expect(glyph?.exportDirty).toBe(1)
+    expect(glyph?.syncDirty).toBe(1)
+    expect(unicodeGlyphs.map((record) => record.glyphId)).toEqual(['B'])
+  })
+
+  it('rejects geometry-bearing sourceData in metadata patches', async () => {
+    await saveProjectDraft({
+      id: 'project-bad-metadata-patch',
+      title: 'Bad Metadata Patch',
+      lastModified: 20,
+      createdAt: 10,
+      updatedAt: 20,
+      sourceName: 'BadMetadataPatch.ufo',
+      sourceType: 'local',
+      fontData,
+      projectMetadata: null,
+      projectSourceData: null,
+      projectSourceFormat: 'ufo',
+    })
+
+    await expect(
+      patchKumikoGlyphMetadata({
+        projectId: 'project-bad-metadata-patch',
+        glyphId: 'A',
+        patch: {
+          sourceData: {
+            glyphs: {
+              fields: {
+                paths: [],
+              },
+            },
+          },
+        },
+      })
+    ).rejects.toThrow(/geometry key/)
+
+    const glyph = await loadKumikoGlyphRecord(
+      makeKumikoGlyphKey('project-bad-metadata-patch', 'A')
+    )
+    expect(glyph?.sourceData).toBeUndefined()
   })
 })
