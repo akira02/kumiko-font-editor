@@ -12,7 +12,10 @@ import type {
   PathNode,
   PathSegmentType,
 } from 'src/store'
-import { normalizeUnicodeHex } from 'src/lib/project/unicode'
+import {
+  normalizeUnicodeHex,
+  unicodeHexToCharacter,
+} from 'src/lib/project/unicode'
 
 // Build a multi-master FontData from a parsed .glyphs / .glyphspackage document
 // (the OpenStep structure produced by parseOpenStep / readGlyphsPackageFromFiles).
@@ -521,11 +524,11 @@ const buildMetrics = (
 // --- assembly ---------------------------------------------------------------
 
 const firstUnicode = (value: unknown): string | null => {
-  // parseOpenStep coerces an unquoted all-digit hex code (e.g. `0041`) to a
-  // number, dropping leading zeros; reconstruct the 4+ digit hex string. Codes
-  // containing A–F stay strings, so only the numeric case needs padding.
+  // Glyphs 3 writes numeric unicode values as decimal code points
+  // (e.g. 65 for U+0041, 983046 for U+F0006). Quoted or A-F-containing
+  // values stay strings and are normalized as hex below.
   if (typeof value === 'number' && Number.isFinite(value)) {
-    return normalizeUnicodeHex(String(value))
+    return normalizeUnicodeHex(value)
   }
   const raw = asString(value)
   if (!raw) {
@@ -537,18 +540,7 @@ const firstUnicode = (value: unknown): string | null => {
 }
 
 const displayName = (unicode: string | null, glyphName: string): string => {
-  if (!unicode) {
-    return glyphName
-  }
-  const codePoint = Number.parseInt(unicode, 16)
-  if (!Number.isFinite(codePoint)) {
-    return glyphName
-  }
-  try {
-    return String.fromCodePoint(codePoint)
-  } catch {
-    return glyphName
-  }
+  return unicodeHexToCharacter(unicode) ?? glyphName
 }
 
 const buildLineMetrics = (

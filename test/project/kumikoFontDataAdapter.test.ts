@@ -206,6 +206,26 @@ describe('kumikoFontDataAdapter', () => {
     })
   })
 
+  it('sanitizes invalid unicode values when rebuilding runtime FontData', () => {
+    const project = fontDataToKumikoProjectRecord({
+      projectId: 'project-1',
+      title: 'Test',
+      fontData,
+      createdAt: 10,
+      updatedAt: 20,
+    })
+    const glyphs = fontDataToKumikoGlyphRecords({
+      projectId: 'project-1',
+      fontData,
+      updatedAt: 20,
+    })
+    glyphs[0].unicodes = ['0041', '983046', '110000']
+
+    const rebuilt = kumikoRecordsToFontData(project, glyphs)
+
+    expect(rebuilt.glyphs.A.unicodes).toEqual(['0041'])
+  })
+
   it('detects geometry-bearing keys inside sourceData', () => {
     expect(
       findGeometryBearingSourceDataKey({

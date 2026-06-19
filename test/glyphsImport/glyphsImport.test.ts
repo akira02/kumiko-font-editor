@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises'
 import { describe, expect, it } from 'vitest'
 import { parseOpenStep } from 'src/lib/fontFormats/openstepParser'
 import { buildFontDataFromGlyphsDocument } from 'src/lib/fontFormats/glyphsImport'
@@ -18,7 +19,7 @@ fontMaster = (
 glyphs = (
 {
 glyphname = A;
-unicode = 0041;
+unicode = 65;
 layers = (
 {
 layerId = "m01";
@@ -39,7 +40,7 @@ paths = (
 },
 {
 glyphname = Aacute;
-unicode = 00C1;
+unicode = 193;
 layers = (
 { layerId = "m01"; width = 500; components = ( { name = A; transform = "{1, 0, 0, 1, 50, 0}"; } ); },
 { layerId = "m02"; width = 600; components = ( { name = A; } ); }
@@ -60,7 +61,7 @@ fontMaster = (
 glyphs = (
 {
 glyphname = B;
-unicode = 0042;
+unicode = 66;
 layers = (
 { layerId = "M1"; width = 520; shapes = ( { closed = 1; nodes = ( (100,0,l), (400,0,l), (400,700,ls), (100,700,l) ); } ); },
 { layerId = "M2"; width = 620; shapes = ( { closed = 1; nodes = ( (120,0,l), (480,0,l), (480,700,l), (120,700,l) ); } ); }
@@ -160,6 +161,42 @@ describe('buildFontDataFromGlyphsDocument (Glyphs 3)', () => {
       smooth: true,
     })
     expect(m1?.metrics.width).toBe(520)
+  })
+
+  it('reads decimal high-plane private-use unicode values from a compact ChiakiTRFont fixture', async () => {
+    const text = await readFile(
+      new URL(
+        '../fixtures/glyphs/ChiakiTRFont-decimal-unicode.glyphs',
+        import.meta.url
+      ),
+      'utf8'
+    )
+    const privateUse = buildFontDataFromGlyphsDocument(parse(text))
+
+    expect(privateUse.glyphs.A.unicodes).toEqual(['0041'])
+    expect(privateUse.glyphs.F0006.unicodes).toEqual(['F0006'])
+    expect(privateUse.glyphs.F0006.name).toBe(String.fromCodePoint(0xf0006))
+  })
+
+  it('drops invalid unicode values instead of importing crashable code points', () => {
+    const invalid = buildFontDataFromGlyphsDocument(
+      parse(`{
+.formatVersion = 3;
+fontMaster = ( { id = "M1"; name = Regular; } );
+glyphs = (
+{
+glyphname = badUnicode;
+unicode = 9999999;
+layers = (
+{ layerId = "M1"; width = 500; shapes = ( { closed = 0; nodes = ( (0,0,l), (100,0,l) ); } ); }
+);
+}
+);
+}`)
+    )
+
+    expect(invalid.glyphs.badUnicode.unicodes).toEqual([])
+    expect(invalid.glyphs.badUnicode.name).toBe('badUnicode')
   })
 
   it('preserves quadratic q/qs node semantics', () => {

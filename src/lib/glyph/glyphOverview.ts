@@ -8,6 +8,10 @@ import {
 import { activeLayer, getGlyphLayer } from 'src/store/glyphLayer'
 import type { GlyphEditTimes } from 'src/lib/glyph/glyphEditTimes'
 import { getPrimaryGlyphUnicode } from 'src/lib/glyph/glyphUnicode'
+import {
+  unicodeHexToCharacter,
+  unicodeHexToCodePoint,
+} from 'src/lib/project/unicode'
 
 export type OverviewGroupBy = 'none' | 'script' | 'block'
 
@@ -77,16 +81,13 @@ const getCodePoint = (glyph: GlyphData) => {
     return null
   }
 
-  const parsed = Number.parseInt(primaryUnicode, 16)
-  return Number.isFinite(parsed) ? parsed : null
+  return unicodeHexToCodePoint(primaryUnicode)
 }
 
-const getGlyphSortKey = (glyph: GlyphData) =>
-  getPrimaryGlyphUnicode(glyph)
-    ? Number.parseInt(getPrimaryGlyphUnicode(glyph)!, 16)
-        .toString()
-        .padStart(8, '0')
-    : glyph.id
+const getGlyphSortKey = (glyph: GlyphData) => {
+  const codePoint = getCodePoint(glyph)
+  return codePoint === null ? glyph.id : codePoint.toString().padStart(8, '0')
+}
 
 const sortGlyphsByCodePoint = (glyphs: GlyphData[]) =>
   [...glyphs].sort((left, right) => {
@@ -131,8 +132,7 @@ export const getGlyphBlockLabel = (glyph: GlyphData) =>
   findRangeLabel(getCodePoint(glyph), BLOCK_RANGES)
 
 export const getGlyphDisplayCharacter = (glyph: GlyphData) => {
-  const codePoint = getCodePoint(glyph)
-  return codePoint === null ? null : String.fromCodePoint(codePoint)
+  return unicodeHexToCharacter(getPrimaryGlyphUnicode(glyph))
 }
 
 interface GlyphTypeDefinition {

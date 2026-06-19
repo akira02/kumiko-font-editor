@@ -1,0 +1,39 @@
+{
+.appVersion = "3134";
+.formatVersion = 3;
+familyName = ChiakiTRFont;
+fontMaster = (
+{
+id = "M1";
+name = Regular;
+}
+);
+glyphs = (
+{
+glyphname = A;
+unicode = 65;
+layers = (
+{
+layerId = "M1";
+width = 600;
+shapes = (
+{ closed = 0; nodes = ( (100,0,l), (500,0,l) ); }
+);
+}
+);
+},
+{
+glyphname = F0006;
+unicode = 983046;
+layers = (
+{
+layerId = "M1";
+width = 500;
+shapes = (
+{ closed = 0; nodes = ( (0,0,l), (100,0,l) ); }
+);
+}
+);
+}
+);
+}

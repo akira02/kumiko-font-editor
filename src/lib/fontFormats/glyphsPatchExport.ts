@@ -215,7 +215,7 @@ export const patchGlyphText = (
   const rawGlyph = rawGlyphText
     ? (parseOpenStep(rawGlyphText) as Record<string, unknown>)
     : {
-        glyphname: glyph.name,
+        glyphname: glyph.id,
         unicode: getPrimaryGlyphUnicode(glyph) ?? undefined,
         export: glyph.export === false ? 0 : 1,
         category: glyph.category ?? undefined,
@@ -229,7 +229,7 @@ export const patchGlyphText = (
   } as GlyphsDocument
 
   const glyphRecord = (doc.glyphs?.[0] ?? rawGlyph) as Record<string, unknown>
-  glyphRecord.glyphname = glyph.name
+  glyphRecord.glyphname = glyph.id
   if (!rawGlyphText) {
     glyphRecord.unicode = getPrimaryGlyphUnicode(glyph) ?? undefined
   }

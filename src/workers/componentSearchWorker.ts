@@ -2,6 +2,7 @@ import {
   canonicalizeComponent,
   getGlyphwikiVariantMap,
 } from 'src/lib/glyph/glyphwikiVariants'
+import { unicodeHexToCharacter } from 'src/lib/project/unicode'
 
 interface ProjectGlyphSummary {
   id: string
@@ -276,11 +277,9 @@ const getDataset = () => {
 }
 
 const getGlyphCharacter = (glyph: ProjectGlyphSummary) => {
-  if (glyph.unicode) {
-    const codePoint = Number.parseInt(glyph.unicode, 16)
-    if (Number.isFinite(codePoint)) {
-      return String.fromCodePoint(codePoint)
-    }
+  const character = unicodeHexToCharacter(glyph.unicode)
+  if (character) {
+    return character
   }
 
   return Array.from(glyph.name ?? '').length === 1 ? glyph.name : null

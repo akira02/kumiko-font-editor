@@ -1,4 +1,8 @@
 import { getPrimaryGlyphUnicode } from 'src/lib/glyph/glyphUnicode'
+import {
+  unicodeHexToCharacter,
+  unicodeHexToCodePoint,
+} from 'src/lib/project/unicode'
 
 /**
  * 漢字判定與字身框（body box）推導。這些是品質檢查各模組共用的
@@ -42,8 +46,7 @@ export const getGlyphCodePoint = (glyph: UnicodeBearer) => {
   if (!primaryUnicode) {
     return null
   }
-  const parsed = Number.parseInt(primaryUnicode, 16)
-  return Number.isFinite(parsed) ? parsed : null
+  return unicodeHexToCodePoint(primaryUnicode)
 }
 
 export const isHanGlyph = (glyph: UnicodeBearer) => {
@@ -56,11 +59,12 @@ export const getGlyphCharacter = (
   glyph: UnicodeBearer & { name?: string },
   fallback?: string
 ) => {
-  const codePoint = getGlyphCodePoint(glyph)
-  if (codePoint !== null) {
-    return String.fromCodePoint(codePoint)
-  }
-  return fallback ?? glyph.name ?? ''
+  return (
+    unicodeHexToCharacter(getPrimaryGlyphUnicode(glyph)) ??
+    fallback ??
+    glyph.name ??
+    ''
+  )
 }
 
 export const getStructureBodyBox = (

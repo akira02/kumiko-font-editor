@@ -22,7 +22,10 @@ import {
 import type { ProjectSourceFormat } from 'src/lib/project/projectFormats'
 import type { KumikoProjectSourceData } from 'src/lib/project/kumikoProjectTypes'
 import { hashString } from 'src/lib/hash'
-import { normalizeUnicodeHex } from 'src/lib/project/unicode'
+import {
+  normalizeUnicodeHex,
+  unicodeHexToCharacter,
+} from 'src/lib/project/unicode'
 import { parseUfoColor } from 'src/lib/color/kumikoColor'
 import { gitBlobShaFromText } from 'src/lib/github/sync/gitBlobSha'
 import {
@@ -449,17 +452,7 @@ const getProjectTitleFromFolder = (files: FileList | File[]) => {
 
 const getUnicodeDisplayName = (unicodes: string[], glyphName: string) => {
   const primary = unicodes[0]
-  if (!primary) {
-    return glyphName
-  }
-  try {
-    const codePoint = Number.parseInt(primary, 16)
-    return Number.isFinite(codePoint)
-      ? String.fromCodePoint(codePoint)
-      : glyphName
-  } catch {
-    return glyphName
-  }
+  return unicodeHexToCharacter(primary) ?? glyphName
 }
 
 const buildLineMetrics = (

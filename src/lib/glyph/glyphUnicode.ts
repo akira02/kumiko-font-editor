@@ -1,5 +1,8 @@
 import type { GlyphData } from 'src/store'
-import { normalizeUnicodeHex } from 'src/lib/project/unicode'
+import {
+  normalizeUnicodeHex,
+  unicodeHexToCharacter,
+} from 'src/lib/project/unicode'
 
 export const getGlyphUnicodes = (glyph: Pick<GlyphData, 'unicodes'>) =>
   (glyph.unicodes ?? [])
@@ -12,11 +15,4 @@ export const getPrimaryGlyphUnicode = (
 
 export const getGlyphUnicodeChar = (
   glyph: Pick<GlyphData, 'unicodes'> | undefined
-) => {
-  const unicode = getPrimaryGlyphUnicode(glyph)
-  if (!unicode) {
-    return null
-  }
-  const codePoint = Number.parseInt(unicode, 16)
-  return Number.isFinite(codePoint) ? String.fromCodePoint(codePoint) : null
-}
+) => unicodeHexToCharacter(getPrimaryGlyphUnicode(glyph))

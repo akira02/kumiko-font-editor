@@ -23,6 +23,10 @@ import { getComponentMatrix } from 'src/lib/components/componentTransform'
 
 const getGlyphUnicodes = (glyph: GlyphData) => {
   const values = glyph.unicodes ?? []
+  return normalizeUnicodeValues(values)
+}
+
+const normalizeUnicodeValues = (values: readonly string[]) => {
   const normalized = values
     .map((unicode) => normalizeUnicodeHex(unicode))
     .filter((unicode): unicode is string => Boolean(unicode))
@@ -405,7 +409,7 @@ export const kumikoGlyphRecordToGlyphData = (
     activeLayerId: record.layerOrder[0] ?? null,
     layerOrder: record.layerOrder,
     layers,
-    unicodes: record.unicodes,
+    unicodes: normalizeUnicodeValues(record.unicodes),
     production: record.production,
     export: record.export,
     category: record.category,
@@ -431,7 +435,7 @@ export const kumikoGlyphRecordToGlyphMetadata = (
   activeLayerId: null,
   layerOrder: record.layerOrder,
   componentGlyphIds: record.componentGlyphIds,
-  unicodes: record.unicodes,
+  unicodes: normalizeUnicodeValues(record.unicodes),
   production: record.production,
   export: record.export,
   category: record.category,
