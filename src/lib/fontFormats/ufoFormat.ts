@@ -22,10 +22,7 @@ import {
 import type { ProjectSourceFormat } from 'src/lib/project/projectFormats'
 import type { KumikoProjectSourceData } from 'src/lib/project/kumikoProjectTypes'
 import { hashString } from 'src/lib/hash'
-import {
-  normalizeUnicodeHex,
-  unicodeHexToCharacter,
-} from 'src/lib/project/unicode'
+import { normalizeUnicodeHex } from 'src/lib/project/unicode'
 import { parseUfoColor } from 'src/lib/color/kumikoColor'
 import { gitBlobShaFromText } from 'src/lib/github/sync/gitBlobSha'
 import {
@@ -450,11 +447,6 @@ const getProjectTitleFromFolder = (files: FileList | File[]) => {
   return normalizePath(path).split('/')[0] ?? 'Untitled'
 }
 
-const getUnicodeDisplayName = (unicodes: string[], glyphName: string) => {
-  const primary = unicodes[0]
-  return unicodeHexToCharacter(primary) ?? glyphName
-}
-
 const buildLineMetrics = (
   fontinfo: Record<string, unknown> | null | undefined
 ) => {
@@ -747,14 +739,13 @@ const buildFontDataFromUfoGlyphs = (
     glyphs: Object.fromEntries(
       glyphRecords.map((record) => {
         const glyphId = record.glyphName
-        const name = getUnicodeDisplayName(record.unicodes, record.glyphName)
         const layerId = metadata.layers[0]?.layerId ?? 'public.default'
 
         return [
           glyphId,
           {
             id: glyphId,
-            name,
+            name: glyphId,
             activeLayerId: layerId,
             layerOrder: [layerId],
             layers: {
@@ -1030,7 +1021,7 @@ export const buildMultiMasterFontData = (
 
     glyphs[glyphId] = {
       id: glyphId,
-      name: getUnicodeDisplayName(representative.unicodes, glyphId),
+      name: glyphId,
       activeLayerId,
       layerOrder,
       layers,

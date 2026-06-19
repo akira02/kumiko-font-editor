@@ -12,10 +12,7 @@ import type {
   PathNode,
   PathSegmentType,
 } from 'src/store'
-import {
-  normalizeUnicodeHex,
-  unicodeHexToCharacter,
-} from 'src/lib/project/unicode'
+import { normalizeUnicodeHex } from 'src/lib/project/unicode'
 
 // Build a multi-master FontData from a parsed .glyphs / .glyphspackage document
 // (the OpenStep structure produced by parseOpenStep / readGlyphsPackageFromFiles).
@@ -539,10 +536,6 @@ const firstUnicode = (value: unknown): string | null => {
   return normalizeUnicodeHex(first)
 }
 
-const displayName = (unicode: string | null, glyphName: string): string => {
-  return unicodeHexToCharacter(unicode) ?? glyphName
-}
-
 const buildLineMetrics = (
   master: Raw | undefined
 ): FontData['lineMetricsHorizontalLayout'] => {
@@ -719,7 +712,7 @@ export const buildFontDataFromGlyphsDocument = (
 
     glyphs[parsed.glyphName] = {
       id: parsed.glyphName,
-      name: displayName(parsed.unicode, parsed.glyphName),
+      name: parsed.glyphName,
       activeLayerId,
       layerOrder,
       layers,

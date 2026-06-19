@@ -301,7 +301,7 @@ export const importBinaryFontFile = async (file: File) => {
     glyphOrder.push(glyphId)
     glyphs[glyphId] = {
       id: glyphId,
-      name: glyph.name ?? glyphId,
+      name: glyphId,
       unicodes: unicode ? [unicode] : [],
       activeLayerId: 'public.default',
       layerOrder: ['public.default'],

@@ -8,6 +8,7 @@ import {
   type GlyphsDocument,
 } from 'src/lib/fontFormats/glyphsDocument'
 import { getGlyphLayer } from 'src/store/glyphLayer'
+import { getGlyphDisplayCharacter } from 'src/lib/glyph/glyphOverview'
 
 const G2 = `{
 familyName = "TestFamily";
@@ -174,8 +175,12 @@ describe('buildFontDataFromGlyphsDocument (Glyphs 3)', () => {
     const privateUse = buildFontDataFromGlyphsDocument(parse(text))
 
     expect(privateUse.glyphs.A.unicodes).toEqual(['0041'])
+    expect(privateUse.glyphs.A.name).toBe('A')
     expect(privateUse.glyphs.F0006.unicodes).toEqual(['F0006'])
-    expect(privateUse.glyphs.F0006.name).toBe(String.fromCodePoint(0xf0006))
+    expect(privateUse.glyphs.F0006.name).toBe('F0006')
+    expect(getGlyphDisplayCharacter(privateUse.glyphs.F0006)).toBe(
+      String.fromCodePoint(0xf0006)
+    )
   })
 
   it('drops invalid unicode values instead of importing crashable code points', () => {
