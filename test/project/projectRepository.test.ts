@@ -10,7 +10,9 @@ import {
 } from 'src/lib/project/projectRepository'
 import {
   findKumikoGlyphRecordsByUnicode,
+  listExportDirtyKumikoGlyphIds,
   listExportDirtyKumikoGlyphRecords,
+  listSyncDirtyKumikoGlyphIds,
   loadKumikoGlyphRecord,
   loadKumikoProjectRecord,
   makeKumikoGlyphKey,
@@ -86,6 +88,10 @@ describe('projectRepository canonical storage', () => {
     expect(projectRecord?.exportedDigest).toMatch(/^[0-9a-f]{8}$/)
     expect(projectRecord?.syncedDigest).toMatch(/^[0-9a-f]{8}$/)
     expect(dirtyGlyphs.map((glyph) => glyph.glyphId)).toEqual(['A'])
+    await expect(listExportDirtyKumikoGlyphIds('project-1')).resolves.toEqual([
+      'A',
+    ])
+    await expect(listSyncDirtyKumikoGlyphIds('project-1')).resolves.toEqual([])
     expect(unicodeGlyphs.map((glyph) => glyph.glyphId)).toEqual(['A'])
     expect(shortUnicodeGlyphs.map((glyph) => glyph.glyphId)).toEqual(['A'])
     expect(dirtyGlyphs[0]?.exportedDigest).toBeNull()
@@ -553,6 +559,9 @@ describe('projectRepository canonical storage', () => {
       projectSourceData: null,
       projectSourceFormat: 'ufo',
     })
+    const originalGlyph = await loadKumikoGlyphRecord(
+      makeKumikoGlyphKey('project-metadata-autosave', 'A')
+    )
 
     const metadataDraft = await loadProjectDraftMetadata(
       'project-metadata-autosave'
@@ -586,6 +595,8 @@ describe('projectRepository canonical storage', () => {
     expect(glyph?.layers['public.default']?.metrics.width).toBe(500)
     expect(glyph?.exportDirty).toBe(1)
     expect(glyph?.syncDirty).toBe(1)
+    expect(glyph?.exportedDigest).toBe(originalGlyph?.exportedDigest)
+    expect(glyph?.syncedDigest).toBe(originalGlyph?.syncedDigest)
   })
 
   it('patches glyph metadata without replacing canonical geometry', async () => {
@@ -677,6 +688,60 @@ describe('projectRepository canonical storage', () => {
     expect(glyph?.exportDirty).toBe(1)
     expect(glyph?.syncDirty).toBe(1)
     expect(unicodeGlyphs.map((record) => record.glyphId)).toEqual(['B'])
+  })
+
+  it('updates metadata patch baselines only when marking a glyph clean', async () => {
+    await saveProjectDraft({
+      id: 'project-metadata-digest',
+      title: 'Metadata Digest',
+      lastModified: 20,
+      createdAt: 10,
+      updatedAt: 20,
+      sourceName: 'MetadataDigest.ufo',
+      sourceType: 'local',
+      fontData,
+      projectMetadata: null,
+      projectSourceData: null,
+      projectSourceFormat: 'ufo',
+    })
+
+    const original = await loadKumikoGlyphRecord(
+      makeKumikoGlyphKey('project-metadata-digest', 'A')
+    )
+    await patchKumikoGlyphMetadata({
+      projectId: 'project-metadata-digest',
+      glyphId: 'A',
+      patch: { note: 'dirty metadata' },
+      updatedAt: 40,
+      exportDirty: true,
+      syncDirty: true,
+    })
+    const dirty = await loadKumikoGlyphRecord(
+      makeKumikoGlyphKey('project-metadata-digest', 'A')
+    )
+
+    expect(dirty?.exportDirty).toBe(1)
+    expect(dirty?.syncDirty).toBe(1)
+    expect(dirty?.exportedDigest).toBe(original?.exportedDigest)
+    expect(dirty?.syncedDigest).toBe(original?.syncedDigest)
+
+    await patchKumikoGlyphMetadata({
+      projectId: 'project-metadata-digest',
+      glyphId: 'A',
+      patch: {},
+      updatedAt: 50,
+      exportDirty: false,
+      syncDirty: false,
+    })
+    const clean = await loadKumikoGlyphRecord(
+      makeKumikoGlyphKey('project-metadata-digest', 'A')
+    )
+
+    expect(clean?.exportDirty).toBe(0)
+    expect(clean?.syncDirty).toBe(0)
+    expect(clean?.exportedDigest).toMatch(/^[0-9a-f]{8}$/)
+    expect(clean?.syncedDigest).toBe(clean?.exportedDigest)
+    expect(clean?.exportedDigest).not.toBe(original?.exportedDigest)
   })
 
   it('rejects geometry-bearing sourceData in metadata patches', async () => {

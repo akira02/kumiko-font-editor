@@ -57,6 +57,11 @@ export type KumikoGlyphMetadataPatch = Partial<
   >
 >
 
+export type KumikoGlyphSyncMetadata = Pick<
+  KumikoGlyphRecord,
+  'projectId' | 'glyphId' | 'sourceData' | 'syncDirty'
+>
+
 const normalizeGlyphRecordUnicodes = (
   unicodes: KumikoGlyphRecord['unicodes']
 ) => {
@@ -289,8 +294,8 @@ export const patchKumikoGlyphMetadata = async (input: {
   const digest = createKumikoGlyphDigest(nextRecord)
   const persistedRecord: KumikoGlyphRecord = {
     ...nextRecord,
-    exportedDigest: nextRecord.exportDirty ? null : digest,
-    syncedDigest: nextRecord.syncDirty ? null : digest,
+    exportedDigest: nextRecord.exportDirty ? record.exportedDigest : digest,
+    syncedDigest: nextRecord.syncDirty ? record.syncedDigest : digest,
   }
 
   store.put(persistedRecord)
@@ -311,6 +316,36 @@ export const listLiveKumikoGlyphRecordsForProject = async (
   projectId: string
 ) => {
   return listKumikoGlyphRecordsForProject(projectId)
+}
+
+export const listKumikoGlyphSyncMetadataForProject = async (
+  projectId: string
+) => {
+  const database = await openDatabase()
+  const transaction = database.transaction(KUMIKO_GLYPHS_STORE, 'readonly')
+  const index = transaction.objectStore(KUMIKO_GLYPHS_STORE).index('byProject')
+  const records: KumikoGlyphSyncMetadata[] = []
+  await new Promise<void>((resolve, reject) => {
+    const request = index.openCursor(projectId)
+    request.onsuccess = () => {
+      const cursor = request.result
+      if (!cursor) {
+        resolve()
+        return
+      }
+      const record = cursor.value as KumikoGlyphRecord
+      records.push({
+        projectId: record.projectId,
+        glyphId: record.glyphId,
+        sourceData: record.sourceData,
+        syncDirty: record.syncDirty,
+      })
+      cursor.continue()
+    }
+    request.onerror = () => reject(request.error)
+  })
+  await transactionDone(transaction)
+  return records
 }
 
 export const findKumikoGlyphRecordsByUnicode = async (
@@ -382,6 +417,40 @@ export const listSyncDirtyKumikoGlyphRecords = async (projectId: string) => {
   >
 }
 
+const listDirtyKumikoGlyphIds = async (
+  projectId: string,
+  indexName: 'byProjectExportDirty' | 'byProjectSyncDirty'
+) => {
+  const database = await openDatabase()
+  const transaction = database.transaction(KUMIKO_GLYPHS_STORE, 'readonly')
+  const index = transaction.objectStore(KUMIKO_GLYPHS_STORE).index(indexName)
+  const glyphIds: string[] = []
+  await new Promise<void>((resolve, reject) => {
+    const request = index.openKeyCursor(IDBKeyRange.only([projectId, 1]))
+    request.onsuccess = () => {
+      const cursor = request.result
+      if (!cursor) {
+        resolve()
+        return
+      }
+      const primaryKey = cursor.primaryKey
+      if (Array.isArray(primaryKey) && typeof primaryKey[1] === 'string') {
+        glyphIds.push(primaryKey[1])
+      }
+      cursor.continue()
+    }
+    request.onerror = () => reject(request.error)
+  })
+  await transactionDone(transaction)
+  return glyphIds
+}
+
+export const listExportDirtyKumikoGlyphIds = async (projectId: string) =>
+  listDirtyKumikoGlyphIds(projectId, 'byProjectExportDirty')
+
+export const listSyncDirtyKumikoGlyphIds = async (projectId: string) =>
+  listDirtyKumikoGlyphIds(projectId, 'byProjectSyncDirty')
+
 export const updateKumikoGlyphExportDirtyState = async (
   keys: KumikoGlyphPrimaryKey[],
   exportDirty: boolean | 0 | 1
@@ -403,10 +472,16 @@ export const updateKumikoGlyphExportDirtyState = async (
     if (!record) {
       continue
     }
-    store.put({
+    const nextRecord: KumikoGlyphRecord = {
       ...record,
       exportDirty: exportDirtyValue,
       updatedAt: timestamp,
+    }
+    store.put({
+      ...nextRecord,
+      exportedDigest: exportDirtyValue
+        ? record.exportedDigest
+        : createKumikoGlyphDigest(nextRecord),
     })
   }
 
@@ -434,10 +509,16 @@ export const updateKumikoGlyphSyncDirtyState = async (
     if (!record) {
       continue
     }
-    store.put({
+    const nextRecord: KumikoGlyphRecord = {
       ...record,
       syncDirty: syncDirtyValue,
       updatedAt: timestamp,
+    }
+    store.put({
+      ...nextRecord,
+      syncedDigest: syncDirtyValue
+        ? record.syncedDigest
+        : createKumikoGlyphDigest(nextRecord),
     })
   }
 

@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { Window } from 'happy-dom'
 import {
   applyKumikoRemoteSnapshot,
+  buildKumikoProjectSyncReport,
   buildKumikoUfoExportState,
   markKumikoGitHubCommitSynced,
   markKumikoUfoExportClean,
@@ -58,6 +59,17 @@ vi.mock('src/lib/github/githubImport', () => ({
   })),
 }))
 
+vi.mock('src/lib/github/sync/remoteTree', () => ({
+  fetchRemoteTree: vi.fn(async () => ({
+    commitSha: 'remote-head',
+    truncated: false,
+    blobShaByPath: new Map([
+      ['Kumiko.ufo/glyphs/A.glif', 'old-sha'],
+      ['Kumiko.ufo/glyphs/B.glif', 'old-b-sha'],
+    ]),
+  })),
+}))
+
 const sourceData = {
   ufo: {
     designspace: null,
@@ -84,6 +96,17 @@ const sourceData = {
         kerningExtra: {},
       },
     ],
+  },
+} satisfies Parameters<typeof saveProjectDraft>[0]['projectSourceData']
+
+const sourceDataWithDeletedB = {
+  ufo: {
+    ...sourceData.ufo,
+    ufos: sourceData.ufo.ufos.map((ufo) => ({
+      ...ufo,
+      contents: { A: 'A.glif', B: 'B.glif' },
+      glyphOrder: ['A', 'B'],
+    })),
   },
 } satisfies Parameters<typeof saveProjectDraft>[0]['projectSourceData']
 
@@ -174,6 +197,45 @@ describe('Kumiko GitHub UFO sync', () => {
       'Kumiko.ufo/glyphs/contents.plist',
     ])
     expect(prepared.changedGlyphNames).toEqual(['A'])
+  })
+
+  it('builds sync reports from lightweight canonical metadata', async () => {
+    await saveProjectDraft({
+      id: 'github-sync-report',
+      title: 'Kumiko',
+      lastModified: 2,
+      createdAt: 1,
+      updatedAt: 2,
+      sourceName: 'Kumiko.ufo',
+      sourceType: 'github',
+      githubSource: {
+        owner: 'owner',
+        repo: 'repo',
+        ref: 'main',
+        defaultBranch: 'main',
+        commitSha: 'base',
+      },
+      fontData: makeFontData(),
+      projectMetadata: null,
+      projectSourceData: sourceDataWithDeletedB,
+      projectSourceFormat: 'ufo',
+      projectRoundTripFormat: 'ufo',
+      projectGlyphsPackage: null,
+      syncDirtyGlyphIds: ['A'],
+    })
+
+    const report = await buildKumikoProjectSyncReport({
+      projectId: 'github-sync-report',
+      activeUfoId: 'Kumiko.ufo',
+    })
+
+    expect(report?.localChanges.map((entry) => entry.status).sort()).toEqual([
+      'localDeleted',
+      'localModified',
+    ])
+    expect(report?.localChanges.map((entry) => entry.glyphName).sort()).toEqual(
+      ['A', 'B']
+    )
   })
 
   it('applies remote GLIF updates to canonical glyph records', async () => {

@@ -6,10 +6,10 @@ import {
   type SyncConflictResolution,
 } from 'src/lib/github/sync'
 import {
-  listSyncDirtyKumikoGlyphRecords,
+  listSyncDirtyKumikoGlyphIds,
   loadKumikoUiValue,
 } from 'src/lib/project/kumikoProjectPersistence'
-import { loadProjectDraft } from 'src/lib/project/projectRepository'
+import { loadProjectDraftMetadata } from 'src/lib/project/projectRepository'
 import {
   sanitizeGlyphEditTimes,
   UFO_GLYPH_EDIT_TIMES_KEY,
@@ -53,7 +53,7 @@ export const useGitHubSyncStatus = (input: {
   })
 
   const reloadProjectFromPersistence = async (projectId: string) => {
-    const loadedProject = await loadProjectDraft(projectId)
+    const loadedProject = await loadProjectDraftMetadata(projectId)
     if (!loadedProject) {
       return
     }
@@ -65,17 +65,14 @@ export const useGitHubSyncStatus = (input: {
       loadedProject.fontData!,
       loadedProject.projectMetadata,
       sourceFormat,
-      roundTripFormat
+      roundTripFormat,
+      loadedProject.projectUiState
     )
-    const dirtyGlyphs = await listSyncDirtyKumikoGlyphRecords(projectId)
+    const dirtyGlyphIds = await listSyncDirtyKumikoGlyphIds(projectId)
     const glyphEditTimes = sanitizeGlyphEditTimes(
       await loadKumikoUiValue(projectId, UFO_GLYPH_EDIT_TIMES_KEY)
     )
-    hydratePersistedLocalChanges(
-      dirtyGlyphs.map((glyph) => glyph.glyphId),
-      [],
-      glyphEditTimes
-    )
+    hydratePersistedLocalChanges(dirtyGlyphIds, [], glyphEditTimes)
   }
 
   const applyMutation = useMutation({

@@ -4,7 +4,7 @@ import {
   UFO_GLYPH_EDIT_TIMES_KEY,
 } from 'src/lib/glyph/glyphEditTimes'
 import {
-  listExportDirtyKumikoGlyphRecords,
+  listExportDirtyKumikoGlyphIds,
   loadKumikoUiValue,
 } from 'src/lib/project/kumikoProjectPersistence'
 import { useStore } from 'src/store'
@@ -30,15 +30,11 @@ export function useHomeProjects() {
 
   const restorePersistedUfoChanges = useCallback(
     async (projectId: string) => {
-      const dirtyGlyphs = await listExportDirtyKumikoGlyphRecords(projectId)
+      const dirtyGlyphIds = await listExportDirtyKumikoGlyphIds(projectId)
       const glyphEditTimes = sanitizeGlyphEditTimes(
         await loadKumikoUiValue(projectId, UFO_GLYPH_EDIT_TIMES_KEY)
       )
-      hydratePersistedLocalChanges(
-        dirtyGlyphs.map((glyph) => glyph.glyphId),
-        [],
-        glyphEditTimes
-      )
+      hydratePersistedLocalChanges(dirtyGlyphIds, [], glyphEditTimes)
     },
     [hydratePersistedLocalChanges]
   )

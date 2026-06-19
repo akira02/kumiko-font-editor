@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import {
-  listSyncDirtyKumikoGlyphRecords,
+  listSyncDirtyKumikoGlyphIds,
   loadKumikoProjectRecord,
 } from 'src/lib/project/kumikoProjectPersistence'
 
@@ -23,7 +23,7 @@ export const useProjectSyncDirtyStatus = (input: {
       }
       const [project, dirtyGlyphs] = await Promise.all([
         loadKumikoProjectRecord(input.projectId),
-        listSyncDirtyKumikoGlyphRecords(input.projectId),
+        listSyncDirtyKumikoGlyphIds(input.projectId),
       ])
       return Boolean(project?.syncDirty === 1 || dirtyGlyphs.length > 0)
     },

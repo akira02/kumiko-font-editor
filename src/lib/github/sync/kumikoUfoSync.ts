@@ -15,9 +15,11 @@ import type {
 } from 'src/lib/github/sync/types'
 import {
   deleteKumikoGlyphRecordBatch,
+  listKumikoGlyphSyncMetadataForProject,
   listKumikoGlyphRecordsForProject,
-  listSyncDirtyKumikoGlyphRecords,
+  listSyncDirtyKumikoGlyphIds,
   loadKumikoProjectRecord,
+  loadKumikoGlyphRecords,
   makeKumikoGlyphKey,
   saveKumikoGlyphRecordBatch,
   saveKumikoProjectRecord,
@@ -135,7 +137,7 @@ export const resolveKumikoSyncTarget = (
   }
 }
 
-const readGlyphUfoSource = (glyph: KumikoGlyphRecord) =>
+const readGlyphUfoSource = (glyph: Pick<KumikoGlyphRecord, 'sourceData'>) =>
   glyph.sourceData?.ufo ?? {}
 
 const readLayerUfoSource = (layer: KumikoGlyphLayerRecord | undefined) =>
@@ -148,7 +150,7 @@ const selectLayerForUfo = (glyph: KumikoGlyphRecord, defaultLayerId: string) =>
 
 const makeContents = (
   project: KumikoProjectRecord,
-  glyphs: KumikoGlyphRecord[],
+  glyphs: Array<Pick<KumikoGlyphRecord, 'glyphId' | 'sourceData'>>,
   activeUfoId: string
 ) => {
   const { source } = getUfoSource(project, activeUfoId)
@@ -352,7 +354,7 @@ const ufoGlyphToGlyphData = (input: {
 
 const toSyncGlyphRecord = (input: {
   project: KumikoProjectRecord
-  glyph: KumikoGlyphRecord
+  glyph: Pick<KumikoGlyphRecord, 'glyphId' | 'sourceData' | 'syncDirty'>
   activeUfoId: string
   fileName: string
 }): SyncGlyphRecord => {
@@ -442,23 +444,25 @@ export const prepareKumikoGitHubCommit = async (input: {
     throw new Error('目前專案不是從 GitHub 載入，無法提交到 GitHub')
   }
 
-  const allGlyphs = await listKumikoGlyphRecordsForProject(input.projectId)
+  const glyphMetadata = await listKumikoGlyphSyncMetadataForProject(
+    input.projectId
+  )
   const dirtyGlyphIds = new Set(
-    (await listSyncDirtyKumikoGlyphRecords(input.projectId)).map(
-      (glyph) => glyph.glyphId
+    await listSyncDirtyKumikoGlyphIds(input.projectId)
+  )
+  const dirtyGlyphs = await loadKumikoGlyphRecords(
+    [...dirtyGlyphIds].map((glyphId) =>
+      makeKumikoGlyphKey(input.projectId, glyphId)
     )
   )
-  const contents = makeContents(project, allGlyphs, input.activeUfoId)
+  const contents = makeContents(project, glyphMetadata, input.activeUfoId)
   const metadata = buildMetadata(project, input.activeUfoId, contents)
   const { source, defaultLayer } = getUfoSource(project, input.activeUfoId)
-  const liveGlyphIds = new Set(allGlyphs.map((glyph) => glyph.glyphId))
+  const liveGlyphIds = new Set(glyphMetadata.map((glyph) => glyph.glyphId))
   const files: GitHubCommitFileInput[] = []
   const exportStateUpdates: GitHubPreparedCommit['exportStateUpdates'] = []
 
-  for (const glyph of allGlyphs) {
-    if (!dirtyGlyphIds.has(glyph.glyphId)) {
-      continue
-    }
+  for (const glyph of dirtyGlyphs) {
     const fileName = contents[glyph.glyphId]
     if (!fileName) {
       continue
@@ -543,7 +547,7 @@ export const markKumikoGitHubCommitSynced = async (
   }
   const [project, glyphs] = await Promise.all([
     loadKumikoProjectRecord(projectId),
-    listKumikoGlyphRecordsForProject(projectId),
+    listKumikoGlyphSyncMetadataForProject(projectId),
   ])
   if (!project) {
     return
@@ -564,8 +568,11 @@ export const markKumikoGitHubCommitSynced = async (
     ])
   )
   const timestamp = Date.now()
+  const updatedGlyphs = await loadKumikoGlyphRecords(
+    updates.map((update) => makeKumikoGlyphKey(projectId, update.glyphId))
+  )
   await saveKumikoGlyphRecordBatch(
-    glyphs.map((glyph) => {
+    updatedGlyphs.map((glyph) => {
       const update = updateByGlyphId.get(glyph.glyphId)
       if (!update) {
         return glyph
@@ -630,7 +637,9 @@ export const markKumikoUfoExportClean = async (
   }
   const [project, glyphs] = await Promise.all([
     loadKumikoProjectRecord(projectId),
-    listKumikoGlyphRecordsForProject(projectId),
+    loadKumikoGlyphRecords(
+      updates.map((update) => makeKumikoGlyphKey(projectId, update.glyphId))
+    ),
   ])
   if (!project) {
     return
@@ -682,7 +691,7 @@ export const buildKumikoProjectSyncReport = async (input: {
     return null
   }
 
-  const glyphs = await listKumikoGlyphRecordsForProject(input.projectId)
+  const glyphs = await listKumikoGlyphSyncMetadataForProject(input.projectId)
   const contents = makeContents(project, glyphs, input.activeUfoId)
   const { source, defaultLayer } = getUfoSource(project, input.activeUfoId)
   const remote = await fetchRemoteTree({
@@ -737,7 +746,18 @@ export const applyKumikoRemoteSnapshot = async (input: {
   const parsedUfos = buildWorkspaceFileMapFromEntries(snapshot.ufoEntries)
   const remoteUfo =
     parsedUfos.find((ufo) => ufo.relativePath === source.relativePath) ?? null
-  const existingGlyphs = await listKumikoGlyphRecordsForProject(input.projectId)
+  const affectedGlyphIds = [
+    ...new Set(
+      input.report.entries
+        .map((entry) => entry.glyphName)
+        .filter((glyphName): glyphName is string => Boolean(glyphName))
+    ),
+  ]
+  const existingGlyphs = await loadKumikoGlyphRecords(
+    affectedGlyphIds.map((glyphId) =>
+      makeKumikoGlyphKey(input.projectId, glyphId)
+    )
+  )
   const existingById = new Map(
     existingGlyphs.map((glyph) => [glyph.glyphId, glyph])
   )
