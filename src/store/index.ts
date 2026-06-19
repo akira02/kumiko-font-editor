@@ -67,6 +67,7 @@ export type {
   PathNode,
   PathNodeKind,
   PathSegmentType,
+  PersistenceStatus,
   SelectedNodeRef,
   SelectedSegmentState,
   ViewportState,

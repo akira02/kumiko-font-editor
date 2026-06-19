@@ -20,6 +20,7 @@ import {
 } from 'src/lib/project/projectArchive'
 import { serializeGlyphsFileToBlob } from 'src/lib/fontFormats/glyphsExport'
 import { createGlyphsPackageDataFromFontData } from 'src/lib/fontFormats/glyphsPackage'
+import { flushPendingDraft } from 'src/lib/project/flushPendingDraft'
 import { loadProjectDraft } from 'src/lib/project/projectRepository'
 import { useStore } from 'src/store'
 import type { FontExportFormat } from 'src/features/common/fontExport/ExportFontModal'
@@ -62,7 +63,12 @@ export function useFontExport() {
   const projectId = useStore((state) => state.projectId)
   const projectTitle = useStore((state) => state.projectTitle)
   const selectedLayerId = useStore((state) => state.selectedLayerId)
+  const dirtyGlyphIds = useStore((state) => state.dirtyGlyphIds)
+  const deletedGlyphIds = useStore((state) => state.deletedGlyphIds)
+  const glyphEditTimes = useStore((state) => state.glyphEditTimes)
+  const markDraftSaved = useStore((state) => state.markDraftSaved)
   const markLocalSaved = useStore((state) => state.markLocalSaved)
+  const setPersistenceStatus = useStore((state) => state.setPersistenceStatus)
   const compilerRuntimeStatus = createCompilerRuntimeStatus()
   const openTypeExportWarnings = fontData?.openTypeFeatures
     ? deriveOpenTypeExportWarnings(fontData.openTypeFeatures, {
@@ -100,6 +106,18 @@ export function useFontExport() {
 
     try {
       setIsExporting(true)
+      await flushPendingDraft({
+        projectId,
+        projectTitle: projectTitle || projectId,
+        fontData,
+        dirtyGlyphIds,
+        deletedGlyphIds,
+        glyphEditTimes,
+        selectedLayerId,
+        setPersistenceStatus,
+        markDraftSaved,
+      })
+
       const selectedBinaryFormats = selectedFormats.filter(
         (format) =>
           format !== 'zip' &&

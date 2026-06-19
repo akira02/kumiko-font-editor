@@ -2,6 +2,7 @@ import { useCallback, useMemo, useRef, useState, type MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '@chakra-ui/react'
 import { useStore, type GlyphData } from 'src/store'
+import { useFlushCurrentDraft } from 'src/features/common/projectPersistence/useFlushCurrentDraft'
 
 interface UseOverviewSelectionOptions {
   activeGlyphs: GlyphData[]
@@ -16,6 +17,7 @@ export function useOverviewSelection({
   const toast = useToast()
   const setSelectedGlyphId = useStore((state) => state.setSelectedGlyphId)
   const deleteGlyph = useStore((state) => state.deleteGlyph)
+  const flushCurrentDraft = useFlushCurrentDraft()
   const selectionAnchorGlyphIdRef = useRef<string | null>(selectedGlyphId)
   const [overviewSelectedGlyphIds, setOverviewSelectedGlyphIds] = useState<
     string[]
@@ -132,26 +134,45 @@ export function useOverviewSelection({
     ]
   )
 
-  const handleDeleteSelectedGlyphs = useCallback(() => {
+  const handleDeleteSelectedGlyphs = useCallback(async () => {
     if (selectedGlyphIdList.length === 0) {
       return
     }
 
-    for (const glyphId of selectedGlyphIdList) {
-      deleteGlyph(glyphId)
+    try {
+      for (const glyphId of selectedGlyphIdList) {
+        deleteGlyph(glyphId)
+      }
+      await flushCurrentDraft()
+      selectGlyphs([], null)
+      selectionAnchorGlyphIdRef.current = null
+      toast({
+        title: t('fontOverview.selection.deletedToastTitle'),
+        description: t('fontOverview.selection.deletedToastDescription', {
+          count: selectedGlyphIdList.length,
+        }),
+        status: 'success',
+        duration: 2200,
+        isClosable: true,
+      })
+    } catch (error) {
+      toast({
+        title: '刪除後儲存失敗',
+        description: '字符已從目前工作階段移除，但尚未寫入本機專案。',
+        status: 'error',
+        duration: 3600,
+        isClosable: true,
+      })
+      console.warn('Flush after glyph selection deletion failed.', error)
     }
-    selectGlyphs([], null)
-    selectionAnchorGlyphIdRef.current = null
-    toast({
-      title: t('fontOverview.selection.deletedToastTitle'),
-      description: t('fontOverview.selection.deletedToastDescription', {
-        count: selectedGlyphIdList.length,
-      }),
-      status: 'success',
-      duration: 2200,
-      isClosable: true,
-    })
-  }, [deleteGlyph, selectGlyphs, selectedGlyphIdList, t, toast])
+  }, [
+    deleteGlyph,
+    flushCurrentDraft,
+    selectGlyphs,
+    selectedGlyphIdList,
+    t,
+    toast,
+  ])
 
   return {
     handleDeleteSelectedGlyphs,

@@ -141,7 +141,7 @@ export interface GlyphLayerData {
   guidelines: GlyphGuideline[]
   metrics: GlyphMetrics
   verticalMetrics?: GlyphVerticalMetrics
-  color?: KumikoColor | string | number | null
+  color?: KumikoColor | null
   visible?: boolean
   locked?: boolean
   background?: GlyphLayerContent | null
@@ -173,7 +173,7 @@ export interface GlyphData {
   status?: number | null
   production?: string | null
   note?: string | null
-  color?: KumikoColor | string | number | null
+  color?: KumikoColor | null
   leftMetricsKey?: string | null
   rightMetricsKey?: string | null
   widthMetricsKey?: string | null

@@ -1,6 +1,6 @@
 import { useToast } from '@chakra-ui/react'
 import { useMemo } from 'react'
-import { saveDraftSnapshot } from 'src/lib/project/draftSave'
+import { flushPendingDraft } from 'src/lib/project/flushPendingDraft'
 import { getProjectArchiveMetadata } from 'src/lib/project/projectArchive'
 import { listGlyphLayers } from 'src/store/glyphLayerOps'
 import {
@@ -12,6 +12,8 @@ import {
 } from 'src/store'
 import type { PathBooleanOperation } from 'src/lib/pathBooleanOperations'
 import { useGitHubCommitFlow } from 'src/features/common/glyphInspector/hooks/useGitHubCommitFlow'
+import { useProjectSyncDirtyStatus } from 'src/features/common/glyphInspector/hooks/useProjectSyncDirtyStatus'
+import { useFlushCurrentDraft } from 'src/features/common/projectPersistence/useFlushCurrentDraft'
 import { buildQualityReport } from 'src/features/common/qualityCheck/utils/qualityLint'
 import {
   parseNumberInput,
@@ -32,6 +34,7 @@ export function useRightPanelModel() {
   const dirtyGlyphIds = useStore((state) => state.dirtyGlyphIds)
   const deletedGlyphIds = useStore((state) => state.deletedGlyphIds)
   const glyphEditTimes = useStore((state) => state.glyphEditTimes)
+  const setPersistenceStatus = useStore((state) => state.setPersistenceStatus)
   const hasLocalChanges = useStore((state) => state.hasLocalChanges)
   const localDirtyGlyphIds = useStore((state) => state.localDirtyGlyphIds)
   const localDeletedGlyphIds = useStore((state) => state.localDeletedGlyphIds)
@@ -51,6 +54,7 @@ export function useRightPanelModel() {
   const setWorkspaceView = useStore((state) => state.setWorkspaceView)
   const markDraftSaved = useStore((state) => state.markDraftSaved)
   const deleteGlyph = useStore((state) => state.deleteGlyph)
+  const flushCurrentDraft = useFlushCurrentDraft()
   const selectedProjectMetadata = getProjectArchiveMetadata() as {
     activeUfoId?: string | null
     githubSource?: {
@@ -65,11 +69,18 @@ export function useRightPanelModel() {
     selectedProjectMetadata?.githubSource?.repo
       ? `${selectedProjectMetadata.githubSource.owner}/${selectedProjectMetadata.githubSource.repo}`
       : null
+  const persistedSyncDirtyQuery = useProjectSyncDirtyStatus({
+    projectId,
+    enabled: hasGitHubSource,
+  })
+  const hasRuntimeGitHubChanges =
+    localDirtyGlyphIds.length > 0 || localDeletedGlyphIds.length > 0
+  const hasPersistedGitHubChanges = persistedSyncDirtyQuery.data ?? false
   const canCommitToGitHub = Boolean(
     projectId &&
     projectTitle &&
     hasGitHubSource &&
-    (localDirtyGlyphIds.length > 0 || localDeletedGlyphIds.length > 0)
+    (hasRuntimeGitHubChanges || hasPersistedGitHubChanges)
   )
   const commitQualityReport = useMemo(
     () =>
@@ -196,19 +207,32 @@ export function useRightPanelModel() {
     applyPathBooleanOperation(glyph.id, pathIds, operation)
   }
 
-  const handleDeleteGlyph = () => {
+  const handleDeleteGlyph = async () => {
     if (!glyph) {
       return
     }
 
-    deleteGlyph(glyph.id)
-    toast({
-      title: '已刪除字符',
-      description: `${glyph.id} 已從目前專案移除。`,
-      status: 'success',
-      duration: 2200,
-      isClosable: true,
-    })
+    const glyphId = glyph.id
+    try {
+      deleteGlyph(glyphId)
+      await flushCurrentDraft()
+      toast({
+        title: '已刪除字符',
+        description: `${glyphId} 已從目前專案移除。`,
+        status: 'success',
+        duration: 2200,
+        isClosable: true,
+      })
+    } catch (error) {
+      toast({
+        title: '刪除後儲存失敗',
+        description: '字符已從目前工作階段移除，但尚未寫入本機專案。',
+        status: 'error',
+        duration: 3600,
+        isClosable: true,
+      })
+      console.warn('Flush after glyph deletion failed.', error)
+    }
   }
 
   const handleSaveProject = async () => {
@@ -217,7 +241,7 @@ export function useRightPanelModel() {
     }
 
     try {
-      await saveDraftSnapshot({
+      await flushPendingDraft({
         projectId,
         projectTitle,
         fontData,
@@ -225,8 +249,9 @@ export function useRightPanelModel() {
         deletedGlyphIds,
         glyphEditTimes,
         selectedLayerId,
+        setPersistenceStatus,
+        markDraftSaved,
       })
-      markDraftSaved(dirtyGlyphIds, deletedGlyphIds)
       toast({
         title: '已儲存',
         description: '目前變更已寫入本機專案。',

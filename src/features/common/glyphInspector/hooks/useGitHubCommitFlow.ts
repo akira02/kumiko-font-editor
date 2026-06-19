@@ -22,7 +22,7 @@ import {
   markGitHubCommitSynced,
   prepareGitHubCommit,
 } from 'src/lib/github/githubPr'
-import { saveDraftSnapshot } from 'src/lib/project/draftSave'
+import { flushPendingDraft } from 'src/lib/project/flushPendingDraft'
 import { useStore, type FontData } from 'src/store'
 import type { GlyphEditTimes } from 'src/lib/glyph/glyphEditTimes'
 import {
@@ -35,6 +35,7 @@ import {
 } from 'src/features/common/glyphInspector/utils/githubCommitFlowUtils'
 import type { GitHubCommitModalProps } from 'src/features/common/glyphInspector/components/GitHubCommitModal'
 import { useGitHubSyncStatus } from 'src/features/common/glyphInspector/hooks/useGitHubSyncStatus'
+import { projectSyncDirtyStatusQueryKey } from 'src/features/common/glyphInspector/hooks/useProjectSyncDirtyStatus'
 import { useTranslation } from 'react-i18next'
 
 interface UseGitHubCommitFlowInput {
@@ -49,7 +50,7 @@ interface UseGitHubCommitFlowInput {
   localDirtyGlyphIds: string[]
   localDeletedGlyphIds: string[]
   glyphEditTimes: GlyphEditTimes
-  markDraftSaved: () => void
+  markDraftSaved: (savedDirtyIds?: string[], savedDeletedIds?: string[]) => void
 }
 
 interface ScopedForkStatusOverride {
@@ -274,7 +275,7 @@ export const useGitHubCommitFlow = ({
   const handleOpenGitHubModal = async () => {
     gitHubModal.onOpen()
 
-    if (!projectId || !projectTitle) {
+    if (!fontData || !projectId || !projectTitle) {
       return
     }
 
@@ -301,6 +302,17 @@ export const useGitHubCommitFlow = ({
 
     try {
       setIsPreparingGitHubCommit(true)
+      await flushPendingDraft({
+        projectId,
+        projectTitle,
+        fontData,
+        dirtyGlyphIds: localDirtyGlyphIds,
+        deletedGlyphIds: localDeletedGlyphIds,
+        glyphEditTimes,
+        selectedLayerId,
+        setPersistenceStatus,
+        markDraftSaved,
+      })
       const preparedCommit = await prepareGitHubCommit({
         projectId,
         projectTitle,
@@ -425,10 +437,8 @@ export const useGitHubCommitFlow = ({
       return
     }
 
-    let localDraftSaved = false
     try {
-      setPersistenceStatus('saving')
-      await saveDraftSnapshot({
+      await flushPendingDraft({
         projectId,
         projectTitle,
         fontData,
@@ -436,9 +446,9 @@ export const useGitHubCommitFlow = ({
         deletedGlyphIds: localDeletedGlyphIds,
         glyphEditTimes,
         selectedLayerId: activeLayerId,
+        setPersistenceStatus,
+        markDraftSaved,
       })
-      localDraftSaved = true
-      setPersistenceStatus('saved')
 
       const preparedCommit = await prepareGitHubCommit({
         projectId,
@@ -461,6 +471,9 @@ export const useGitHubCommitFlow = ({
       })
       markDraftSaved()
       void refetchSyncReport()
+      void queryClient.invalidateQueries({
+        queryKey: projectSyncDirtyStatusQueryKey(projectId),
+      })
       if (githubForkStatus) {
         setForkStatusOverride(
           setForkStatusQueryData(queryClient, githubForkStatus, {
@@ -484,12 +497,6 @@ export const useGitHubCommitFlow = ({
         isClosable: true,
       })
     } catch (error) {
-      if (!localDraftSaved) {
-        setPersistenceStatus(
-          'error',
-          error instanceof Error ? error.message : 'GitHub commit save failed.'
-        )
-      }
       const message = getErrorMessage(error, '目前無法建立 GitHub commit。')
 
       if (isMissingGitHubTokenError(message)) {
@@ -551,6 +558,9 @@ export const useGitHubCommitFlow = ({
   const handleApplyRemoteSync = async () => {
     try {
       const result = await syncStatus.applyRemote()
+      void queryClient.invalidateQueries({
+        queryKey: projectSyncDirtyStatusQueryKey(projectId),
+      })
       toast({
         title: '已套用遠端更新',
         description: `更新了 ${result.appliedCount} 個檔案。`,

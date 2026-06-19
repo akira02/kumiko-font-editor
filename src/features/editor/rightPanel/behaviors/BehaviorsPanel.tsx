@@ -8,6 +8,7 @@ import {
   Button,
   Stack,
   useDisclosure,
+  useToast,
 } from '@chakra-ui/react'
 import { useMemo, useRef, useState } from 'react'
 import {
@@ -24,6 +25,7 @@ import {
   type SpacingBehaviorRow,
 } from 'src/lib/openTypeFeatures'
 import { useStore, type FontData, type GlyphData } from 'src/store'
+import { useFlushCurrentDraft } from 'src/features/common/projectPersistence/useFlushCurrentDraft'
 import { CombinationBehaviorList } from 'src/features/editor/rightPanel/behaviors/CombinationBehaviorList'
 import { AlternateBehaviorList } from 'src/features/editor/rightPanel/behaviors/AlternateBehaviorList'
 import { SpacingBehaviorList } from 'src/features/editor/rightPanel/behaviors/SpacingBehaviorList'
@@ -38,6 +40,7 @@ interface BehaviorsPanelProps {
 
 export function BehaviorsPanel({ fontData, glyph }: BehaviorsPanelProps) {
   const { t } = useTranslation()
+  const toast = useToast()
 
   const [draftRowIds, setDraftRowIds] = useState<string[]>([])
   const [alternateDraftRowIds, setAlternateDraftRowIds] = useState<string[]>([])
@@ -61,6 +64,7 @@ export function BehaviorsPanel({ fontData, glyph }: BehaviorsPanelProps) {
   const deleteCombinationBehavior = useStore(
     (state) => state.deleteCombinationBehavior
   )
+  const flushCurrentDraft = useFlushCurrentDraft()
   const upsertAlternateBehavior = useStore(
     (state) => state.upsertAlternateBehavior
   )
@@ -148,11 +152,23 @@ export function BehaviorsPanel({ fontData, glyph }: BehaviorsPanelProps) {
     closeUnusedGlyphDialog()
   }
 
-  const deleteUnusedGlyph = () => {
+  const deleteUnusedGlyph = async () => {
     if (!unusedGlyphPrompt) return
-    unusedGlyphPrompt.deleteBehavior()
-    deleteGlyph(unusedGlyphPrompt.glyphId)
-    closeUnusedGlyphDialog()
+    try {
+      unusedGlyphPrompt.deleteBehavior()
+      deleteGlyph(unusedGlyphPrompt.glyphId)
+      await flushCurrentDraft()
+      closeUnusedGlyphDialog()
+    } catch (error) {
+      toast({
+        title: '刪除後儲存失敗',
+        description: '字符已從目前工作階段移除，但尚未寫入本機專案。',
+        status: 'error',
+        duration: 3600,
+        isClosable: true,
+      })
+      console.warn('Flush after unused glyph deletion failed.', error)
+    }
   }
 
   const deleteCombinationRow = (row: CombinationBehaviorRow) => {

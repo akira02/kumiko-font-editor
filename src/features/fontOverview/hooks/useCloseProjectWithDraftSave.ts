@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '@chakra-ui/react'
-import { saveDraftSnapshot } from 'src/lib/project/draftSave'
+import { flushPendingDraft } from 'src/lib/project/flushPendingDraft'
 import { useStore } from 'src/store'
 
 export function useCloseProjectWithDraftSave() {
@@ -37,8 +37,7 @@ export function useCloseProjectWithDraftSave() {
 
     setIsClosingProject(true)
     try {
-      setPersistenceStatus('saving')
-      await saveDraftSnapshot({
+      await flushPendingDraft({
         projectId,
         projectTitle,
         fontData,
@@ -46,15 +45,11 @@ export function useCloseProjectWithDraftSave() {
         deletedGlyphIds,
         glyphEditTimes,
         selectedLayerId,
+        setPersistenceStatus,
+        markDraftSaved,
       })
-      markDraftSaved(dirtyGlyphIds, deletedGlyphIds)
-      setPersistenceStatus('saved')
       closeProjectState()
     } catch (error) {
-      setPersistenceStatus(
-        'error',
-        error instanceof Error ? error.message : 'Save before close failed.'
-      )
       console.warn('Save before closing project failed.', error)
       toast({
         title: t('fontOverview.closeProjectSaveFailed'),

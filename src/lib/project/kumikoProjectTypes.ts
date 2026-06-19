@@ -140,7 +140,7 @@ export interface KumikoGlyphRecord {
   category?: string | null
   subCategory?: string | null
   status?: number | null
-  color?: KumikoColor | string | number | null
+  color?: KumikoColor | null
   note?: string | null
   leftMetricsKey?: string | null
   rightMetricsKey?: string | null
