@@ -162,4 +162,55 @@ describe('projectRepository canonical storage', () => {
     expect(glyphA?.exportDirty).toBe(1)
     expect(glyphB).toBeUndefined()
   })
+
+  it('keeps project clean when autosaving only glyph geometry changes', async () => {
+    await saveProjectDraft({
+      id: 'project-glyph-only',
+      title: 'Glyph Only',
+      lastModified: 20,
+      createdAt: 10,
+      updatedAt: 20,
+      sourceName: 'GlyphOnly.ufo',
+      sourceType: 'local',
+      fontData,
+      projectMetadata: null,
+      projectSourceData: null,
+      projectSourceFormat: 'ufo',
+    })
+
+    const nextFontData: FontData = {
+      ...fontData,
+      glyphs: {
+        A: {
+          ...fontData.glyphs.A,
+          layers: {
+            'public.default': {
+              ...fontData.glyphs.A.layers!['public.default']!,
+              metrics: { width: 620, lsb: 0, rsb: 620 },
+            },
+          },
+        },
+      },
+    }
+
+    await saveDraftSnapshot({
+      projectId: 'project-glyph-only',
+      projectTitle: 'Glyph Only',
+      fontData: nextFontData,
+      dirtyGlyphIds: ['A'],
+      deletedGlyphIds: [],
+      glyphEditTimes: { A: 40 },
+      selectedLayerId: 'public.default',
+    })
+
+    const [project, glyphA] = await Promise.all([
+      loadKumikoProjectRecord('project-glyph-only'),
+      loadKumikoGlyphRecord(makeKumikoGlyphKey('project-glyph-only', 'A')),
+    ])
+
+    expect(project?.exportDirty).toBe(0)
+    expect(project?.syncDirty).toBe(0)
+    expect(glyphA?.exportDirty).toBe(1)
+    expect(glyphA?.syncDirty).toBe(1)
+  })
 })

@@ -20,6 +20,13 @@ import {
   withProjectGlyphEditTimes,
 } from 'src/lib/glyph/glyphEditTimes'
 
+const getGlyphOrder = (fontData: FontData) =>
+  fontData.glyphOrder ?? Object.keys(fontData.glyphs)
+
+const hasSameGlyphOrder = (left: readonly string[], right: readonly string[]) =>
+  left.length === right.length &&
+  left.every((glyphId, index) => glyphId === right[index])
+
 export const saveDraftSnapshot = async (input: {
   projectId: string
   projectTitle: string
@@ -39,10 +46,12 @@ export const saveDraftSnapshot = async (input: {
     )) ?? getProjectArchiveMetadata()
   const now = Date.now()
 
+  const nextGlyphOrder = getGlyphOrder(input.fontData)
   const projectChanged =
-    input.dirtyGlyphIds.length > 0 ||
+    !persistedProject ||
+    persistedProject.title !== input.projectTitle ||
     input.deletedGlyphIds.length > 0 ||
-    Boolean(persistedProject)
+    !hasSameGlyphOrder(persistedProject.glyphOrder, nextGlyphOrder)
   const project = fontDataToKumikoProjectRecord({
     projectId: input.projectId,
     title: input.projectTitle,
