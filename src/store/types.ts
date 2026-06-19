@@ -76,6 +76,7 @@ export interface GlyphComponentRef {
   // scaleX/scaleY they carry the full UFO/Glyphs component transform.
   xyScale?: number
   yxScale?: number
+  autoAlign?: boolean | null
   color?: KumikoColor | null
   customData?: GlyphCustomData
   sourceData?: GlyphSourceData
@@ -129,6 +130,8 @@ export interface GlyphImage {
   customData?: GlyphCustomData
 }
 
+export type GlyphHint = Record<string, unknown>
+
 export interface GlyphLayerData {
   id: string
   name: string
@@ -136,12 +139,15 @@ export interface GlyphLayerData {
   // user-kept outline snapshots. Undefined is treated as 'master' for back-compat.
   type?: 'master' | 'backup' | 'brace' | 'bracket'
   associatedMasterId?: string | null
+  braceLocation?: Record<string, number> | null
+  bracketAxisRules?: Record<string, { min?: number; max?: number }> | null
   paths: PathData[]
   componentRefs: GlyphComponentRef[]
   anchors: GlyphAnchor[]
   guidelines: GlyphGuideline[]
   metrics: GlyphMetrics
   verticalMetrics?: GlyphVerticalMetrics
+  hints?: GlyphHint[]
   color?: KumikoColor | null
   visible?: boolean
   locked?: boolean

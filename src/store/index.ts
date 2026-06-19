@@ -47,6 +47,7 @@ export type {
   GlyphCustomData,
   GlyphData,
   GlyphGuideline,
+  GlyphHint,
   GlyphImage,
   GlyphLayerData,
   GlyphLayerContent,

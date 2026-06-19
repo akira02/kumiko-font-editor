@@ -31,6 +31,7 @@ const fontData = {
           name: 'Regular',
           type: 'master',
           associatedMasterId: 'M1',
+          hints: [{ kind: 'stem', x: 12 }],
           paths: [
             {
               id: 'p1',
@@ -61,8 +62,10 @@ const fontData = {
         'backup-1': {
           id: 'backup-1',
           name: 'Sketch',
-          type: 'backup',
+          type: 'brace',
           associatedMasterId: 'M1',
+          braceLocation: { Weight: 500 },
+          bracketAxisRules: { Weight: { min: 450, max: 700 } },
           paths: [],
           components: ['base'],
           componentRefs: [
@@ -76,6 +79,7 @@ const fontData = {
               xyScale: 0.25,
               yxScale: -0.5,
               rotation: 0,
+              autoAlign: true,
             },
           ],
           anchors: [],
@@ -131,10 +135,12 @@ describe('kumikoFontDataAdapter', () => {
       customData: { glyphFlag: true },
     })
     expect(glyphs[0].layers.M1.outlineKind).toBe('cubic')
+    expect(glyphs[0].layers.M1.hints).toEqual([{ kind: 'stem', x: 12 }])
     expect(glyphs[0].layers.M1.image?.fileName).toBe('sketch.png')
     expect(glyphs[0].layers.M1.customData).toEqual({ layerFlag: true })
     expect(glyphs[0].layers['backup-1'].componentRefs[0]).toMatchObject({
       glyphId: 'base',
+      autoAlign: true,
       transform: {
         a: 1,
         b: 0.25,
@@ -176,6 +182,7 @@ describe('kumikoFontDataAdapter', () => {
       y: 700,
     })
     expect(rebuilt.glyphs.A.layers?.M1.image?.fileName).toBe('sketch.png')
+    expect(rebuilt.glyphs.A.layers?.M1.hints).toEqual([{ kind: 'stem', x: 12 }])
     expect(rebuilt.glyphs.A.layers?.M1.customData).toEqual({
       layerFlag: true,
     })
@@ -183,6 +190,7 @@ describe('kumikoFontDataAdapter', () => {
       rebuilt.glyphs.A.layers?.['backup-1'].componentRefs[0]
     ).toMatchObject({
       glyphId: 'base',
+      autoAlign: true,
       x: 10,
       y: 20,
       scaleX: 1,
@@ -190,6 +198,11 @@ describe('kumikoFontDataAdapter', () => {
       xyScale: 0.25,
       yxScale: -0.5,
       rotation: 0,
+    })
+    expect(rebuilt.glyphs.A.layers?.['backup-1']).toMatchObject({
+      type: 'brace',
+      braceLocation: { Weight: 500 },
+      bracketAxisRules: { Weight: { min: 450, max: 700 } },
     })
   })
 
