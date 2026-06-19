@@ -163,6 +163,104 @@ describe('projectRepository canonical storage', () => {
     expect(glyphB).toBeUndefined()
   })
 
+  it('persists glyph rename as old-key delete plus new-key add', async () => {
+    const originalFontData: FontData = {
+      glyphOrder: ['A', 'B'],
+      glyphs: {
+        A: fontData.glyphs.A,
+        B: {
+          ...fontData.glyphs.A,
+          id: 'B',
+          name: 'B',
+          unicodes: ['0042'],
+          layers: {
+            'public.default': {
+              ...fontData.glyphs.A.layers!['public.default']!,
+              componentRefs: [
+                {
+                  id: 'component-1',
+                  glyphId: 'A',
+                  x: 0,
+                  y: 0,
+                  scaleX: 1,
+                  scaleY: 1,
+                  rotation: 0,
+                },
+              ],
+            },
+          },
+        },
+      },
+    }
+    await saveProjectDraft({
+      id: 'project-rename',
+      title: 'Rename',
+      lastModified: 20,
+      createdAt: 10,
+      updatedAt: 20,
+      sourceName: 'Rename.ufo',
+      sourceType: 'local',
+      fontData: originalFontData,
+      projectMetadata: null,
+      projectSourceData: null,
+      projectSourceFormat: 'ufo',
+    })
+
+    const renamedFontData: FontData = {
+      ...originalFontData,
+      glyphOrder: ['A.alt', 'B'],
+      glyphs: {
+        'A.alt': {
+          ...originalFontData.glyphs.A,
+          id: 'A.alt',
+          name: 'A.alt',
+        },
+        B: {
+          ...originalFontData.glyphs.B,
+          layers: {
+            'public.default': {
+              ...originalFontData.glyphs.B.layers!['public.default']!,
+              componentRefs: [
+                {
+                  id: 'component-1',
+                  glyphId: 'A.alt',
+                  x: 0,
+                  y: 0,
+                  scaleX: 1,
+                  scaleY: 1,
+                  rotation: 0,
+                },
+              ],
+            },
+          },
+        },
+      },
+    }
+
+    await saveDraftSnapshot({
+      projectId: 'project-rename',
+      projectTitle: 'Rename',
+      fontData: renamedFontData,
+      dirtyGlyphIds: ['A.alt', 'B'],
+      deletedGlyphIds: ['A'],
+      glyphEditTimes: { 'A.alt': 40, B: 40 },
+      selectedLayerId: 'public.default',
+    })
+
+    const [project, oldGlyph, newGlyph, dependentGlyph] = await Promise.all([
+      loadKumikoProjectRecord('project-rename'),
+      loadKumikoGlyphRecord(makeKumikoGlyphKey('project-rename', 'A')),
+      loadKumikoGlyphRecord(makeKumikoGlyphKey('project-rename', 'A.alt')),
+      loadKumikoGlyphRecord(makeKumikoGlyphKey('project-rename', 'B')),
+    ])
+
+    expect(project?.glyphOrder).toEqual(['A.alt', 'B'])
+    expect(oldGlyph).toBeUndefined()
+    expect(newGlyph?.glyphId).toBe('A.alt')
+    expect(dependentGlyph?.componentGlyphIds).toEqual(['A.alt'])
+    expect(dependentGlyph?.componentRefKeys).toEqual(['project-rename\0A.alt'])
+  })
+
   it('keeps project clean when autosaving only glyph geometry changes', async () => {
     await saveProjectDraft({
       id: 'project-glyph-only',

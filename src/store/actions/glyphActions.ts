@@ -5,10 +5,13 @@
 import { current } from 'immer'
 import type { StateCreator } from 'zustand'
 import type {
+  FontData,
   GlobalState,
+  GlyphData,
   GlyphMetrics,
   OnCurveNodeType,
 } from 'src/store/types'
+import type { GlyphSelector } from 'src/lib/openTypeFeatures'
 import {
   createBackupLayer,
   deleteBackupLayer,
@@ -75,6 +78,67 @@ const backupLayerName = (): string => {
   return `${day} ${month}, ${year} ${hours}:${minutes}`
 }
 
+const renameGlyphSelector = (
+  selector: GlyphSelector,
+  oldGlyphId: string,
+  newGlyphId: string
+): GlyphSelector =>
+  selector.kind === 'glyph' && selector.glyph === oldGlyphId
+    ? { ...selector, glyph: newGlyphId }
+    : selector
+
+const renameGlyphReferences = (
+  fontData: FontData,
+  oldGlyphId: string,
+  newGlyphId: string
+) => {
+  for (const glyph of Object.values(fontData.glyphs)) {
+    for (const layer of Object.values(glyph.layers ?? {})) {
+      for (const componentRef of layer.componentRefs) {
+        if (componentRef.glyphId === oldGlyphId) {
+          componentRef.glyphId = newGlyphId
+        }
+      }
+      for (const componentRef of layer.background?.componentRefs ?? []) {
+        if (componentRef.glyphId === oldGlyphId) {
+          componentRef.glyphId = newGlyphId
+        }
+      }
+    }
+
+    if (glyph.leftMetricsKey === oldGlyphId) {
+      glyph.leftMetricsKey = newGlyphId
+    }
+    if (glyph.rightMetricsKey === oldGlyphId) {
+      glyph.rightMetricsKey = newGlyphId
+    }
+    if (glyph.widthMetricsKey === oldGlyphId) {
+      glyph.widthMetricsKey = newGlyphId
+    }
+  }
+
+  for (const group of fontData.kerningGroups ?? []) {
+    group.glyphs = group.glyphs.map((glyphId) =>
+      glyphId === oldGlyphId ? newGlyphId : glyphId
+    )
+  }
+
+  for (const pair of fontData.kerningPairs ?? []) {
+    pair.left = renameGlyphSelector(pair.left, oldGlyphId, newGlyphId)
+    pair.right = renameGlyphSelector(pair.right, oldGlyphId, newGlyphId)
+  }
+}
+
+const createRenamedGlyph = (
+  glyph: GlyphData,
+  oldGlyphId: string,
+  newGlyphId: string
+): GlyphData => ({
+  ...glyph,
+  id: newGlyphId,
+  name: glyph.name === oldGlyphId ? newGlyphId : glyph.name,
+})
+
 export const buildGlyphActions = (set: ImmerSet) => ({
   deleteGlyph: (glyphId: string) =>
     set((state) => {
@@ -113,6 +177,56 @@ export const buildGlyphActions = (set: ImmerSet) => ({
       markGlyphDeleted(state, glyphId)
       syncFilteredGlyphList(state)
     }),
+
+  renameGlyph: (oldGlyphId: string, newGlyphId: string) => {
+    let renamed = false
+    set((state) => {
+      const fontData = state.fontData
+      const glyph = fontData?.glyphs[oldGlyphId]
+      const trimmedNewGlyphId = newGlyphId.trim()
+      if (
+        !fontData ||
+        !glyph ||
+        !trimmedNewGlyphId ||
+        oldGlyphId === trimmedNewGlyphId ||
+        fontData.glyphs[trimmedNewGlyphId]
+      ) {
+        return
+      }
+
+      const renamedGlyph = createRenamedGlyph(
+        current(glyph),
+        oldGlyphId,
+        trimmedNewGlyphId
+      )
+      delete fontData.glyphs[oldGlyphId]
+      fontData.glyphs[trimmedNewGlyphId] = renamedGlyph
+      fontData.glyphOrder = (
+        fontData.glyphOrder ?? Object.keys(fontData.glyphs)
+      )
+        .filter((glyphId) => glyphId !== trimmedNewGlyphId)
+        .map((glyphId) =>
+          glyphId === oldGlyphId ? trimmedNewGlyphId : glyphId
+        )
+      if (!fontData.glyphOrder.includes(trimmedNewGlyphId)) {
+        fontData.glyphOrder.push(trimmedNewGlyphId)
+      }
+
+      renameGlyphReferences(fontData, oldGlyphId, trimmedNewGlyphId)
+      state.editorGlyphIds = state.editorGlyphIds.map((glyphId) =>
+        glyphId === oldGlyphId ? trimmedNewGlyphId : glyphId
+      )
+      syncEditorTextFromGlyphIds(state)
+      if (state.selectedGlyphId === oldGlyphId) {
+        state.selectedGlyphId = trimmedNewGlyphId
+      }
+      markGlyphDeleted(state, oldGlyphId)
+      markGlyphAdded(state, trimmedNewGlyphId)
+      syncFilteredGlyphList(state)
+      renamed = true
+    })
+    return renamed
+  },
 
   addGlyphs: (
     glyphs: Array<{
