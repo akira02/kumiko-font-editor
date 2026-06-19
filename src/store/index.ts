@@ -102,6 +102,8 @@ const initialState = {
   localDirtyGlyphIds: [],
   localDeletedGlyphIds: [],
   glyphEditTimes: {},
+  glyphGeometryAccess: {},
+  glyphGeometryAccessCounter: 0,
   editorGlyphIds: [],
   editorText: '',
   editorTextCursorIndex: 0,

@@ -15,8 +15,10 @@ import type {
 import type { KumikoProjectUiState } from 'src/lib/project/projectTypes'
 import type { GlyphEditTimes } from 'src/lib/glyph/glyphEditTimes'
 import { getProjectGlyphEditTimes } from 'src/lib/glyph/glyphEditTimes'
+import { isGlyphGeometryLoaded } from 'src/lib/glyph/glyphGeometryState'
 import { syncEditorTextFromGlyphIds } from 'src/store/editorLine'
 import { syncFilteredGlyphList } from 'src/store/glyphSearch'
+import { evictGlyphGeometry } from 'src/store/glyphGeometryEviction'
 import {
   getGlyphLayer,
   getActiveLayerId,
@@ -87,6 +89,8 @@ export const buildProjectActions = (
       state.localDirtyGlyphIds = []
       state.localDeletedGlyphIds = []
       state.glyphEditTimes = getProjectGlyphEditTimes(projectMetadata)
+      state.glyphGeometryAccess = {}
+      state.glyphGeometryAccessCounter = 0
       state.editorGlyphIds = []
       state.editorText = ''
       state.editorTextCursorIndex = 0
@@ -119,6 +123,13 @@ export const buildProjectActions = (
           ? state.selectedLayerId
           : state.activeMasterId
       syncFilteredGlyphList(state)
+
+      for (const glyph of Object.values(hotFontData.glyphs)) {
+        if (isGlyphGeometryLoaded(glyph)) {
+          state.glyphGeometryAccessCounter += 1
+          state.glyphGeometryAccess[glyph.id] = state.glyphGeometryAccessCounter
+        }
+      }
 
       const storedSelectedGlyphId = projectUiState?.selectedGlyphId ?? null
       if (storedSelectedGlyphId && hotFontData.glyphs[storedSelectedGlyphId]) {
@@ -161,7 +172,10 @@ export const buildProjectActions = (
         dirtyGlyphIds.length > 0 || deletedGlyphIds.length > 0
     }),
 
-  hydrateGlyphGeometry: (glyphs: FontData['glyphs'][string][]) =>
+  hydrateGlyphGeometry: (
+    glyphs: FontData['glyphs'][string][],
+    options?: { maxLoadedGlyphs?: number }
+  ) =>
     set((state) => {
       if (!state.fontData || glyphs.length === 0) {
         return
@@ -181,7 +195,22 @@ export const buildProjectActions = (
           ...glyph,
           activeLayerId,
         }
+        state.glyphGeometryAccessCounter += 1
+        state.glyphGeometryAccess[glyph.id] = state.glyphGeometryAccessCounter
       }
+
+      evictGlyphGeometry({
+        glyphs: state.fontData.glyphs,
+        accessByGlyphId: state.glyphGeometryAccess,
+        dirtyGlyphIds: state.dirtyGlyphIds,
+        localDirtyGlyphIds: state.localDirtyGlyphIds,
+        deletedGlyphIds: state.deletedGlyphIds,
+        localDeletedGlyphIds: state.localDeletedGlyphIds,
+        editorGlyphIds: state.editorGlyphIds,
+        selectedGlyphId: state.selectedGlyphId,
+        keepGlyphIds: glyphs.map((glyph) => glyph.id),
+        maxLoadedGlyphs: options?.maxLoadedGlyphs,
+      })
 
       if (
         state.selectedGlyphId &&
@@ -213,6 +242,8 @@ export const buildProjectActions = (
       state.localDirtyGlyphIds = []
       state.localDeletedGlyphIds = []
       state.glyphEditTimes = {}
+      state.glyphGeometryAccess = {}
+      state.glyphGeometryAccessCounter = 0
       state.editorGlyphIds = []
       state.editorText = ''
       state.editorTextCursorIndex = 0

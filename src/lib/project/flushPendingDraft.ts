@@ -1,4 +1,5 @@
 import { saveDraftSnapshot } from 'src/lib/project/draftSave'
+import { saveProjectUiState } from 'src/lib/project/projectRepository'
 import type { GlyphEditTimes } from 'src/lib/glyph/glyphEditTimes'
 import type { FontData, PersistenceStatus } from 'src/store'
 import type { KumikoProjectUiState } from 'src/lib/project/projectTypes'
@@ -71,17 +72,26 @@ export const flushPendingDraft = async ({
 
   try {
     setPersistenceStatus('saving')
-    await saveDraftSnapshot({
-      projectId,
-      projectTitle,
-      fontData,
-      dirtyGlyphIds,
-      deletedGlyphIds,
-      projectQueued,
-      projectUiState,
-      glyphEditTimes,
-      selectedLayerId,
-    })
+    if (
+      uiStateQueued &&
+      !projectQueued &&
+      dirtyGlyphIds.length === 0 &&
+      deletedGlyphIds.length === 0
+    ) {
+      await saveProjectUiState(projectId, projectUiState)
+    } else {
+      await saveDraftSnapshot({
+        projectId,
+        projectTitle,
+        fontData,
+        dirtyGlyphIds,
+        deletedGlyphIds,
+        projectQueued,
+        projectUiState,
+        glyphEditTimes,
+        selectedLayerId,
+      })
+    }
     markDraftSaved(dirtyGlyphIds, deletedGlyphIds, persistenceRevision)
     setPersistenceStatus('saved')
     return true

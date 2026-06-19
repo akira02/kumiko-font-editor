@@ -101,7 +101,7 @@ export function GlyphSummaryCard({
             colorScheme={isDirty ? 'orange' : 'green'}
             variant="subtle"
           >
-            {isDirty ? '未儲存' : '已儲存'}
+            {isDirty ? '等待本機儲存' : '已同步到本機'}
           </Tag>
         </Stack>
         {showLayerSelect && availableLayers.length > 0 && (

@@ -376,6 +376,8 @@ export interface GlobalState {
   localDirtyGlyphIds: string[]
   localDeletedGlyphIds: string[]
   glyphEditTimes: GlyphEditTimes
+  glyphGeometryAccess: Record<string, number>
+  glyphGeometryAccessCounter: number
   editorGlyphIds: string[]
   editorText: string
   editorTextCursorIndex: number
@@ -574,7 +576,10 @@ export interface GlobalState {
     projectRoundTripFormat?: ProjectRoundTripFormat | null,
     projectUiState?: KumikoProjectUiState | null
   ) => void
-  hydrateGlyphGeometry: (glyphs: GlyphData[]) => void
+  hydrateGlyphGeometry: (
+    glyphs: GlyphData[],
+    options?: { maxLoadedGlyphs?: number }
+  ) => void
   hydratePersistedLocalChanges: (
     dirtyGlyphIds: string[],
     deletedGlyphIds: string[],

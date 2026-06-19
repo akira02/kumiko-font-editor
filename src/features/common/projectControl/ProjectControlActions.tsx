@@ -1,14 +1,6 @@
+import { HStack, IconButton, Tooltip, useDisclosure } from '@chakra-ui/react'
 import {
-  Box,
-  HStack,
-  IconButton,
-  Tooltip,
-  useDisclosure,
-} from '@chakra-ui/react'
-import {
-  Check,
   Download,
-  FloppyDisk,
   FontQuestion,
   Github,
   PageSearch,
@@ -18,27 +10,21 @@ import { AppSettingsModal } from 'src/features/common/projectControl/AppSettings
 import { useTranslation } from 'react-i18next'
 
 interface ProjectControlActionsProps {
-  canSaveDraft: boolean
   hasGitHubSource: boolean
-  isDraftCurrent: boolean
   isSavingToLocal: boolean
   onOpenExportModal: () => void
   onOpenFontSettingsModal: () => void
   onOpenGitHubModal: () => void
   onOpenQualityCheckModal: () => void
-  onSaveProject: () => void
 }
 
 export function ProjectControlActions({
-  canSaveDraft,
   hasGitHubSource,
-  isDraftCurrent,
   isSavingToLocal,
   onOpenExportModal,
   onOpenFontSettingsModal,
   onOpenGitHubModal,
   onOpenQualityCheckModal,
-  onSaveProject,
 }: ProjectControlActionsProps) {
   const appSettingsModal = useDisclosure()
   const { t } = useTranslation()
@@ -166,54 +152,6 @@ export function ProjectControlActions({
             onClick={onOpenExportModal}
             isDisabled={isSavingToLocal}
           />
-        </Tooltip>
-        <Tooltip label={t('projectControl.save')}>
-          <Box position="relative">
-            <IconButton
-              aria-label={t('projectControl.save')}
-              icon={
-                <FloppyDisk
-                  width={18}
-                  height={18}
-                  strokeWidth={1.9}
-                  aria-hidden="true"
-                />
-              }
-              size="sm"
-              minW={9}
-              h={9}
-              px={0}
-              borderRadius="full"
-              variant="ghost"
-              color="field.ink"
-              _hover={{ bg: 'field.ink', color: 'field.paper' }}
-              onClick={onSaveProject}
-              isDisabled={!canSaveDraft || isSavingToLocal}
-            />
-            {isDraftCurrent ? (
-              <Box
-                position="absolute"
-                right="5px"
-                bottom="5px"
-                display="grid"
-                placeItems="center"
-                boxSize={3}
-                bg="green.400"
-                color="gray.950"
-                borderRadius="full"
-                borderWidth="1px"
-                borderColor="gray.900"
-                pointerEvents="none"
-              >
-                <Check
-                  width={7}
-                  height={7}
-                  strokeWidth={3}
-                  aria-hidden="true"
-                />
-              </Box>
-            ) : null}
-          </Box>
         </Tooltip>
       </HStack>
       <AppSettingsModal

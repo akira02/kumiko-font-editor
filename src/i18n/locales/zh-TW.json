@@ -204,7 +204,7 @@
     "backHome": "⬅︎ 首頁",
     "cancel": "取消",
     "closeProjectSaveFailed": "離開前儲存失敗",
-    "closeProjectSaveFailedDescription": "目前仍留在專案中，請稍後再試或手動儲存。",
+    "closeProjectSaveFailedDescription": "目前仍留在專案中，請稍後再試。",
     "currentTotalPrefix": "目前共",
     "glyph": "字符",
     "glyphCardHint": "單擊查看資訊，雙擊進入字符編輯器",

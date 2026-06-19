@@ -49,19 +49,7 @@ export function EditorRightPanel() {
     >
       <Stack spacing={5}>
         <ProjectControlActions
-          canSaveDraft={Boolean(
-            panel.fontData &&
-            panel.projectId &&
-            panel.projectTitle &&
-            panel.isDirty
-          )}
           hasGitHubSource={panel.hasGitHubSource}
-          isDraftCurrent={Boolean(
-            panel.fontData &&
-            panel.projectId &&
-            panel.projectTitle &&
-            !panel.isDirty
-          )}
           isSavingToLocal={fontExport.isExporting}
           onOpenExportModal={exportModal.onOpen}
           onOpenFontSettingsModal={fontSettingsModal.onOpen}
@@ -69,7 +57,6 @@ export function EditorRightPanel() {
             void panel.gitHubCommitFlow.openGitHubModal()
           }
           onOpenQualityCheckModal={qualityCheckModal.onOpen}
-          onSaveProject={panel.handleSaveProject}
         />
 
         {!panel.glyph ? (

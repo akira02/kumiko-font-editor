@@ -76,19 +76,7 @@ export function OverviewRightPanel({
     >
       <Stack spacing={4}>
         <ProjectControlActions
-          canSaveDraft={Boolean(
-            panel.fontData &&
-            panel.projectId &&
-            panel.projectTitle &&
-            panel.isDirty
-          )}
           hasGitHubSource={panel.hasGitHubSource}
-          isDraftCurrent={Boolean(
-            panel.fontData &&
-            panel.projectId &&
-            panel.projectTitle &&
-            !panel.isDirty
-          )}
           isSavingToLocal={fontExport.isExporting}
           onOpenExportModal={exportModal.onOpen}
           onOpenFontSettingsModal={fontSettingsModal.onOpen}
@@ -96,7 +84,6 @@ export function OverviewRightPanel({
             void panel.gitHubCommitFlow.openGitHubModal()
           }
           onOpenQualityCheckModal={() => openQualityCheck('font')}
-          onSaveProject={panel.handleSaveProject}
         />
 
         {hasMultiSelection ? (

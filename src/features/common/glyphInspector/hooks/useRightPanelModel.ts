@@ -1,7 +1,5 @@
 import { useToast } from '@chakra-ui/react'
 import { useMemo } from 'react'
-import { flushPendingDraft } from 'src/lib/project/flushPendingDraft'
-import { createProjectUiStateSnapshot } from 'src/lib/project/projectUiState'
 import { getProjectArchiveMetadata } from 'src/lib/project/projectArchive'
 import { listGlyphLayers } from 'src/store/glyphLayerOps'
 import {
@@ -26,21 +24,13 @@ export function useRightPanelModel() {
   const selectedGlyphId = useStore((state) => state.selectedGlyphId)
   const selectedLayerId = useStore((state) => state.selectedLayerId)
   const workspaceView = useStore((state) => state.workspaceView)
-  const activeMasterId = useStore((state) => state.activeMasterId)
-  const overviewSectionId = useStore((state) => state.overviewSectionId)
-  const overviewTopGlyphId = useStore((state) => state.overviewTopGlyphId)
-  const overviewGridState = useStore((state) => state.overviewGridState)
   const selectedNodeIds = useStore((state) => state.selectedNodeIds)
   const selectedSegment = useStore((state) => state.selectedSegment)
   const fontData = useStore((state) => state.fontData)
   const projectId = useStore((state) => state.projectId)
   const projectTitle = useStore((state) => state.projectTitle)
   const isDirty = useStore((state) => state.isDirty)
-  const dirtyGlyphIds = useStore((state) => state.dirtyGlyphIds)
-  const deletedGlyphIds = useStore((state) => state.deletedGlyphIds)
-  const persistenceQueue = useStore((state) => state.persistenceQueue)
   const glyphEditTimes = useStore((state) => state.glyphEditTimes)
-  const setPersistenceStatus = useStore((state) => state.setPersistenceStatus)
   const hasLocalChanges = useStore((state) => state.hasLocalChanges)
   const localDirtyGlyphIds = useStore((state) => state.localDirtyGlyphIds)
   const localDeletedGlyphIds = useStore((state) => state.localDeletedGlyphIds)
@@ -241,53 +231,6 @@ export function useRightPanelModel() {
     }
   }
 
-  const handleSaveProject = async () => {
-    if (!fontData || !projectId || !projectTitle) {
-      return
-    }
-
-    try {
-      await flushPendingDraft({
-        projectId,
-        projectTitle,
-        fontData,
-        projectQueued: persistenceQueue.projectQueued,
-        uiStateQueued: persistenceQueue.uiStateQueued,
-        projectUiState: createProjectUiStateSnapshot({
-          selectedGlyphId,
-          selectedLayerId,
-          activeMasterId,
-          overviewSectionId,
-          overviewTopGlyphId,
-          overviewGridState,
-        }),
-        dirtyGlyphIds,
-        deletedGlyphIds,
-        persistenceRevision: persistenceQueue.revision,
-        glyphEditTimes,
-        selectedLayerId,
-        setPersistenceStatus,
-        markDraftSaved,
-      })
-      toast({
-        title: '已儲存',
-        description: '目前變更已寫入本機專案。',
-        status: 'success',
-        duration: 2200,
-        isClosable: true,
-      })
-    } catch (error) {
-      toast({
-        title: '儲存失敗',
-        description: '無法寫入本機草稿，請稍後再試。',
-        status: 'error',
-        duration: 3200,
-        isClosable: true,
-      })
-      console.warn('Manual project save failed.', error)
-    }
-  }
-
   // Layer panel rows: a font source switches the active master (font-wide),
   // anything else (backups) is a per-glyph layer selection.
   const selectLayer = (layerId: string) => {
@@ -328,7 +271,6 @@ export function useRightPanelModel() {
     handleMoveSelection,
     handleNodeTypeChange,
     handlePathOperation,
-    handleSaveProject,
     setSelectedLayerId,
     setWorkspaceView,
   }

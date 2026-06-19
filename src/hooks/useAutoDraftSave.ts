@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { saveDraftSnapshot } from 'src/lib/project/draftSave'
+import { flushPendingDraft } from 'src/lib/project/flushPendingDraft'
 import { createProjectUiStateSnapshot } from 'src/lib/project/projectUiState'
 import { useStore } from 'src/store'
 
@@ -41,12 +41,12 @@ export function useAutoDraftSave() {
     }
 
     autosaveTimerRef.current = window.setTimeout(() => {
-      setPersistenceStatus('saving')
-      void saveDraftSnapshot({
+      void flushPendingDraft({
         projectId,
         projectTitle,
         fontData,
         projectQueued: persistenceQueue.projectQueued,
+        uiStateQueued: persistenceQueue.uiStateQueued,
         projectUiState: createProjectUiStateSnapshot({
           selectedGlyphId,
           selectedLayerId,
@@ -57,21 +57,15 @@ export function useAutoDraftSave() {
         }),
         dirtyGlyphIds,
         deletedGlyphIds,
+        persistenceRevision: persistenceQueue.revision,
         glyphEditTimes,
         selectedLayerId,
+        setPersistenceStatus,
+        markDraftSaved,
+      }).catch((error) => {
+        setPersistenceStatus('error', getErrorMessage(error))
+        console.warn('Auto draft save failed.', error)
       })
-        .then(() => {
-          markDraftSaved(
-            dirtyGlyphIds,
-            deletedGlyphIds,
-            persistenceQueue.revision
-          )
-          setPersistenceStatus('saved')
-        })
-        .catch((error) => {
-          setPersistenceStatus('error', getErrorMessage(error))
-          console.warn('Auto draft save failed.', error)
-        })
     }, AUTO_DRAFT_SAVE_DELAY_MS)
 
     return () => {
@@ -93,6 +87,7 @@ export function useAutoDraftSave() {
     overviewTopGlyphId,
     persistenceQueue.projectQueued,
     persistenceQueue.revision,
+    persistenceQueue.uiStateQueued,
     projectId,
     projectTitle,
     selectedGlyphId,

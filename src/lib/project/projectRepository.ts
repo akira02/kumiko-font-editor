@@ -2,7 +2,6 @@ import {
   deleteKumikoProjectRecord,
   loadKumikoGlyphRecord,
   loadKumikoGlyphRecords,
-  listKumikoGlyphRecordsForProject,
   listKumikoProjectRecords,
   loadKumikoProjectRecord,
   loadKumikoUiValue,
@@ -15,6 +14,7 @@ import {
   fontDataToKumikoGlyphRecords,
   fontDataToKumikoProjectRecord,
   kumikoGlyphRecordToGlyphData,
+  kumikoGlyphRecordToGlyphMetadata,
   kumikoRecordsToFontData,
 } from 'src/lib/project/kumikoFontDataAdapter'
 import { toProjectSummary } from 'src/lib/project/projectTypes'
@@ -26,6 +26,7 @@ import type {
 const PROJECT_METADATA_UI_KEY = 'projectMetadata'
 const GLYPHS_PACKAGE_UI_KEY = 'glyphsPackage'
 export const PROJECT_UI_STATE_KEY = 'projectUiState'
+const PROJECT_DRAFT_GLYPH_BATCH_SIZE = 256
 
 export type ProjectDraft = KumikoProjectDraft
 
@@ -39,8 +40,33 @@ const projectRecordToDraft = async (
   record: NonNullable<Awaited<ReturnType<typeof loadKumikoProjectRecord>>>,
   options: { metadataOnly?: boolean } = {}
 ): Promise<ProjectDraft> => {
-  const glyphRecords = await listKumikoGlyphRecordsForProject(record.projectId)
-  const fontData = kumikoRecordsToFontData(record, glyphRecords, options)
+  const fontData = kumikoRecordsToFontData(record, [], options)
+  const loadGlyphBatch = (
+    records: Awaited<ReturnType<typeof loadKumikoGlyphRecords>>
+  ) => {
+    for (const glyphRecord of records) {
+      fontData.glyphs[glyphRecord.glyphId] = options.metadataOnly
+        ? kumikoGlyphRecordToGlyphMetadata(glyphRecord)
+        : kumikoGlyphRecordToGlyphData(glyphRecord)
+    }
+  }
+
+  for (
+    let index = 0;
+    index < record.glyphOrder.length;
+    index += PROJECT_DRAFT_GLYPH_BATCH_SIZE
+  ) {
+    const glyphIds = record.glyphOrder.slice(
+      index,
+      index + PROJECT_DRAFT_GLYPH_BATCH_SIZE
+    )
+    loadGlyphBatch(
+      await loadKumikoGlyphRecords(
+        glyphIds.map((glyphId) => makeKumikoGlyphKey(record.projectId, glyphId))
+      )
+    )
+  }
+
   return {
     id: record.projectId,
     title: record.title,
@@ -97,6 +123,17 @@ export const loadProjectDraft = async (projectId: string) => {
 export const loadProjectDraftMetadata = async (projectId: string) => {
   const record = await loadKumikoProjectRecord(projectId)
   return record ? projectRecordToDraft(record, { metadataOnly: true }) : null
+}
+
+export const saveProjectUiState = async (
+  projectId: string,
+  projectUiState: ProjectDraft['projectUiState']
+) => {
+  await saveKumikoUiValue(
+    projectId,
+    PROJECT_UI_STATE_KEY,
+    projectUiState ?? null
+  )
 }
 
 export const loadProjectGlyphGeometry = async (

@@ -204,7 +204,7 @@
     "backHome": "Back home",
     "cancel": "Cancel",
     "closeProjectSaveFailed": "Could not save before closing",
-    "closeProjectSaveFailedDescription": "The project is still open. Try again later or save manually.",
+    "closeProjectSaveFailedDescription": "The project is still open. Try again later.",
     "currentTotalPrefix": "Total",
     "glyph": "Glyph",
     "glyphCardHint": "Click to view details. Double-click to enter the glyph editor.",
