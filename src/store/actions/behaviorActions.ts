@@ -32,7 +32,7 @@ import {
 } from 'src/lib/openTypeFeatures'
 import { syncFilteredGlyphList } from 'src/store/glyphSearch'
 import type { GlobalState } from 'src/store/types'
-import { markProjectDirty } from 'src/store/dirtyState'
+import { markGlyphDirty, markProjectDirty } from 'src/store/dirtyState'
 
 type ImmerSet = Parameters<
   StateCreator<GlobalState, [['zustand/immer', never]], []>
@@ -228,19 +228,3 @@ export const buildBehaviorActions = (set: ImmerSet) => ({
       markProjectDirty(state)
     }),
 })
-
-function markGlyphDirty(state: GlobalState, glyphId: string) {
-  markProjectDirty(state)
-  const editedAt = Date.now()
-  state.glyphEditTimes[glyphId] = editedAt
-  if (!state.dirtyGlyphIds.includes(glyphId)) {
-    state.dirtyGlyphIds.push(glyphId)
-  }
-  if (!state.localDirtyGlyphIds.includes(glyphId)) {
-    state.localDirtyGlyphIds.push(glyphId)
-  }
-  state.deletedGlyphIds = state.deletedGlyphIds.filter((id) => id !== glyphId)
-  state.localDeletedGlyphIds = state.localDeletedGlyphIds.filter(
-    (id) => id !== glyphId
-  )
-}

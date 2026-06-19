@@ -6,38 +6,54 @@ interface FlushPendingDraftInput {
   projectId: string
   projectTitle: string
   fontData: FontData
+  projectQueued?: boolean
   dirtyGlyphIds: string[]
   deletedGlyphIds: string[]
+  persistenceRevision?: number
   glyphEditTimes: GlyphEditTimes
   selectedLayerId: string | null
   setPersistenceStatus: (
     status: PersistenceStatus,
     error?: string | null
   ) => void
-  markDraftSaved: (savedDirtyIds?: string[], savedDeletedIds?: string[]) => void
+  markDraftSaved: (
+    savedDirtyIds?: string[],
+    savedDeletedIds?: string[],
+    savedRevision?: number
+  ) => void
 }
 
 const getErrorMessage = (error: unknown, fallback: string) =>
   error instanceof Error ? error.message : fallback
 
 export const hasPendingDraftChanges = ({
+  projectQueued,
   dirtyGlyphIds,
   deletedGlyphIds,
-}: Pick<FlushPendingDraftInput, 'dirtyGlyphIds' | 'deletedGlyphIds'>) =>
-  dirtyGlyphIds.length > 0 || deletedGlyphIds.length > 0
+}: Pick<
+  FlushPendingDraftInput,
+  'projectQueued' | 'dirtyGlyphIds' | 'deletedGlyphIds'
+>) =>
+  Boolean(projectQueued) ||
+  dirtyGlyphIds.length > 0 ||
+  deletedGlyphIds.length > 0
 
 export const flushPendingDraft = async ({
   projectId,
   projectTitle,
   fontData,
+  projectQueued = false,
   dirtyGlyphIds,
   deletedGlyphIds,
+  persistenceRevision,
   glyphEditTimes,
   selectedLayerId,
   setPersistenceStatus,
   markDraftSaved,
 }: FlushPendingDraftInput) => {
-  if (!hasPendingDraftChanges({ dirtyGlyphIds, deletedGlyphIds })) {
+  if (
+    !hasPendingDraftChanges({ projectQueued, dirtyGlyphIds, deletedGlyphIds })
+  ) {
     return false
   }
 
@@ -49,10 +65,11 @@ export const flushPendingDraft = async ({
       fontData,
       dirtyGlyphIds,
       deletedGlyphIds,
+      projectQueued,
       glyphEditTimes,
       selectedLayerId,
     })
-    markDraftSaved(dirtyGlyphIds, deletedGlyphIds)
+    markDraftSaved(dirtyGlyphIds, deletedGlyphIds, persistenceRevision)
     setPersistenceStatus('saved')
     return true
   } catch (error) {

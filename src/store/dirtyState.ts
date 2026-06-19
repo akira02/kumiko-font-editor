@@ -1,44 +1,75 @@
 import type { GlobalState } from 'src/store/types'
 
-export const markProjectDirty = (state: GlobalState) => {
+const markPersistenceQueued = (state: GlobalState) => {
   state.isDirty = true
-  state.hasLocalChanges = true
   state.persistenceStatus = 'queued'
   state.persistenceError = null
+  state.persistenceQueue.status = 'queued'
+  state.persistenceQueue.lastError = null
+}
+
+const nextPersistenceRevision = (state: GlobalState) => {
+  state.persistenceQueue.revision += 1
+  return state.persistenceQueue.revision
+}
+
+const addUnique = (values: string[], value: string) => {
+  if (!values.includes(value)) {
+    values.push(value)
+  }
+}
+
+const removeValue = (values: string[], value: string) =>
+  values.filter((item) => item !== value)
+
+export const markProjectDirty = (state: GlobalState) => {
+  const revision = nextPersistenceRevision(state)
+  markPersistenceQueued(state)
+  state.hasLocalChanges = true
+  state.persistenceQueue.projectQueued = true
+  state.persistenceQueue.projectRevision = revision
 }
 
 export const markGlyphDirty = (state: GlobalState, glyphId: string) => {
-  markProjectDirty(state)
+  const revision = nextPersistenceRevision(state)
+  markPersistenceQueued(state)
+  state.hasLocalChanges = true
   state.glyphEditTimes[glyphId] = Date.now()
-  if (!state.dirtyGlyphIds.includes(glyphId)) {
-    state.dirtyGlyphIds.push(glyphId)
-  }
-  if (!state.localDirtyGlyphIds.includes(glyphId)) {
-    state.localDirtyGlyphIds.push(glyphId)
-  }
+  addUnique(state.dirtyGlyphIds, glyphId)
+  addUnique(state.localDirtyGlyphIds, glyphId)
+  addUnique(state.persistenceQueue.glyphIds, glyphId)
+  state.persistenceQueue.glyphRevisions[glyphId] = revision
+  state.persistenceQueue.deletedGlyphIds = removeValue(
+    state.persistenceQueue.deletedGlyphIds,
+    glyphId
+  )
+  delete state.persistenceQueue.deletedGlyphRevisions[glyphId]
 }
 
 // An added glyph is dirty and must drop any pending deletion of the same id.
 export const markGlyphAdded = (state: GlobalState, glyphId: string) => {
   markGlyphDirty(state, glyphId)
-  state.deletedGlyphIds = state.deletedGlyphIds.filter((id) => id !== glyphId)
-  state.localDeletedGlyphIds = state.localDeletedGlyphIds.filter(
-    (id) => id !== glyphId
-  )
+  markProjectDirty(state)
+  state.deletedGlyphIds = removeValue(state.deletedGlyphIds, glyphId)
+  state.localDeletedGlyphIds = removeValue(state.localDeletedGlyphIds, glyphId)
 }
 
 // A deleted glyph drops its dirty/edit-time tracking and is queued for removal.
 export const markGlyphDeleted = (state: GlobalState, glyphId: string) => {
-  markProjectDirty(state)
+  const revision = nextPersistenceRevision(state)
+  markPersistenceQueued(state)
+  state.hasLocalChanges = true
   delete state.glyphEditTimes[glyphId]
-  state.dirtyGlyphIds = state.dirtyGlyphIds.filter((id) => id !== glyphId)
-  state.localDirtyGlyphIds = state.localDirtyGlyphIds.filter(
-    (id) => id !== glyphId
+  state.dirtyGlyphIds = removeValue(state.dirtyGlyphIds, glyphId)
+  state.localDirtyGlyphIds = removeValue(state.localDirtyGlyphIds, glyphId)
+  state.persistenceQueue.glyphIds = removeValue(
+    state.persistenceQueue.glyphIds,
+    glyphId
   )
-  if (!state.deletedGlyphIds.includes(glyphId)) {
-    state.deletedGlyphIds.push(glyphId)
-  }
-  if (!state.localDeletedGlyphIds.includes(glyphId)) {
-    state.localDeletedGlyphIds.push(glyphId)
-  }
+  delete state.persistenceQueue.glyphRevisions[glyphId]
+  addUnique(state.deletedGlyphIds, glyphId)
+  addUnique(state.localDeletedGlyphIds, glyphId)
+  addUnique(state.persistenceQueue.deletedGlyphIds, glyphId)
+  state.persistenceQueue.deletedGlyphRevisions[glyphId] = revision
+  markProjectDirty(state)
 }

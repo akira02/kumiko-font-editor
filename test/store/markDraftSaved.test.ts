@@ -7,10 +7,33 @@ const makeGlyph = (id: string): GlyphData =>
     id,
     name: id,
     unicodes: [],
-    metrics: { width: 1000, lsb: 0, rsb: 0 },
-    paths: [],
-    components: [],
-    componentRefs: [],
+    activeLayerId: 'public.default',
+    layerOrder: ['public.default'],
+    layers: {
+      'public.default': {
+        id: 'public.default',
+        name: 'public.default',
+        paths: [
+          {
+            id: 'path-1',
+            closed: false,
+            nodes: [
+              {
+                id: 'node-1',
+                kind: 'oncurve',
+                segmentType: 'line',
+                x: 0,
+                y: 0,
+              },
+            ],
+          },
+        ],
+        componentRefs: [],
+        anchors: [],
+        guidelines: [],
+        metrics: { width: 1000, lsb: 0, rsb: 0 },
+      },
+    },
   }) as unknown as GlyphData
 
 const loadFont = () => {
@@ -55,6 +78,52 @@ describe('markDraftSaved', () => {
     expect(useStore.getState().dirtyGlyphIds).toEqual(['B'])
     expect(useStore.getState().deletedGlyphIds).toEqual(['D'])
     expect(useStore.getState().isDirty).toBe(true)
+  })
+
+  it('keeps a glyph queued when it was edited after the saved revision', () => {
+    loadFont()
+    useStore
+      .getState()
+      .updateNodePosition('A', 'path-1', 'node-1', { x: 10, y: 0 })
+    const savedRevision = useStore.getState().persistenceQueue.revision
+    useStore
+      .getState()
+      .updateNodePosition('A', 'path-1', 'node-1', { x: 20, y: 0 })
+
+    useStore.getState().markDraftSaved(['A'], [], savedRevision)
+
+    expect(useStore.getState().dirtyGlyphIds).toEqual(['A'])
+    expect(useStore.getState().isDirty).toBe(true)
+    expect(useStore.getState().persistenceQueue.glyphIds).toEqual(['A'])
+  })
+
+  it('queues project-only changes separately from glyph edits', () => {
+    loadFont()
+
+    useStore.getState().updateFontInfo({
+      fontInfo: { familyName: 'Renamed Project', customData: {} },
+    })
+
+    expect(useStore.getState().dirtyGlyphIds).toEqual([])
+    expect(useStore.getState().persistenceQueue.projectQueued).toBe(true)
+    expect(useStore.getState().isDirty).toBe(true)
+  })
+
+  it('does not report saved while newer queued edits remain', () => {
+    loadFont()
+    useStore
+      .getState()
+      .updateNodePosition('A', 'path-1', 'node-1', { x: 10, y: 0 })
+    const savedRevision = useStore.getState().persistenceQueue.revision
+    useStore
+      .getState()
+      .updateNodePosition('A', 'path-1', 'node-1', { x: 20, y: 0 })
+
+    useStore.getState().markDraftSaved(['A'], [], savedRevision)
+    useStore.getState().setPersistenceStatus('saved')
+
+    expect(useStore.getState().persistenceStatus).toBe('queued')
+    expect(useStore.getState().persistenceQueue.status).toBe('queued')
   })
 
   it('clears the dirty flag when nothing remains', () => {

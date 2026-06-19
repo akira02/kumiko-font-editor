@@ -341,6 +341,18 @@ export type WorkspaceView = 'overview' | 'editor'
 export type OverviewGroupByState = 'none' | 'script' | 'block'
 export type PersistenceStatus = 'idle' | 'queued' | 'saving' | 'saved' | 'error'
 
+export interface PersistenceQueueState {
+  projectQueued: boolean
+  glyphIds: string[]
+  deletedGlyphIds: string[]
+  revision: number
+  projectRevision: number | null
+  glyphRevisions: Record<string, number>
+  deletedGlyphRevisions: Record<string, number>
+  status: PersistenceStatus
+  lastError: string | null
+}
+
 export interface GlobalState {
   fontData: FontData | null
   projectId: string | null
@@ -348,6 +360,7 @@ export interface GlobalState {
   isDirty: boolean
   persistenceStatus: PersistenceStatus
   persistenceError: string | null
+  persistenceQueue: PersistenceQueueState
   dirtyGlyphIds: string[]
   deletedGlyphIds: string[]
   hasLocalChanges: boolean
@@ -558,7 +571,11 @@ export interface GlobalState {
     glyphEditTimes?: GlyphEditTimes
   ) => void
   closeProjectState: () => void
-  markDraftSaved: (savedDirtyIds?: string[], savedDeletedIds?: string[]) => void
+  markDraftSaved: (
+    savedDirtyIds?: string[],
+    savedDeletedIds?: string[],
+    savedRevision?: number
+  ) => void
   setPersistenceStatus: (
     status: PersistenceStatus,
     error?: string | null

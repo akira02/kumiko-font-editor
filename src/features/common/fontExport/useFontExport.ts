@@ -65,6 +65,7 @@ export function useFontExport() {
   const selectedLayerId = useStore((state) => state.selectedLayerId)
   const dirtyGlyphIds = useStore((state) => state.dirtyGlyphIds)
   const deletedGlyphIds = useStore((state) => state.deletedGlyphIds)
+  const persistenceQueue = useStore((state) => state.persistenceQueue)
   const glyphEditTimes = useStore((state) => state.glyphEditTimes)
   const markDraftSaved = useStore((state) => state.markDraftSaved)
   const markLocalSaved = useStore((state) => state.markLocalSaved)
@@ -110,8 +111,10 @@ export function useFontExport() {
         projectId,
         projectTitle: projectTitle || projectId,
         fontData,
+        projectQueued: persistenceQueue.projectQueued,
         dirtyGlyphIds,
         deletedGlyphIds,
+        persistenceRevision: persistenceQueue.revision,
         glyphEditTimes,
         selectedLayerId,
         setPersistenceStatus,

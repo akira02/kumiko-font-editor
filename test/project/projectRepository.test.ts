@@ -316,6 +316,45 @@ describe('projectRepository canonical storage', () => {
     expect(glyphA?.syncDirty).toBe(1)
   })
 
+  it('autosaves project-only metadata changes without dirty glyphs', async () => {
+    await saveProjectDraft({
+      id: 'project-only-autosave',
+      title: 'Project Only Autosave',
+      lastModified: 20,
+      createdAt: 10,
+      updatedAt: 20,
+      sourceName: 'ProjectOnly.ufo',
+      sourceType: 'local',
+      fontData,
+      projectMetadata: null,
+      projectSourceData: null,
+      projectSourceFormat: 'ufo',
+    })
+
+    const nextFontData: FontData = {
+      ...fontData,
+      fontInfo: {
+        familyName: 'Renamed Family',
+        customData: {},
+      },
+    }
+    await saveDraftSnapshot({
+      projectId: 'project-only-autosave',
+      projectTitle: 'Project Only Autosave',
+      fontData: nextFontData,
+      dirtyGlyphIds: [],
+      deletedGlyphIds: [],
+      projectQueued: true,
+      glyphEditTimes: {},
+      selectedLayerId: 'public.default',
+    })
+
+    const project = await loadKumikoProjectRecord('project-only-autosave')
+    expect(project?.fontInfo?.familyName).toBe('Renamed Family')
+    expect(project?.exportDirty).toBe(1)
+    expect(project?.syncDirty).toBe(1)
+  })
+
   it('loads project drafts as glyph metadata without resident geometry', async () => {
     const componentFontData: FontData = {
       glyphOrder: ['A', 'B'],

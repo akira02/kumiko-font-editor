@@ -52,6 +52,7 @@ export const saveDraftSnapshot = async (input: {
   fontData: FontData
   dirtyGlyphIds: string[]
   deletedGlyphIds: string[]
+  projectQueued?: boolean
   glyphEditTimes: GlyphEditTimes
   selectedLayerId: string | null
 }) => {
@@ -67,6 +68,7 @@ export const saveDraftSnapshot = async (input: {
 
   const nextGlyphOrder = getGlyphOrder(input.fontData)
   const projectChanged =
+    input.projectQueued ||
     !persistedProject ||
     persistedProject.title !== input.projectTitle ||
     input.deletedGlyphIds.length > 0 ||

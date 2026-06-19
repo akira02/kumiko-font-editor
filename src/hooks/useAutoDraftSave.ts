@@ -13,6 +13,7 @@ export function useAutoDraftSave() {
   const projectTitle = useStore((state) => state.projectTitle)
   const dirtyGlyphIds = useStore((state) => state.dirtyGlyphIds)
   const deletedGlyphIds = useStore((state) => state.deletedGlyphIds)
+  const persistenceQueue = useStore((state) => state.persistenceQueue)
   const glyphEditTimes = useStore((state) => state.glyphEditTimes)
   const selectedLayerId = useStore((state) => state.selectedLayerId)
   const isDirty = useStore((state) => state.isDirty)
@@ -39,13 +40,18 @@ export function useAutoDraftSave() {
         projectId,
         projectTitle,
         fontData,
+        projectQueued: persistenceQueue.projectQueued,
         dirtyGlyphIds,
         deletedGlyphIds,
         glyphEditTimes,
         selectedLayerId,
       })
         .then(() => {
-          markDraftSaved(dirtyGlyphIds, deletedGlyphIds)
+          markDraftSaved(
+            dirtyGlyphIds,
+            deletedGlyphIds,
+            persistenceQueue.revision
+          )
           setPersistenceStatus('saved')
         })
         .catch((error) => {
@@ -67,6 +73,8 @@ export function useAutoDraftSave() {
     glyphEditTimes,
     isDirty,
     markDraftSaved,
+    persistenceQueue.projectQueued,
+    persistenceQueue.revision,
     projectId,
     projectTitle,
     selectedLayerId,

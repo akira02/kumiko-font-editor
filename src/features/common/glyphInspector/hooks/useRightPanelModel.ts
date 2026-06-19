@@ -33,6 +33,7 @@ export function useRightPanelModel() {
   const isDirty = useStore((state) => state.isDirty)
   const dirtyGlyphIds = useStore((state) => state.dirtyGlyphIds)
   const deletedGlyphIds = useStore((state) => state.deletedGlyphIds)
+  const persistenceQueue = useStore((state) => state.persistenceQueue)
   const glyphEditTimes = useStore((state) => state.glyphEditTimes)
   const setPersistenceStatus = useStore((state) => state.setPersistenceStatus)
   const hasLocalChanges = useStore((state) => state.hasLocalChanges)
@@ -245,8 +246,10 @@ export function useRightPanelModel() {
         projectId,
         projectTitle,
         fontData,
+        projectQueued: persistenceQueue.projectQueued,
         dirtyGlyphIds,
         deletedGlyphIds,
+        persistenceRevision: persistenceQueue.revision,
         glyphEditTimes,
         selectedLayerId,
         setPersistenceStatus,

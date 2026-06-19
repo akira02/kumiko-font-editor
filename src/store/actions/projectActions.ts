@@ -27,6 +27,29 @@ type ImmerSet = Parameters<
   StateCreator<GlobalState, [['zustand/immer', never]], []>
 >[0]
 
+const createEmptyPersistenceQueue = (): GlobalState['persistenceQueue'] => ({
+  projectQueued: false,
+  glyphIds: [],
+  deletedGlyphIds: [],
+  revision: 0,
+  projectRevision: null,
+  glyphRevisions: {},
+  deletedGlyphRevisions: {},
+  status: 'idle',
+  lastError: null,
+})
+
+const hasQueuedPersistence = (state: GlobalState) =>
+  state.persistenceQueue.projectQueued ||
+  state.persistenceQueue.glyphIds.length > 0 ||
+  state.persistenceQueue.deletedGlyphIds.length > 0
+
+const syncDirtyListsFromQueue = (state: GlobalState) => {
+  state.dirtyGlyphIds = [...state.persistenceQueue.glyphIds]
+  state.deletedGlyphIds = [...state.persistenceQueue.deletedGlyphIds]
+  state.isDirty = hasQueuedPersistence(state)
+}
+
 export const buildProjectActions = (
   set: ImmerSet,
   clearTemporal: () => void
@@ -52,6 +75,7 @@ export const buildProjectActions = (
       state.isDirty = false
       state.persistenceStatus = 'idle'
       state.persistenceError = null
+      state.persistenceQueue = createEmptyPersistenceQueue()
       state.dirtyGlyphIds = []
       state.deletedGlyphIds = []
       state.hasLocalChanges = false
@@ -163,6 +187,7 @@ export const buildProjectActions = (
       state.isDirty = false
       state.persistenceStatus = 'idle'
       state.persistenceError = null
+      state.persistenceQueue = createEmptyPersistenceQueue()
       state.dirtyGlyphIds = []
       state.deletedGlyphIds = []
       state.hasLocalChanges = false
@@ -189,24 +214,73 @@ export const buildProjectActions = (
 
   // Pass the ids that were actually persisted so edits made during an async
   // save are not cleared; omit both to clear everything (full save/commit).
-  markDraftSaved: (savedDirtyIds?: string[], savedDeletedIds?: string[]) =>
+  markDraftSaved: (
+    savedDirtyIds?: string[],
+    savedDeletedIds?: string[],
+    savedRevision?: number
+  ) =>
     set((state) => {
       if (!savedDirtyIds && !savedDeletedIds) {
         state.isDirty = false
         state.dirtyGlyphIds = []
         state.deletedGlyphIds = []
+        state.persistenceQueue = {
+          ...createEmptyPersistenceQueue(),
+          revision: state.persistenceQueue.revision,
+        }
         return
       }
       const savedDirty = new Set(savedDirtyIds ?? [])
       const savedDeleted = new Set(savedDeletedIds ?? [])
-      state.dirtyGlyphIds = state.dirtyGlyphIds.filter(
-        (id) => !savedDirty.has(id)
+      const canClearRevision = (revision: number | undefined) =>
+        savedRevision === undefined || (revision ?? 0) <= savedRevision
+
+      if (!hasQueuedPersistence(state) && savedRevision === undefined) {
+        state.dirtyGlyphIds = state.dirtyGlyphIds.filter(
+          (id) => !savedDirty.has(id)
+        )
+        state.deletedGlyphIds = state.deletedGlyphIds.filter(
+          (id) => !savedDeleted.has(id)
+        )
+        state.isDirty =
+          state.dirtyGlyphIds.length > 0 || state.deletedGlyphIds.length > 0
+        return
+      }
+
+      state.persistenceQueue.glyphIds = state.persistenceQueue.glyphIds.filter(
+        (id) => {
+          if (
+            savedDirty.has(id) &&
+            canClearRevision(state.persistenceQueue.glyphRevisions[id])
+          ) {
+            delete state.persistenceQueue.glyphRevisions[id]
+            return false
+          }
+          return true
+        }
       )
-      state.deletedGlyphIds = state.deletedGlyphIds.filter(
-        (id) => !savedDeleted.has(id)
-      )
-      state.isDirty =
-        state.dirtyGlyphIds.length > 0 || state.deletedGlyphIds.length > 0
+      state.persistenceQueue.deletedGlyphIds =
+        state.persistenceQueue.deletedGlyphIds.filter((id) => {
+          if (
+            savedDeleted.has(id) &&
+            canClearRevision(state.persistenceQueue.deletedGlyphRevisions[id])
+          ) {
+            delete state.persistenceQueue.deletedGlyphRevisions[id]
+            return false
+          }
+          return true
+        })
+      if (
+        state.persistenceQueue.projectQueued &&
+        canClearRevision(state.persistenceQueue.projectRevision ?? undefined)
+      ) {
+        state.persistenceQueue.projectQueued = false
+        state.persistenceQueue.projectRevision = null
+      }
+      syncDirtyListsFromQueue(state)
+      if (!state.isDirty && state.persistenceQueue.status === 'saving') {
+        state.persistenceQueue.status = 'saved'
+      }
     }),
 
   setPersistenceStatus: (
@@ -214,8 +288,17 @@ export const buildProjectActions = (
     error: string | null = null
   ) =>
     set((state) => {
+      if (status === 'saved' && hasQueuedPersistence(state)) {
+        state.persistenceStatus = 'queued'
+        state.persistenceError = null
+        state.persistenceQueue.status = 'queued'
+        state.persistenceQueue.lastError = null
+        return
+      }
       state.persistenceStatus = status
       state.persistenceError = error
+      state.persistenceQueue.status = status
+      state.persistenceQueue.lastError = error
     }),
 
   markLocalSaved: () =>

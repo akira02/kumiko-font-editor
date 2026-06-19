@@ -17,6 +17,7 @@ export function useCloseProjectWithDraftSave() {
   const fontData = useStore((state) => state.fontData)
   const dirtyGlyphIds = useStore((state) => state.dirtyGlyphIds)
   const deletedGlyphIds = useStore((state) => state.deletedGlyphIds)
+  const persistenceQueue = useStore((state) => state.persistenceQueue)
   const glyphEditTimes = useStore((state) => state.glyphEditTimes)
   const selectedLayerId = useStore((state) => state.selectedLayerId)
   const [isClosingProject, setIsClosingProject] = useState(false)
@@ -48,8 +49,10 @@ export function useCloseProjectWithDraftSave() {
         projectId,
         projectTitle,
         fontData,
+        projectQueued: persistenceQueue.projectQueued,
         dirtyGlyphIds,
         deletedGlyphIds,
+        persistenceRevision: persistenceQueue.revision,
         glyphEditTimes,
         selectedLayerId,
         setPersistenceStatus,
@@ -78,6 +81,8 @@ export function useCloseProjectWithDraftSave() {
     isClosingProject,
     isDirty,
     markDraftSaved,
+    persistenceQueue.projectQueued,
+    persistenceQueue.revision,
     projectId,
     projectTitle,
     selectedLayerId,

@@ -50,7 +50,11 @@ interface UseGitHubCommitFlowInput {
   localDirtyGlyphIds: string[]
   localDeletedGlyphIds: string[]
   glyphEditTimes: GlyphEditTimes
-  markDraftSaved: (savedDirtyIds?: string[], savedDeletedIds?: string[]) => void
+  markDraftSaved: (
+    savedDirtyIds?: string[],
+    savedDeletedIds?: string[],
+    savedRevision?: number
+  ) => void
 }
 
 interface ScopedForkStatusOverride {
@@ -91,6 +95,7 @@ export const useGitHubCommitFlow = ({
   const toast = useToast()
   const { t } = useTranslation()
   const setPersistenceStatus = useStore((state) => state.setPersistenceStatus)
+  const persistenceQueue = useStore((state) => state.persistenceQueue)
   const gitHubModal = useDisclosure()
   const [isPreparingGitHubCommit, setIsPreparingGitHubCommit] = useState(false)
   const [forkStatusOverrideState, setForkStatusOverrideState] =
@@ -306,8 +311,10 @@ export const useGitHubCommitFlow = ({
         projectId,
         projectTitle,
         fontData,
+        projectQueued: persistenceQueue.projectQueued,
         dirtyGlyphIds: localDirtyGlyphIds,
         deletedGlyphIds: localDeletedGlyphIds,
+        persistenceRevision: persistenceQueue.revision,
         glyphEditTimes,
         selectedLayerId,
         setPersistenceStatus,
@@ -442,8 +449,10 @@ export const useGitHubCommitFlow = ({
         projectId,
         projectTitle,
         fontData,
+        projectQueued: persistenceQueue.projectQueued,
         dirtyGlyphIds: localDirtyGlyphIds,
         deletedGlyphIds: localDeletedGlyphIds,
+        persistenceRevision: persistenceQueue.revision,
         glyphEditTimes,
         selectedLayerId: activeLayerId,
         setPersistenceStatus,
