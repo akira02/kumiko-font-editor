@@ -71,12 +71,17 @@ export function useHomeProjects() {
   const githubImport = useGitHubImport(importHandlers)
 
   const handleOpenProject = async (project: (typeof projects)[number]) => {
-    const loadedProject = await openProject(project)
-    if (!loadedProject) {
-      return
-    }
+    try {
+      const loadedProject = await openProject(project)
+      if (!loadedProject) {
+        return
+      }
 
-    await loadImportedProject(loadedProject)
+      await loadImportedProject(loadedProject)
+    } catch (err) {
+      console.error(err)
+      alert(err instanceof Error ? err.message : '開啟專案失敗')
+    }
   }
 
   const handleRenameProject = async (id: string, title: string) => {

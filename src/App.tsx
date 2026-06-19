@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react'
 import { useAutoDraftSave } from 'src/hooks/useAutoDraftSave'
+import { useProjectWriteLockHeartbeat } from 'src/hooks/useProjectWriteLockHeartbeat'
 import { useStore } from 'src/store'
 
 const Home = lazy(() =>
@@ -21,6 +22,7 @@ function App() {
   const workspaceView = useStore((state) => state.workspaceView)
 
   useAutoDraftSave()
+  useProjectWriteLockHeartbeat()
 
   if (!fontData) {
     return (

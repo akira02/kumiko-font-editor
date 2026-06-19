@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '@chakra-ui/react'
 import { flushPendingDraft } from 'src/lib/project/flushPendingDraft'
+import { releaseProjectWriteLock } from 'src/lib/project/projectWriteLock'
 import { useStore } from 'src/store'
 
 export function useCloseProjectWithDraftSave() {
@@ -26,11 +27,17 @@ export function useCloseProjectWithDraftSave() {
     }
 
     if (!isDirty) {
+      if (projectId) {
+        await releaseProjectWriteLock(projectId)
+      }
       closeProjectState()
       return
     }
 
     if (!fontData || !projectId || !projectTitle) {
+      if (projectId) {
+        await releaseProjectWriteLock(projectId)
+      }
       closeProjectState()
       return
     }
@@ -48,6 +55,7 @@ export function useCloseProjectWithDraftSave() {
         setPersistenceStatus,
         markDraftSaved,
       })
+      await releaseProjectWriteLock(projectId)
       closeProjectState()
     } catch (error) {
       console.warn('Save before closing project failed.', error)
