@@ -49,6 +49,7 @@ export type {
   GlyphGuideline,
   GlyphImage,
   GlyphLayerData,
+  GlyphLayerContent,
   GlyphMetrics,
   GlyphSourceData,
   GlyphVerticalMetrics,

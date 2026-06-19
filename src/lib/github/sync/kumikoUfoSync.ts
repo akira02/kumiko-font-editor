@@ -42,7 +42,6 @@ import type {
   UfoLayerRecord,
   UfoMetadataRecord,
 } from 'src/lib/fontFormats/ufoTypes'
-import { getComponentMatrix } from 'src/lib/components/componentTransform'
 import { parseUfoColor, serializeUfoColor } from 'src/lib/color/kumikoColor'
 import {
   glyphDataToKumikoGlyphRecord,
@@ -216,7 +215,7 @@ const toUfoGlyphRecord = (input: {
     })),
     contours: layer.paths.map((path) => pathToUfoContour(path)),
     components: layer.componentRefs.map((component) => {
-      const matrix = getComponentMatrix(component)
+      const matrix = component.transform
       return {
         base: component.glyphId,
         identifier: component.identifier ?? component.id,

@@ -73,6 +73,8 @@ const fontData = {
               y: 20,
               scaleX: 1,
               scaleY: 1,
+              xyScale: 0.25,
+              yxScale: -0.5,
               rotation: 0,
             },
           ],
@@ -133,8 +135,14 @@ describe('kumikoFontDataAdapter', () => {
     expect(glyphs[0].layers.M1.customData).toEqual({ layerFlag: true })
     expect(glyphs[0].layers['backup-1'].componentRefs[0]).toMatchObject({
       glyphId: 'base',
-      x: 10,
-      y: 20,
+      transform: {
+        a: 1,
+        b: 0.25,
+        c: -0.5,
+        d: 1,
+        e: 10,
+        f: 20,
+      },
     })
     expect('components' in glyphs[0].layers['backup-1']).toBe(false)
   })
@@ -170,6 +178,18 @@ describe('kumikoFontDataAdapter', () => {
     expect(rebuilt.glyphs.A.layers?.M1.image?.fileName).toBe('sketch.png')
     expect(rebuilt.glyphs.A.layers?.M1.customData).toEqual({
       layerFlag: true,
+    })
+    expect(
+      rebuilt.glyphs.A.layers?.['backup-1'].componentRefs[0]
+    ).toMatchObject({
+      glyphId: 'base',
+      x: 10,
+      y: 20,
+      scaleX: 1,
+      scaleY: 1,
+      xyScale: 0.25,
+      yxScale: -0.5,
+      rotation: 0,
     })
   })
 

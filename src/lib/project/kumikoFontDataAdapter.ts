@@ -1,13 +1,17 @@
 import type {
+  KumikoGlyphComponentRefRecord,
   KumikoGlyphLayerRecord,
   KumikoGlyphRecord,
+  KumikoGlyphLayerContentRecord,
   KumikoGlyphStoreRecord,
   KumikoProjectRecord,
   KumikoProjectSourceFormat,
 } from 'src/lib/project/kumikoProjectTypes'
 import type {
   FontData,
+  GlyphComponentRef,
   GlyphData,
+  GlyphLayerContent,
   GlyphLayerData,
   GlyphSourceData,
   PathSegmentType,
@@ -15,6 +19,7 @@ import type {
 import { hashString } from 'src/lib/hash'
 import { deterministicStringify } from 'src/store/deterministicStringify'
 import { normalizeUnicodeHex } from 'src/lib/project/unicode'
+import { getComponentMatrix } from 'src/lib/components/componentTransform'
 
 const getGlyphUnicodes = (glyph: GlyphData) => {
   const values = glyph.unicodes ?? []
@@ -139,6 +144,58 @@ const deriveComponentGlyphIds = (
   return [...ids].sort((left, right) => left.localeCompare(right))
 }
 
+const toKumikoComponentRefRecord = (
+  componentRef: GlyphComponentRef
+): KumikoGlyphComponentRefRecord => ({
+  id: componentRef.id,
+  identifier: componentRef.identifier,
+  name: componentRef.name,
+  glyphId: componentRef.glyphId,
+  color: componentRef.color,
+  customData: componentRef.customData,
+  sourceData: componentRef.sourceData,
+  transform: getComponentMatrix(componentRef),
+})
+
+const toKumikoLayerContentRecord = (
+  content: GlyphLayerContent
+): KumikoGlyphLayerContentRecord => ({
+  paths: content.paths,
+  componentRefs: content.componentRefs.map(toKumikoComponentRefRecord),
+  anchors: content.anchors,
+  guidelines: content.guidelines,
+  metrics: content.metrics,
+})
+
+const toGlyphComponentRef = (
+  componentRef: KumikoGlyphComponentRefRecord
+): GlyphComponentRef => ({
+  id: componentRef.id,
+  identifier: componentRef.identifier,
+  name: componentRef.name,
+  glyphId: componentRef.glyphId,
+  x: componentRef.transform.e,
+  y: componentRef.transform.f,
+  scaleX: componentRef.transform.a,
+  xyScale: componentRef.transform.b,
+  yxScale: componentRef.transform.c,
+  scaleY: componentRef.transform.d,
+  rotation: 0,
+  color: componentRef.color,
+  customData: componentRef.customData,
+  sourceData: componentRef.sourceData,
+})
+
+const toGlyphLayerContent = (
+  content: KumikoGlyphLayerContentRecord
+): GlyphLayerContent => ({
+  paths: content.paths,
+  componentRefs: content.componentRefs.map(toGlyphComponentRef),
+  anchors: content.anchors,
+  guidelines: content.guidelines,
+  metrics: content.metrics,
+})
+
 const toKumikoLayerRecord = (layer: GlyphLayerData): KumikoGlyphLayerRecord => {
   assertSourceDataHasNoGeometry(
     layer.sourceData,
@@ -151,7 +208,7 @@ const toKumikoLayerRecord = (layer: GlyphLayerData): KumikoGlyphLayerRecord => {
     associatedMasterId: layer.associatedMasterId,
     outlineKind: deriveLayerOutlineKind(layer),
     paths: layer.paths,
-    componentRefs: layer.componentRefs,
+    componentRefs: layer.componentRefs.map(toKumikoComponentRefRecord),
     anchors: layer.anchors,
     guidelines: layer.guidelines,
     metrics: layer.metrics,
@@ -159,7 +216,9 @@ const toKumikoLayerRecord = (layer: GlyphLayerData): KumikoGlyphLayerRecord => {
     color: layer.color,
     visible: layer.visible,
     locked: layer.locked,
-    background: layer.background,
+    background: layer.background
+      ? toKumikoLayerContentRecord(layer.background)
+      : null,
     image: layer.image,
     customData: layer.customData,
     sourceData: layer.sourceData as GlyphSourceData | undefined,
@@ -307,7 +366,7 @@ const toGlyphLayerData = (layer: KumikoGlyphLayerRecord): GlyphLayerData => ({
   type: layer.type,
   associatedMasterId: layer.associatedMasterId,
   paths: layer.paths,
-  componentRefs: layer.componentRefs,
+  componentRefs: layer.componentRefs.map(toGlyphComponentRef),
   anchors: layer.anchors,
   guidelines: layer.guidelines,
   metrics: layer.metrics,
@@ -315,7 +374,7 @@ const toGlyphLayerData = (layer: KumikoGlyphLayerRecord): GlyphLayerData => ({
   color: layer.color,
   visible: layer.visible,
   locked: layer.locked,
-  background: layer.background,
+  background: layer.background ? toGlyphLayerContent(layer.background) : null,
   image: layer.image,
   customData: layer.customData,
   sourceData: layer.sourceData as GlyphSourceData | undefined,

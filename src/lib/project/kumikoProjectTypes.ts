@@ -9,13 +9,16 @@ import type {
   FontInfo,
   FontProjectSettings,
   FontSource,
+  GlyphComponentRef,
   GlyphLayerData,
+  GlyphLayerContent,
   KumikoColor,
   KerningGroup,
   KerningPair,
   OpenTypeFeatures,
   OpenTypeFeaturesState,
 } from 'src/store'
+import type { ComponentMatrix } from 'src/lib/components/componentTransform'
 
 export type KumikoProjectSourceFormat =
   | 'glyphs'
@@ -107,11 +110,27 @@ export interface KumikoLayerSourceData {
 
 export interface KumikoGlyphLayerRecord extends Omit<
   GlyphLayerData,
-  'components' | 'type' | 'sourceData'
+  'components' | 'type' | 'sourceData' | 'componentRefs' | 'background'
 > {
   type: 'master' | 'backup' | 'brace' | 'bracket'
   outlineKind: 'cubic' | 'quadratic'
+  componentRefs: KumikoGlyphComponentRefRecord[]
+  background?: KumikoGlyphLayerContentRecord | null
   sourceData?: KumikoLayerSourceData
+}
+
+export interface KumikoGlyphComponentRefRecord extends Omit<
+  GlyphComponentRef,
+  'x' | 'y' | 'scaleX' | 'scaleY' | 'rotation' | 'xyScale' | 'yxScale'
+> {
+  transform: ComponentMatrix
+}
+
+export interface KumikoGlyphLayerContentRecord extends Omit<
+  GlyphLayerContent,
+  'componentRefs'
+> {
+  componentRefs: KumikoGlyphComponentRefRecord[]
 }
 
 export interface KumikoGlyphSourceData {
