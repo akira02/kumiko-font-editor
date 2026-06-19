@@ -2,6 +2,7 @@ import {
   deleteKumikoProjectRecord,
   loadKumikoGlyphRecord,
   loadKumikoGlyphRecords,
+  listKumikoGlyphMetadataForProject,
   listKumikoProjectRecords,
   loadKumikoProjectRecord,
   loadKumikoUiValue,
@@ -41,30 +42,55 @@ const projectRecordToDraft = async (
   options: { metadataOnly?: boolean } = {}
 ): Promise<ProjectDraft> => {
   const fontData = kumikoRecordsToFontData(record, [], options)
-  const loadGlyphBatch = (
-    records: Awaited<ReturnType<typeof loadKumikoGlyphRecords>>
-  ) => {
-    for (const glyphRecord of records) {
-      fontData.glyphs[glyphRecord.glyphId] = options.metadataOnly
-        ? kumikoGlyphRecordToGlyphMetadata(glyphRecord)
-        : kumikoGlyphRecordToGlyphData(glyphRecord)
+  if (options.metadataOnly) {
+    const metadataRecords = await listKumikoGlyphMetadataForProject(
+      record.projectId
+    )
+    const recordsByGlyphId = new Map(
+      metadataRecords.map((glyphRecord) => [glyphRecord.glyphId, glyphRecord])
+    )
+    const orderedGlyphIds = new Set(record.glyphOrder)
+    const orderedRecords = [
+      ...record.glyphOrder
+        .map((glyphId) => recordsByGlyphId.get(glyphId))
+        .filter((glyphRecord): glyphRecord is NonNullable<typeof glyphRecord> =>
+          Boolean(glyphRecord)
+        ),
+      ...metadataRecords.filter(
+        (glyphRecord) => !orderedGlyphIds.has(glyphRecord.glyphId)
+      ),
+    ]
+    for (const glyphRecord of orderedRecords) {
+      fontData.glyphs[glyphRecord.glyphId] =
+        kumikoGlyphRecordToGlyphMetadata(glyphRecord)
     }
-  }
+  } else {
+    const loadGlyphBatch = (
+      records: Awaited<ReturnType<typeof loadKumikoGlyphRecords>>
+    ) => {
+      for (const glyphRecord of records) {
+        fontData.glyphs[glyphRecord.glyphId] =
+          kumikoGlyphRecordToGlyphData(glyphRecord)
+      }
+    }
 
-  for (
-    let index = 0;
-    index < record.glyphOrder.length;
-    index += PROJECT_DRAFT_GLYPH_BATCH_SIZE
-  ) {
-    const glyphIds = record.glyphOrder.slice(
-      index,
-      index + PROJECT_DRAFT_GLYPH_BATCH_SIZE
-    )
-    loadGlyphBatch(
-      await loadKumikoGlyphRecords(
-        glyphIds.map((glyphId) => makeKumikoGlyphKey(record.projectId, glyphId))
+    for (
+      let index = 0;
+      index < record.glyphOrder.length;
+      index += PROJECT_DRAFT_GLYPH_BATCH_SIZE
+    ) {
+      const glyphIds = record.glyphOrder.slice(
+        index,
+        index + PROJECT_DRAFT_GLYPH_BATCH_SIZE
       )
-    )
+      loadGlyphBatch(
+        await loadKumikoGlyphRecords(
+          glyphIds.map((glyphId) =>
+            makeKumikoGlyphKey(record.projectId, glyphId)
+          )
+        )
+      )
+    }
   }
 
   return {

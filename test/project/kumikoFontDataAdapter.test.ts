@@ -255,4 +255,34 @@ describe('kumikoFontDataAdapter', () => {
       })
     ).toThrow(/geometry key/)
   })
+
+  it('rejects geometry-bearing sourceData on glyph elements', () => {
+    const withNodeSourceData: FontData = structuredClone(fontData)
+    withNodeSourceData.glyphs.A.layers!.M1.paths[0].nodes[0].sourceData = {
+      glyphs: { points: [] },
+    }
+
+    expect(() =>
+      fontDataToKumikoGlyphRecords({
+        projectId: 'project-1',
+        fontData: withNodeSourceData,
+        updatedAt: 20,
+      })
+    ).toThrow(/geometry key: node\(n1\)/)
+
+    const withComponentSourceData: FontData = structuredClone(fontData)
+    withComponentSourceData.glyphs.A.layers![
+      'backup-1'
+    ].componentRefs[0].sourceData = {
+      glyphs: { components: [] },
+    }
+
+    expect(() =>
+      fontDataToKumikoGlyphRecords({
+        projectId: 'project-1',
+        fontData: withComponentSourceData,
+        updatedAt: 20,
+      })
+    ).toThrow(/geometry key: component\(c1\)/)
+  })
 })

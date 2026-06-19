@@ -178,6 +178,33 @@ export interface KumikoGlyphRecord {
 
 export type KumikoGlyphStoreRecord = KumikoGlyphRecord
 
+export type KumikoGlyphSyncMetadata = Pick<
+  KumikoGlyphRecord,
+  'projectId' | 'glyphId' | 'sourceData' | 'syncDirty'
+>
+
+export type KumikoGlyphMetadataRecord = Pick<
+  KumikoGlyphRecord,
+  | 'projectId'
+  | 'glyphId'
+  | 'displayName'
+  | 'unicodes'
+  | 'production'
+  | 'export'
+  | 'category'
+  | 'subCategory'
+  | 'status'
+  | 'color'
+  | 'note'
+  | 'leftMetricsKey'
+  | 'rightMetricsKey'
+  | 'widthMetricsKey'
+  | 'layerOrder'
+  | 'componentGlyphIds'
+  | 'customData'
+  | 'sourceData'
+>
+
 export interface KumikoUiStateRecord {
   projectId: string
   key: string

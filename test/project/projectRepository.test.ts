@@ -12,6 +12,7 @@ import {
   findKumikoGlyphRecordsByUnicode,
   listExportDirtyKumikoGlyphIds,
   listExportDirtyKumikoGlyphRecords,
+  listKumikoGlyphMetadataForProject,
   listSyncDirtyKumikoGlyphIds,
   loadKumikoGlyphRecord,
   loadKumikoProjectRecord,
@@ -407,7 +408,7 @@ describe('projectRepository canonical storage', () => {
 
   it('loads project drafts as glyph metadata without resident geometry', async () => {
     const componentFontData: FontData = {
-      glyphOrder: ['A', 'B'],
+      glyphOrder: ['B', 'A'],
       glyphs: {
         A: fontData.glyphs.A,
         B: {
@@ -451,11 +452,20 @@ describe('projectRepository canonical storage', () => {
     const metadataDraft = await loadProjectDraftMetadata(
       'project-metadata-draft'
     )
+    const metadataRecords = await listKumikoGlyphMetadataForProject(
+      'project-metadata-draft'
+    )
     const fullGlyph = await loadProjectGlyphGeometry(
       'project-metadata-draft',
       'B'
     )
 
+    expect(metadataRecords).toHaveLength(2)
+    expect('layers' in metadataRecords[0]).toBe(false)
+    expect(Object.keys(metadataDraft?.fontData?.glyphs ?? {})).toEqual([
+      'B',
+      'A',
+    ])
     expect(metadataDraft?.fontData?.glyphs.B.layers).toBeUndefined()
     expect(metadataDraft?.fontData?.glyphs.B.componentGlyphIds).toEqual(['A'])
     expect(metadataDraft?.fontData?.glyphs.B.unicodes).toEqual(['0042'])

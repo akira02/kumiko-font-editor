@@ -3,17 +3,21 @@ import type {
   KumikoGlyphLayerRecord,
   KumikoGlyphRecord,
   KumikoGlyphLayerContentRecord,
+  KumikoGlyphMetadataRecord,
   KumikoGlyphStoreRecord,
   KumikoProjectRecord,
   KumikoProjectSourceFormat,
 } from 'src/lib/project/kumikoProjectTypes'
 import type {
   FontData,
+  GlyphAnchor,
   GlyphComponentRef,
+  GlyphGuideline,
   GlyphData,
   GlyphLayerContent,
   GlyphLayerData,
   GlyphSourceData,
+  PathData,
   PathSegmentType,
 } from 'src/store'
 import { hashString } from 'src/lib/hash'
@@ -150,27 +154,74 @@ const deriveComponentGlyphIds = (
 
 const toKumikoComponentRefRecord = (
   componentRef: GlyphComponentRef
-): KumikoGlyphComponentRefRecord => ({
-  id: componentRef.id,
-  identifier: componentRef.identifier,
-  name: componentRef.name,
-  glyphId: componentRef.glyphId,
-  color: componentRef.color,
-  autoAlign: componentRef.autoAlign,
-  customData: componentRef.customData,
-  sourceData: componentRef.sourceData,
-  transform: getComponentMatrix(componentRef),
-})
+): KumikoGlyphComponentRefRecord => {
+  assertSourceDataHasNoGeometry(
+    componentRef.sourceData,
+    `component(${componentRef.id}).sourceData`
+  )
+  return {
+    id: componentRef.id,
+    identifier: componentRef.identifier,
+    name: componentRef.name,
+    glyphId: componentRef.glyphId,
+    color: componentRef.color,
+    autoAlign: componentRef.autoAlign,
+    customData: componentRef.customData,
+    sourceData: componentRef.sourceData,
+    transform: getComponentMatrix(componentRef),
+  }
+}
+
+const assertPathSourceDataHasNoGeometry = (path: PathData) => {
+  assertSourceDataHasNoGeometry(path.sourceData, `path(${path.id}).sourceData`)
+  for (const node of path.nodes) {
+    assertSourceDataHasNoGeometry(
+      node.sourceData,
+      `node(${node.id}).sourceData`
+    )
+  }
+}
+
+const assertAnchorSourceDataHasNoGeometry = (anchor: GlyphAnchor) => {
+  assertSourceDataHasNoGeometry(
+    anchor.sourceData,
+    `anchor(${anchor.id}).sourceData`
+  )
+}
+
+const assertGuidelineSourceDataHasNoGeometry = (guideline: GlyphGuideline) => {
+  assertSourceDataHasNoGeometry(
+    guideline.sourceData,
+    `guideline(${guideline.id}).sourceData`
+  )
+}
+
+const assertLayerContentSourceDataHasNoGeometry = (
+  content: GlyphLayerContent
+) => {
+  content.paths.forEach(assertPathSourceDataHasNoGeometry)
+  content.componentRefs.forEach((componentRef) =>
+    assertSourceDataHasNoGeometry(
+      componentRef.sourceData,
+      `component(${componentRef.id}).sourceData`
+    )
+  )
+  content.anchors.forEach(assertAnchorSourceDataHasNoGeometry)
+  content.guidelines.forEach(assertGuidelineSourceDataHasNoGeometry)
+}
 
 const toKumikoLayerContentRecord = (
   content: GlyphLayerContent
-): KumikoGlyphLayerContentRecord => ({
-  paths: content.paths,
-  componentRefs: content.componentRefs.map(toKumikoComponentRefRecord),
-  anchors: content.anchors,
-  guidelines: content.guidelines,
-  metrics: content.metrics,
-})
+): KumikoGlyphLayerContentRecord => {
+  assertLayerContentSourceDataHasNoGeometry(content)
+  return {
+    paths: content.paths,
+    componentRefs: content.componentRefs.map(toKumikoComponentRefRecord),
+    anchors: content.anchors,
+    guidelines: content.guidelines,
+    metrics: content.metrics,
+  }
+}
 
 const toGlyphComponentRef = (
   componentRef: KumikoGlyphComponentRefRecord
@@ -207,6 +258,7 @@ const toKumikoLayerRecord = (layer: GlyphLayerData): KumikoGlyphLayerRecord => {
     layer.sourceData,
     `layer(${layer.id}).sourceData`
   )
+  assertLayerContentSourceDataHasNoGeometry(layer)
   return {
     id: layer.id,
     name: layer.name,
@@ -427,7 +479,7 @@ export const kumikoGlyphRecordToGlyphData = (
 }
 
 export const kumikoGlyphRecordToGlyphMetadata = (
-  record: KumikoGlyphRecord
+  record: KumikoGlyphMetadataRecord | KumikoGlyphRecord
 ): GlyphData => ({
   id: record.glyphId,
   name: record.displayName ?? record.glyphId,

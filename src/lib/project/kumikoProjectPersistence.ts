@@ -11,7 +11,9 @@ import {
 } from 'src/lib/project/kumikoFontDataAdapter'
 import type {
   KumikoGlyphPrimaryKey,
+  KumikoGlyphMetadataRecord,
   KumikoGlyphRecord,
+  KumikoGlyphSyncMetadata,
   KumikoProjectRecord,
   KumikoUiStateRecord,
 } from 'src/lib/project/kumikoProjectTypes'
@@ -55,11 +57,6 @@ export type KumikoGlyphMetadataPatch = Partial<
     | 'customData'
     | 'sourceData'
   >
->
-
-export type KumikoGlyphSyncMetadata = Pick<
-  KumikoGlyphRecord,
-  'projectId' | 'glyphId' | 'sourceData' | 'syncDirty'
 >
 
 const normalizeGlyphRecordUnicodes = (
@@ -339,6 +336,48 @@ export const listKumikoGlyphSyncMetadataForProject = async (
         glyphId: record.glyphId,
         sourceData: record.sourceData,
         syncDirty: record.syncDirty,
+      })
+      cursor.continue()
+    }
+    request.onerror = () => reject(request.error)
+  })
+  await transactionDone(transaction)
+  return records
+}
+
+export const listKumikoGlyphMetadataForProject = async (projectId: string) => {
+  const database = await openDatabase()
+  const transaction = database.transaction(KUMIKO_GLYPHS_STORE, 'readonly')
+  const index = transaction.objectStore(KUMIKO_GLYPHS_STORE).index('byProject')
+  const records: KumikoGlyphMetadataRecord[] = []
+  await new Promise<void>((resolve, reject) => {
+    const request = index.openCursor(projectId)
+    request.onsuccess = () => {
+      const cursor = request.result
+      if (!cursor) {
+        resolve()
+        return
+      }
+      const record = cursor.value as KumikoGlyphRecord
+      records.push({
+        projectId: record.projectId,
+        glyphId: record.glyphId,
+        displayName: record.displayName,
+        unicodes: record.unicodes,
+        production: record.production,
+        export: record.export,
+        category: record.category,
+        subCategory: record.subCategory,
+        status: record.status,
+        color: record.color,
+        note: record.note,
+        leftMetricsKey: record.leftMetricsKey,
+        rightMetricsKey: record.rightMetricsKey,
+        widthMetricsKey: record.widthMetricsKey,
+        layerOrder: record.layerOrder,
+        componentGlyphIds: record.componentGlyphIds,
+        customData: record.customData,
+        sourceData: record.sourceData,
       })
       cursor.continue()
     }

@@ -130,6 +130,9 @@ export function FontOverviewScreen() {
           missingGlyphIds,
           { loadedGlyphIds }
         )
+        if (useStore.getState().projectId !== projectId) {
+          return
+        }
         hydrateGlyphGeometry(glyphs)
       })().finally(() => {
         for (const glyphId of missingGlyphIds) {
