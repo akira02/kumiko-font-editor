@@ -48,6 +48,15 @@ export const ensureActiveLayer = (glyph: GlyphData): GlyphLayerData => {
   return glyph.layers[id]
 }
 
+export const ensureLoadedActiveLayer = (
+  glyph: GlyphData
+): GlyphLayerData | null => {
+  if (!glyph.layers) {
+    return null
+  }
+  return ensureActiveLayer(glyph)
+}
+
 export const getGlyphLayer = (
   glyph: GlyphData | undefined,
   layerId: string | null | undefined

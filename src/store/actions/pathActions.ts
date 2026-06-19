@@ -16,7 +16,7 @@ import {
   lerp,
   orientOpenPathNodesForConnection,
 } from 'src/store/glyphGeometry'
-import { ensureActiveLayer } from 'src/store/glyphLayer'
+import { ensureLoadedActiveLayer } from 'src/store/glyphLayer'
 import {
   pairNearestEndpoints,
   performReconnect,
@@ -82,7 +82,7 @@ export const buildPathActions = (set: ImmerSet) => ({
   createPath: (glyphId: string, path: Omit<PathData, 'id'> & { id?: string }) =>
     set((state) => {
       const glyph = state.fontData?.glyphs[glyphId]
-      const layer = glyph ? ensureActiveLayer(glyph) : undefined
+      const layer = glyph ? ensureLoadedActiveLayer(glyph) : undefined
       if (!glyph || !layer) {
         return
       }
@@ -106,7 +106,7 @@ export const buildPathActions = (set: ImmerSet) => ({
   ) =>
     set((state) => {
       const glyph = state.fontData?.glyphs[glyphId]
-      const layer = glyph ? ensureActiveLayer(glyph) : undefined
+      const layer = glyph ? ensureLoadedActiveLayer(glyph) : undefined
       const path = layer ? findPath(layer, pathId) : undefined
       if (!path) {
         return
@@ -132,7 +132,7 @@ export const buildPathActions = (set: ImmerSet) => ({
   ) =>
     set((state) => {
       const glyph = state.fontData?.glyphs[glyphId]
-      const layer = glyph ? ensureActiveLayer(glyph) : undefined
+      const layer = glyph ? ensureLoadedActiveLayer(glyph) : undefined
       const path = layer ? findPath(layer, pathId) : undefined
       if (!path) {
         return
@@ -164,7 +164,7 @@ export const buildPathActions = (set: ImmerSet) => ({
   ) =>
     set((state) => {
       const glyph = state.fontData?.glyphs[glyphId]
-      const layer = glyph ? ensureActiveLayer(glyph) : undefined
+      const layer = glyph ? ensureLoadedActiveLayer(glyph) : undefined
       if (!glyph || !layer || pieces.length === 0) {
         return
       }
@@ -198,7 +198,7 @@ export const buildPathActions = (set: ImmerSet) => ({
   closePath: (glyphId: string, pathId: string) =>
     set((state) => {
       const glyph = state.fontData?.glyphs[glyphId]
-      const layer = glyph ? ensureActiveLayer(glyph) : undefined
+      const layer = glyph ? ensureLoadedActiveLayer(glyph) : undefined
       const path = layer ? findPath(layer, pathId) : undefined
       if (!path || path.closed || path.nodes.length < 2) {
         return
@@ -219,7 +219,7 @@ export const buildPathActions = (set: ImmerSet) => ({
 
     set((state) => {
       const glyph = state.fontData?.glyphs[glyphId]
-      const layer = glyph ? ensureActiveLayer(glyph) : undefined
+      const layer = glyph ? ensureLoadedActiveLayer(glyph) : undefined
       const sourcePath = layer ? findPath(layer, sourcePathId) : undefined
       const targetPath = layer ? findPath(layer, targetPathId) : undefined
       if (
@@ -278,7 +278,7 @@ export const buildPathActions = (set: ImmerSet) => ({
 
     set((state) => {
       const glyph = state.fontData?.glyphs[glyphId]
-      const layer = glyph ? ensureActiveLayer(glyph) : undefined
+      const layer = glyph ? ensureLoadedActiveLayer(glyph) : undefined
       if (!glyph || !layer || selectedNodeIds.length < 2) {
         return
       }
@@ -391,7 +391,7 @@ export const buildPathActions = (set: ImmerSet) => ({
 
     set((state) => {
       const glyph = state.fontData?.glyphs[glyphId]
-      const layer = glyph ? ensureActiveLayer(glyph) : undefined
+      const layer = glyph ? ensureLoadedActiveLayer(glyph) : undefined
       const selectedPathIds = Array.from(new Set(pathIds))
       if (!glyph || !layer || selectedPathIds.length < 2) {
         return
@@ -438,7 +438,7 @@ export const buildPathActions = (set: ImmerSet) => ({
   ) =>
     set((state) => {
       const glyph = state.fontData?.glyphs[glyphId]
-      const layer = glyph ? ensureActiveLayer(glyph) : undefined
+      const layer = glyph ? ensureLoadedActiveLayer(glyph) : undefined
       const path = layer ? findPath(layer, pathId) : undefined
       if (!glyph || !path) {
         return
@@ -489,7 +489,7 @@ export const buildPathActions = (set: ImmerSet) => ({
   reversePaths: (glyphId: string, pathIds: string[]) =>
     set((state) => {
       const glyph = state.fontData?.glyphs[glyphId]
-      const layer = glyph ? ensureActiveLayer(glyph) : undefined
+      const layer = glyph ? ensureLoadedActiveLayer(glyph) : undefined
       const pathIdSet = new Set(pathIds)
       if (!glyph || !layer || pathIdSet.size === 0) {
         return
@@ -519,7 +519,7 @@ export const buildPathActions = (set: ImmerSet) => ({
   setStartPoint: (glyphId: string, pathId: string, nodeId: string) =>
     set((state) => {
       const glyph = state.fontData?.glyphs[glyphId]
-      const layer = glyph ? ensureActiveLayer(glyph) : undefined
+      const layer = glyph ? ensureLoadedActiveLayer(glyph) : undefined
       const path = layer?.paths.find((candidate) => candidate.id === pathId)
       if (!path || !path.closed) {
         return
@@ -538,7 +538,7 @@ export const buildPathActions = (set: ImmerSet) => ({
   deleteSelectedNodes: (glyphId: string, selectedNodeIds: string[]) =>
     set((state) => {
       const glyph = state.fontData?.glyphs[glyphId]
-      const layer = glyph ? ensureActiveLayer(glyph) : undefined
+      const layer = glyph ? ensureLoadedActiveLayer(glyph) : undefined
       if (!glyph || !layer || selectedNodeIds.length === 0) {
         return
       }

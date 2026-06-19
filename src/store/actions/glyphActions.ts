@@ -38,7 +38,7 @@ import {
 import { syncFilteredGlyphList } from 'src/store/glyphSearch'
 import {
   activeLayer,
-  ensureActiveLayer,
+  ensureLoadedActiveLayer,
   setGlyphActiveLayer,
 } from 'src/store/glyphLayer'
 import {
@@ -316,7 +316,11 @@ export const buildGlyphActions = (set: ImmerSet) => ({
         return
       }
 
-      ensureActiveLayer(glyph).componentRefs.push({
+      const layer = ensureLoadedActiveLayer(glyph)
+      if (!layer) {
+        return
+      }
+      layer.componentRefs.push({
         id: generateId('component'),
         glyphId: componentGlyphId,
         x: 0,
@@ -377,7 +381,10 @@ export const buildGlyphActions = (set: ImmerSet) => ({
       if (!glyph) {
         return
       }
-      const layer = ensureActiveLayer(glyph)
+      const layer = ensureLoadedActiveLayer(glyph)
+      if (!layer) {
+        return
+      }
 
       const node = findNode(findPath(layer, pathId), nodeId)
       if (!node) {
@@ -403,7 +410,10 @@ export const buildGlyphActions = (set: ImmerSet) => ({
       if (!glyph) {
         return
       }
-      const layer = ensureActiveLayer(glyph)
+      const layer = ensureLoadedActiveLayer(glyph)
+      if (!layer) {
+        return
+      }
 
       for (const update of updates) {
         const node = findNode(findPath(layer, update.pathId), update.nodeId)
@@ -434,7 +444,10 @@ export const buildGlyphActions = (set: ImmerSet) => ({
         if (!glyph) {
           continue
         }
-        const layer = ensureActiveLayer(glyph)
+        const layer = ensureLoadedActiveLayer(glyph)
+        if (!layer) {
+          continue
+        }
 
         for (const update of updates) {
           const node = findNode(findPath(layer, update.pathId), update.nodeId)
@@ -465,7 +478,10 @@ export const buildGlyphActions = (set: ImmerSet) => ({
       if (!glyph) {
         return
       }
-      const layer = ensureActiveLayer(glyph)
+      const layer = ensureLoadedActiveLayer(glyph)
+      if (!layer) {
+        return
+      }
 
       const path = findPath(layer, pathId)
       const node = findNode(path, nodeId)
@@ -490,7 +506,10 @@ export const buildGlyphActions = (set: ImmerSet) => ({
       if (!glyph) {
         return
       }
-      const layer = ensureActiveLayer(glyph)
+      const layer = ensureLoadedActiveLayer(glyph)
+      if (!layer) {
+        return
+      }
 
       if (typeof metrics.lsb === 'number') {
         const nextLsb = Math.round(metrics.lsb)
@@ -527,7 +546,7 @@ export const buildGlyphActions = (set: ImmerSet) => ({
   createBackupLayer: (glyphId: string) =>
     set((state) => {
       const glyph = state.fontData?.glyphs[glyphId]
-      if (!glyph) {
+      if (!glyph?.layers) {
         return
       }
       state.fontData!.glyphs[glyphId] = createBackupLayer(
@@ -543,7 +562,7 @@ export const buildGlyphActions = (set: ImmerSet) => ({
     set((state) => {
       const glyph = state.fontData?.glyphs[glyphId]
       const source = state.fontData?.sources?.[masterId]
-      if (!glyph || !source || glyph.layers?.[masterId]) {
+      if (!glyph?.layers || !source || glyph.layers[masterId]) {
         return
       }
       const base = activeLayer(current(glyph))
@@ -566,7 +585,7 @@ export const buildGlyphActions = (set: ImmerSet) => ({
   duplicateLayer: (glyphId: string, layerId: string) =>
     set((state) => {
       const glyph = state.fontData?.glyphs[glyphId]
-      if (!glyph) {
+      if (!glyph?.layers) {
         return
       }
       const sourceName = glyph.layers?.[layerId]?.name ?? 'Master'
@@ -581,7 +600,7 @@ export const buildGlyphActions = (set: ImmerSet) => ({
   deleteBackupLayer: (glyphId: string, layerId: string) =>
     set((state) => {
       const glyph = state.fontData?.glyphs[glyphId]
-      if (!glyph) {
+      if (!glyph?.layers) {
         return
       }
       const nextGlyph = deleteBackupLayer(current(glyph), layerId)
@@ -595,7 +614,7 @@ export const buildGlyphActions = (set: ImmerSet) => ({
   renameBackupLayer: (glyphId: string, layerId: string, name: string) =>
     set((state) => {
       const glyph = state.fontData?.glyphs[glyphId]
-      if (!glyph) {
+      if (!glyph?.layers) {
         return
       }
       const nextGlyph = renameBackupLayer(current(glyph), layerId, name)
@@ -609,7 +628,7 @@ export const buildGlyphActions = (set: ImmerSet) => ({
   promoteBackupToMaster: (glyphId: string, layerId: string) =>
     set((state) => {
       const glyph = state.fontData?.glyphs[glyphId]
-      if (!glyph) {
+      if (!glyph?.layers) {
         return
       }
       const nextGlyph = promoteBackupToMaster(

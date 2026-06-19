@@ -1,5 +1,8 @@
 import { importBinaryFontFile } from 'src/lib/fontFormats/adapters/binary'
-import { saveProjectDraft } from 'src/lib/project/projectRepository'
+import {
+  loadProjectDraftMetadata,
+  saveProjectDraft,
+} from 'src/lib/project/projectRepository'
 import type { KumikoProjectSummary } from 'src/lib/project/projectTypes'
 import {
   importUfoWorkspace,
@@ -49,6 +52,26 @@ const isGlyphsPackageImport = (files: File[]) =>
       .includes('.glyphspackage/')
   )
 
+const loadSavedImportedProject = async (
+  summary: KumikoProjectSummary
+): Promise<ImportedKumikoProject> => {
+  const draft = await loadProjectDraftMetadata(summary.id)
+  if (!draft?.fontData) {
+    throw new Error('匯入後無法載入專案 metadata')
+  }
+
+  return {
+    id: summary.id,
+    title: summary.title,
+    fontData: draft.fontData,
+    projectMetadata: draft.projectMetadata ?? null,
+    projectSourceData: draft.projectSourceData ?? null,
+    projectSourceFormat: draft.projectSourceFormat ?? null,
+    projectRoundTripFormat: draft.projectRoundTripFormat ?? null,
+    summary,
+  }
+}
+
 const saveImportedGlyphsProject = async (
   imported: ImportedGlyphsProject,
   sourceName: string
@@ -73,16 +96,7 @@ const saveImportedGlyphsProject = async (
     projectGlyphsPackage: imported.projectGlyphsPackage,
   })
 
-  return {
-    id: summary.id,
-    title: summary.title,
-    fontData: imported.fontData,
-    projectMetadata: imported.projectMetadata,
-    projectSourceData: imported.projectSourceData,
-    projectSourceFormat: imported.projectSourceFormat,
-    projectRoundTripFormat: null,
-    summary,
-  }
+  return loadSavedImportedProject(summary)
 }
 
 export const saveImportedUfoWorkspaceAsProject = async (
@@ -107,16 +121,7 @@ export const saveImportedUfoWorkspaceAsProject = async (
     projectGlyphsPackage: null,
   })
 
-  return {
-    id: summary.id,
-    title: summary.title,
-    fontData: importedProject.fontData,
-    projectMetadata: importedProject.projectMetadata,
-    projectSourceData: importedProject.projectSourceData,
-    projectSourceFormat: importedProject.projectSourceFormat,
-    projectRoundTripFormat: 'ufo',
-    summary,
-  }
+  return loadSavedImportedProject(summary)
 }
 
 export const importLocalProjectFiles = async (
@@ -157,21 +162,7 @@ export const importLocalProjectFiles = async (
       projectGlyphsPackage: null,
     })
 
-    return {
-      id: importedBinary.projectId,
-      title: importedBinary.projectTitle,
-      fontData: importedBinary.fontData,
-      projectMetadata: { importedFrom: extension },
-      projectSourceData: {
-        binary: {
-          format: importedBinary.sourceFormat,
-          repoPath: null,
-        },
-      },
-      projectSourceFormat: importedBinary.sourceFormat,
-      projectRoundTripFormat: null,
-      summary,
-    }
+    return loadSavedImportedProject(summary)
   }
 
   if (isSingleGlyphsFileImport(selectedFiles)) {

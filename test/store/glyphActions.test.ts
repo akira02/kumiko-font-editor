@@ -13,6 +13,13 @@ const makeGlyph = (id: string, unicode: string | null = null): GlyphData =>
     componentRefs: [],
   }) as unknown as GlyphData
 
+const makeMetadataGlyph = (id: string): GlyphData => ({
+  id,
+  name: id,
+  unicodes: [],
+  layerOrder: ['public.default'],
+})
+
 describe('glyph actions', () => {
   afterEach(() => {
     useStore.getState().closeProjectState()
@@ -164,5 +171,34 @@ describe('glyph actions', () => {
     expect(useStore.getState().fontData?.glyphOrder).toEqual(['A', 'B'])
     expect(useStore.getState().deletedGlyphIds).toEqual([])
     expect(useStore.getState().dirtyGlyphIds).toEqual([])
+  })
+
+  it('does not synthesize empty layers for metadata-only glyph geometry edits', () => {
+    const fontData: FontData = {
+      glyphOrder: ['A', 'B'],
+      glyphs: {
+        A: makeMetadataGlyph('A'),
+        B: makeGlyph('B', '0042'),
+      },
+    }
+    useStore.getState().loadProjectState('project-a', 'Project A', fontData)
+
+    expect(useStore.getState().fontData?.glyphs.A.layers).toBeUndefined()
+
+    useStore.getState().updateGlyphMetrics('A', { width: 700 })
+    useStore.getState().updateNodePosition('A', 'path-1', 'node-1', {
+      x: 10,
+      y: 20,
+    })
+    expect(useStore.getState().addComponentRef('A', 'B')).toBe(false)
+    useStore.getState().createBackupLayer('A')
+    useStore.getState().createPath('A', {
+      closed: false,
+      nodes: [],
+    })
+
+    expect(useStore.getState().fontData?.glyphs.A.layers).toBeUndefined()
+    expect(useStore.getState().dirtyGlyphIds).toEqual([])
+    expect(useStore.getState().persistenceQueue.glyphIds).toEqual([])
   })
 })
