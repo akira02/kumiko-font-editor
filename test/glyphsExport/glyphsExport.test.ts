@@ -267,6 +267,52 @@ describe('serializeGlyphsFileToBlob glyph matching', () => {
     expect(text).toContain('max = 200')
   })
 
+  it('emits canonical and preserved Glyphs metadata fields', async () => {
+    const fontData = {
+      glyphs: {
+        A: {
+          ...glyph('A', 'A', '0041'),
+          note: 'Needs review',
+          leftMetricsKey: 'H',
+          rightMetricsKey: 'O',
+          customData: { reviewed: 1 },
+          sourceData: { glyphs: { fields: { script: 'latin' } } },
+          layers: {
+            M1: {
+              id: 'M1',
+              name: 'Regular',
+              associatedMasterId: 'M1',
+              locked: true,
+              visible: false,
+              customData: { layerFlag: 1 },
+              sourceData: { glyphs: { fields: { color: 3 } } },
+              paths: [],
+              componentRefs: [],
+              anchors: [],
+              guidelines: [],
+              metrics: { width: 500, lsb: 0, rsb: 500 },
+            },
+          },
+          layerOrder: ['M1'],
+          activeLayerId: 'M1',
+        },
+      },
+    } as unknown as FontData
+
+    const text = await serializeGlyphsFileToBlob(fontData, null, null, 2).text()
+
+    expect(text).toContain('note = "Needs review"')
+    expect(text).toContain('leftMetricsKey = H')
+    expect(text).toContain('rightMetricsKey = O')
+    expect(text).toContain('script = latin')
+    expect(text).toContain('userData = {')
+    expect(text).toContain('reviewed = 1')
+    expect(text).toContain('locked = 1')
+    expect(text).toContain('visible = 0')
+    expect(text).toContain('layerFlag = 1')
+    expect(text).toContain('color = 3')
+  })
+
   it('generates a Glyphs package from canonical fontData', () => {
     const fontData = {
       unitsPerEm: 1000,

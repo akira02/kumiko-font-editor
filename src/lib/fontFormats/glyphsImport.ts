@@ -7,6 +7,7 @@ import type {
   GlyphComponentRef,
   GlyphData,
   GlyphLayerData,
+  GlyphSourceData,
   GlyphMetrics,
   PathData,
   PathNode,
@@ -28,6 +29,13 @@ const asRecord = (value: unknown): Raw =>
   value && typeof value === 'object' && !Array.isArray(value)
     ? (value as Raw)
     : {}
+
+const compactRecord = (value: Raw): Raw | null => {
+  const entries = Object.entries(value).filter(
+    ([, entryValue]) => entryValue !== undefined
+  )
+  return entries.length > 0 ? Object.fromEntries(entries) : null
+}
 
 const asString = (value: unknown): string | null =>
   typeof value === 'string'
@@ -282,6 +290,69 @@ const parseAxisRules = (
   })
   return entries.length > 0 ? Object.fromEntries(entries) : null
 }
+
+const parseOptionalBoolean = (value: unknown): boolean | undefined => {
+  if (value === undefined || value === null) {
+    return undefined
+  }
+  return value === 1 || value === true
+}
+
+const parseCustomData = (value: unknown): GlyphSourceData | undefined => {
+  const record = compactRecord(asRecord(value))
+  return record ?? undefined
+}
+
+const GLYPHS_GLYPH_CANONICAL_KEYS = new Set([
+  'glyphname',
+  'name',
+  'unicode',
+  'unicodes',
+  'production',
+  'category',
+  'subCategory',
+  'export',
+  'note',
+  'leftMetricsKey',
+  'rightMetricsKey',
+  'widthMetricsKey',
+  'userData',
+  'layers',
+])
+
+const GLYPHS_LAYER_CANONICAL_KEYS = new Set([
+  'layerId',
+  'associatedMasterId',
+  'name',
+  'width',
+  'paths',
+  'components',
+  'shapes',
+  'anchors',
+  'guides',
+  'guideLines',
+  'attributes',
+  'locked',
+  'visible',
+  'userData',
+])
+
+const extractGlyphsSourceFields = (
+  record: Raw,
+  canonicalKeys: Set<string>
+): Record<string, unknown> | undefined => {
+  const fields = Object.fromEntries(
+    Object.entries(record).filter(
+      ([key, value]) => !canonicalKeys.has(key) && value !== undefined
+    )
+  )
+  return compactRecord(fields) ?? undefined
+}
+
+const glyphsSourceData = (
+  fields: Record<string, unknown> | undefined
+): GlyphSourceData | undefined =>
+  fields ? ({ glyphs: { fields } } as GlyphSourceData) : undefined
 
 const componentFromMatrix = (
   name: string,
@@ -676,8 +747,18 @@ export const buildFontDataFromGlyphsDocument = (
       associatedMasterId: string | null
       braceLocation: Record<string, number> | null
       bracketAxisRules: Record<string, { min?: number; max?: number }> | null
+      locked?: boolean
+      visible?: boolean
+      customData?: GlyphSourceData
+      sourceData?: GlyphSourceData
       content: ParsedLayerContent
     }>
+    note: string | null
+    leftMetricsKey: string | null
+    rightMetricsKey: string | null
+    widthMetricsKey: string | null
+    customData?: GlyphSourceData
+    sourceData?: GlyphSourceData
   }
 
   const contentByMaster = new Map<string, Map<string, ParsedLayerContent>>()
@@ -720,6 +801,12 @@ export const buildFontDataFromGlyphsDocument = (
         associatedMasterId: associated,
         braceLocation,
         bracketAxisRules,
+        locked: parseOptionalBoolean(rawLayer.locked),
+        visible: parseOptionalBoolean(rawLayer.visible),
+        customData: parseCustomData(rawLayer.userData),
+        sourceData: glyphsSourceData(
+          extractGlyphsSourceFields(rawLayer, GLYPHS_LAYER_CANONICAL_KEYS)
+        ),
         content,
       })
       if (isMaster) {
@@ -734,6 +821,14 @@ export const buildFontDataFromGlyphsDocument = (
       category: asString(rawGlyph.category),
       subCategory: asString(rawGlyph.subCategory),
       exportFlag: rawGlyph.export !== 0 && rawGlyph.export !== false,
+      note: asString(rawGlyph.note),
+      leftMetricsKey: asString(rawGlyph.leftMetricsKey),
+      rightMetricsKey: asString(rawGlyph.rightMetricsKey),
+      widthMetricsKey: asString(rawGlyph.widthMetricsKey),
+      customData: parseCustomData(rawGlyph.userData),
+      sourceData: glyphsSourceData(
+        extractGlyphsSourceFields(rawGlyph, GLYPHS_GLYPH_CANONICAL_KEYS)
+      ),
       layers,
     }
   })
@@ -776,6 +871,10 @@ export const buildFontDataFromGlyphsDocument = (
         anchors: layer.content.anchors,
         guidelines: layer.content.guidelines,
         metrics: buildMetrics(layer.content, bounds),
+        locked: layer.locked,
+        visible: layer.visible,
+        customData: layer.customData,
+        sourceData: layer.sourceData,
       }
       layerOrder.push(layer.key)
     }
@@ -796,6 +895,12 @@ export const buildFontDataFromGlyphsDocument = (
       category: parsed.category,
       subCategory: parsed.subCategory,
       export: parsed.exportFlag,
+      note: parsed.note,
+      leftMetricsKey: parsed.leftMetricsKey,
+      rightMetricsKey: parsed.rightMetricsKey,
+      widthMetricsKey: parsed.widthMetricsKey,
+      customData: parsed.customData,
+      sourceData: parsed.sourceData,
     }
     glyphOrder.push(parsed.glyphName)
   }

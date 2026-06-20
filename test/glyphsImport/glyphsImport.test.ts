@@ -21,10 +21,19 @@ glyphs = (
 {
 glyphname = A;
 unicode = 65;
+note = "Needs review";
+leftMetricsKey = H;
+rightMetricsKey = O;
+userData = { reviewed = 1; };
+script = latin;
 layers = (
 {
 layerId = "m01";
 width = 500;
+locked = 1;
+visible = 0;
+userData = { layerFlag = 1; };
+color = 3;
 paths = (
 { closed = 1; nodes = ( "100 0 LINE", "400 0 LINE", "400 700 CURVE SMOOTH", "250 750 OFFCURVE", "100 700 LINE" ); }
 );
@@ -125,6 +134,25 @@ describe('buildFontDataFromGlyphsDocument (Glyphs 2)', () => {
   it('parses anchors', () => {
     const m01 = getGlyphLayer(fontData.glyphs.A, 'm01')
     expect(m01?.anchors[0]).toMatchObject({ name: 'top', x: 250, y: 700 })
+  })
+
+  it('keeps glyph and layer non-geometry metadata', () => {
+    const glyph = fontData.glyphs.A
+    const m01 = getGlyphLayer(glyph, 'm01')
+
+    expect(glyph).toMatchObject({
+      note: 'Needs review',
+      leftMetricsKey: 'H',
+      rightMetricsKey: 'O',
+      customData: { reviewed: 1 },
+      sourceData: { glyphs: { fields: { script: 'latin' } } },
+    })
+    expect(m01).toMatchObject({
+      locked: true,
+      visible: false,
+      customData: { layerFlag: 1 },
+      sourceData: { glyphs: { fields: { color: 3 } } },
+    })
   })
 
   it('parses component transforms', () => {

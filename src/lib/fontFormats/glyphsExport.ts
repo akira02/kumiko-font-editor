@@ -4,7 +4,13 @@ import {
   isIdentityComponentMatrix,
 } from 'src/lib/components/componentTransform'
 import { getNodeSegmentType, getNodeType, isOffCurveNode } from 'src/store'
-import type { FontData, GlyphData, GlyphLayerData, PathNode } from 'src/store'
+import type {
+  FontData,
+  GlyphData,
+  GlyphLayerData,
+  GlyphSourceData,
+  PathNode,
+} from 'src/store'
 import { getPrimaryGlyphUnicode } from 'src/lib/glyph/glyphUnicode'
 
 // A pre-formatted OpenStep token emitted verbatim (no quoting, no re-indent).
@@ -28,6 +34,33 @@ const quoteString = (value: string) => {
     .replace(/\n/g, '\\n')
     .replace(/\r/g, '\\r')
     .replace(/\t/g, '\\t')}"`
+}
+
+const asRecord = (value: unknown): Record<string, unknown> =>
+  value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {}
+
+const sourceGlyphsFields = (
+  sourceData: GlyphSourceData | null | undefined
+): Record<string, unknown> =>
+  asRecord(asRecord(sourceData).glyphs).fields
+    ? asRecord(asRecord(asRecord(sourceData).glyphs).fields)
+    : {}
+
+const hasRecordEntries = (value: Record<string, unknown> | undefined) =>
+  Boolean(value && Object.keys(value).length > 0)
+
+const assignOptional = (
+  target: Record<string, unknown>,
+  key: string,
+  value: unknown
+) => {
+  if (value === undefined || value === null) {
+    delete target[key]
+  } else {
+    target[key] = value
+  }
 }
 
 const serializeOpenStepValueToChunks = (
@@ -255,10 +288,26 @@ export const applyLayerEdits = (
   layer: GlyphLayerData,
   formatVersion: GlyphsFormatVersion = 2
 ) => {
+  Object.assign(targetLayer, sourceGlyphsFields(layer.sourceData))
   targetLayer.layerId = layer.id
   targetLayer.associatedMasterId = layer.associatedMasterId ?? layer.id
   targetLayer.name = layer.name
   targetLayer.width = Math.round(layer.metrics.width)
+  assignOptional(
+    targetLayer,
+    'locked',
+    layer.locked === undefined ? undefined : layer.locked ? 1 : 0
+  )
+  assignOptional(
+    targetLayer,
+    'visible',
+    layer.visible === undefined ? undefined : layer.visible ? 1 : 0
+  )
+  if (hasRecordEntries(layer.customData)) {
+    targetLayer.userData = layer.customData
+  } else {
+    delete targetLayer.userData
+  }
   const attributes =
     targetLayer.attributes &&
     typeof targetLayer.attributes === 'object' &&
@@ -376,14 +425,28 @@ export const createGlyphsRecordFromFontDataGlyph = (
 ) => {
   const patchedGlyph: Record<string, unknown> = {
     ...(rawGlyph ?? {}),
+    ...sourceGlyphsFields(glyph.sourceData),
     glyphname: glyph.id,
-    unicode: getPrimaryGlyphUnicode(glyph) ?? undefined,
     export: glyph.export === false ? 0 : 1,
-    category: glyph.category ?? undefined,
-    subCategory: glyph.subCategory ?? undefined,
-    // Keep the source production name when the in-memory glyph has none.
-    production: glyph.production ?? rawGlyph?.production,
   }
+  assignOptional(patchedGlyph, 'unicode', getPrimaryGlyphUnicode(glyph))
+  assignOptional(patchedGlyph, 'category', glyph.category)
+  assignOptional(patchedGlyph, 'subCategory', glyph.subCategory)
+  assignOptional(patchedGlyph, 'note', glyph.note)
+  assignOptional(patchedGlyph, 'leftMetricsKey', glyph.leftMetricsKey)
+  assignOptional(patchedGlyph, 'rightMetricsKey', glyph.rightMetricsKey)
+  assignOptional(patchedGlyph, 'widthMetricsKey', glyph.widthMetricsKey)
+  if (hasRecordEntries(glyph.customData)) {
+    patchedGlyph.userData = glyph.customData
+  } else {
+    delete patchedGlyph.userData
+  }
+  // Keep the source production name when the in-memory glyph has none.
+  assignOptional(
+    patchedGlyph,
+    'production',
+    glyph.production ?? rawGlyph?.production
+  )
 
   const rawLayers = Array.isArray(rawGlyph?.layers)
     ? (rawGlyph.layers as Array<Record<string, unknown>>)
