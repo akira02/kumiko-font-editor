@@ -117,6 +117,8 @@ export interface KumikoUfoExportStateUpdate {
   sourceHash: string | null
 }
 
+const UFO_STATE_MARK_BATCH_SIZE = 256
+
 const getUfoSource = (project: KumikoProjectRecord, activeUfoId: string) => {
   const source = project.sourceData?.ufo?.ufos?.find(
     (candidate) => candidate.ufoId === activeUfoId
@@ -637,34 +639,45 @@ export const markKumikoGitHubCommitSynced = async (
     ])
   )
   const timestamp = Date.now()
-  const updatedGlyphs = await loadKumikoGlyphRecords(
-    updates.map((update) => makeKumikoGlyphKey(projectId, update.glyphId))
-  )
-  await saveKumikoGlyphRecordBatch(
-    updatedGlyphs.map((glyph) => {
-      const update = updateByGlyphId.get(glyph.glyphId)
-      if (!update) {
-        return glyph
-      }
-      return {
-        ...glyph,
-        syncDirty: 0,
-        exportDirty: 0,
-        syncedDigest: update.sourceHash,
-        exportedDigest: update.sourceHash,
-        sourceData: {
-          ...glyph.sourceData,
-          ufo: {
-            ...glyph.sourceData?.ufo,
-            fileName: update.fileName,
-            sourceHash: update.sourceHash,
-            remoteBlobSha: update.remoteBlobSha,
+  const updatedGlyphIds = [...updateByGlyphId.keys()]
+  for (
+    let index = 0;
+    index < updatedGlyphIds.length;
+    index += UFO_STATE_MARK_BATCH_SIZE
+  ) {
+    const batchGlyphIds = updatedGlyphIds.slice(
+      index,
+      index + UFO_STATE_MARK_BATCH_SIZE
+    )
+    const updatedGlyphs = await loadKumikoGlyphRecords(
+      batchGlyphIds.map((glyphId) => makeKumikoGlyphKey(projectId, glyphId))
+    )
+    await saveKumikoGlyphRecordBatch(
+      updatedGlyphs.map((glyph) => {
+        const update = updateByGlyphId.get(glyph.glyphId)
+        if (!update) {
+          return glyph
+        }
+        return {
+          ...glyph,
+          syncDirty: 0,
+          exportDirty: 0,
+          syncedDigest: update.sourceHash,
+          exportedDigest: update.sourceHash,
+          sourceData: {
+            ...glyph.sourceData,
+            ufo: {
+              ...glyph.sourceData?.ufo,
+              fileName: update.fileName,
+              sourceHash: update.sourceHash,
+              remoteBlobSha: update.remoteBlobSha,
+            },
           },
-        },
-        updatedAt: timestamp,
-      }
-    })
-  )
+          updatedAt: timestamp,
+        }
+      })
+    )
+  }
 
   await saveKumikoProjectRecord({
     ...project,
@@ -704,41 +717,51 @@ export const markKumikoUfoExportClean = async (
   if (updates.length === 0) {
     return
   }
-  const [project, glyphs] = await Promise.all([
-    loadKumikoProjectRecord(projectId),
-    loadKumikoGlyphRecords(
-      updates.map((update) => makeKumikoGlyphKey(projectId, update.glyphId))
-    ),
-  ])
+  const project = await loadKumikoProjectRecord(projectId)
   if (!project) {
     return
   }
   const updateByGlyphId = new Map(
     updates.map((update) => [update.glyphId, update])
   )
+  const glyphIds = [...updateByGlyphId.keys()]
   const timestamp = Date.now()
-  await saveKumikoGlyphRecordBatch(
-    glyphs.map((glyph) => {
-      const update = updateByGlyphId.get(glyph.glyphId)
-      if (!update) {
-        return glyph
-      }
-      return {
-        ...glyph,
-        exportDirty: 0,
-        exportedDigest: update.sourceHash,
-        sourceData: {
-          ...glyph.sourceData,
-          ufo: {
-            ...glyph.sourceData?.ufo,
-            fileName: update.fileName,
-            sourceHash: update.sourceHash,
+
+  for (
+    let index = 0;
+    index < glyphIds.length;
+    index += UFO_STATE_MARK_BATCH_SIZE
+  ) {
+    const batchGlyphIds = glyphIds.slice(
+      index,
+      index + UFO_STATE_MARK_BATCH_SIZE
+    )
+    const glyphs = await loadKumikoGlyphRecords(
+      batchGlyphIds.map((glyphId) => makeKumikoGlyphKey(projectId, glyphId))
+    )
+    await saveKumikoGlyphRecordBatch(
+      glyphs.map((glyph) => {
+        const update = updateByGlyphId.get(glyph.glyphId)
+        if (!update) {
+          return glyph
+        }
+        return {
+          ...glyph,
+          exportDirty: 0,
+          exportedDigest: update.sourceHash,
+          sourceData: {
+            ...glyph.sourceData,
+            ufo: {
+              ...glyph.sourceData?.ufo,
+              fileName: update.fileName,
+              sourceHash: update.sourceHash,
+            },
           },
-        },
-        updatedAt: timestamp,
-      }
-    })
-  )
+          updatedAt: timestamp,
+        }
+      })
+    )
+  }
 
   await saveKumikoProjectRecord({
     ...project,
