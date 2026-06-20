@@ -24,7 +24,6 @@ interface GlyphSummaryCardProps {
   availableLayers: Array<{ id: string; name: string }>
   glyph: GlyphData
   isDirty: boolean
-  selectedLayerId: string | null
   workspaceView: WorkspaceView
   // The editor uses a dedicated LayerListCard instead of this inline select.
   showLayerSelect?: boolean
