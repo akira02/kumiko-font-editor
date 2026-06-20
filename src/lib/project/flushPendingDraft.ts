@@ -2,6 +2,7 @@ import {
   saveDraftSnapshotInWorker,
   saveProjectUiStateInWorker,
 } from 'src/lib/project/draftSaveWorkerClient'
+import { publishProjectDraftSaved } from 'src/lib/project/projectBroadcast'
 import type { GlyphEditTimes } from 'src/lib/glyph/glyphEditTimes'
 import type { FontData, PersistenceStatus } from 'src/store'
 import type { KumikoProjectUiState } from 'src/lib/project/projectTypes'
@@ -119,6 +120,14 @@ const flushPendingDraftNow = async ({
     }
     markDraftSaved(dirtyGlyphIds, deletedGlyphIds, persistenceRevision)
     setPersistenceStatus('saved')
+    publishProjectDraftSaved({
+      projectId,
+      revision: persistenceRevision ?? null,
+      projectChanged: projectQueued,
+      uiStateChanged: uiStateQueued,
+      glyphIds: dirtyGlyphIds,
+      deletedGlyphIds,
+    })
     return true
   } catch (error) {
     setPersistenceStatus(

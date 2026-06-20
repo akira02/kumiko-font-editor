@@ -80,6 +80,7 @@ export function useFontExport() {
   const dirtyGlyphIds = useStore((state) => state.dirtyGlyphIds)
   const deletedGlyphIds = useStore((state) => state.deletedGlyphIds)
   const persistenceQueue = useStore((state) => state.persistenceQueue)
+  const persistenceStatus = useStore((state) => state.persistenceStatus)
   const glyphEditTimes = useStore((state) => state.glyphEditTimes)
   const markDraftSaved = useStore((state) => state.markDraftSaved)
   const markLocalSaved = useStore((state) => state.markLocalSaved)
@@ -102,7 +103,11 @@ export function useFontExport() {
     : []
 
   const canExport = Boolean(
-    fontData && projectId && !isExporting && !hasBlockingOpenTypeWarnings
+    fontData &&
+    projectId &&
+    !isExporting &&
+    persistenceStatus !== 'error' &&
+    !hasBlockingOpenTypeWarnings
   )
   const loadingText = ufoExportProgress
     ? ufoExportProgress.phase === 'zip'
@@ -116,6 +121,7 @@ export function useFontExport() {
       !fontData ||
       !projectId ||
       isExporting ||
+      persistenceStatus === 'error' ||
       hasBlockingOpenTypeWarnings ||
       selectedFormats.length === 0
     ) {

@@ -5,10 +5,6 @@ import {
   loadProjectDraftMetadata,
   renameKumikoProject,
 } from 'src/lib/project/projectRepository'
-import {
-  acquireProjectWriteLock,
-  releaseProjectWriteLock,
-} from 'src/lib/project/projectWriteLock'
 import type { KumikoProjectSummary } from 'src/lib/project/projectTypes'
 import type { KumikoProjectUiState } from 'src/lib/project/projectTypes'
 import type { FontData } from 'src/store'
@@ -41,30 +37,19 @@ export const useProjectList = () => {
     async (
       project: KumikoProjectSummary
     ): Promise<LoadedKumikoProject | null> => {
-      const lock = await acquireProjectWriteLock(project.id)
-      if (!lock.acquired) {
-        throw new Error('這個專案目前已在另一個分頁中開啟。')
+      const draft = await loadProjectDraftMetadata(project.id)
+      if (!draft?.fontData) {
+        return null
       }
 
-      try {
-        const draft = await loadProjectDraftMetadata(project.id)
-        if (!draft?.fontData) {
-          await releaseProjectWriteLock(project.id)
-          return null
-        }
-
-        return {
-          id: draft.id,
-          title: draft.title,
-          fontData: draft.fontData,
-          projectMetadata: draft.projectMetadata ?? null,
-          projectUiState: draft.projectUiState ?? null,
-          projectSourceFormat: draft.projectSourceFormat ?? null,
-          projectRoundTripFormat: draft.projectRoundTripFormat ?? null,
-        }
-      } catch (error) {
-        await releaseProjectWriteLock(project.id)
-        throw error
+      return {
+        id: draft.id,
+        title: draft.title,
+        fontData: draft.fontData,
+        projectMetadata: draft.projectMetadata ?? null,
+        projectUiState: draft.projectUiState ?? null,
+        projectSourceFormat: draft.projectSourceFormat ?? null,
+        projectRoundTripFormat: draft.projectRoundTripFormat ?? null,
       }
     },
     []

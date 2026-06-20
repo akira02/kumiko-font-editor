@@ -765,13 +765,15 @@ Autosave writes must be ordered and transactional:
   digests, and source metadata intact unless the operation intentionally changes
   them.
 
-Multi-tab editing needs an explicit policy before autosave ships. Prefer a
-single-writer project lock stored in IndexedDB and coordinated by
-`BroadcastChannel`; a second tab may open the project read-only or ask to take
-over after the first writer releases/stales out. If the implementation chooses
-last-write-wins instead, it must be documented as such and surface conflict
-warnings for external sync, because silent multi-tab overwrites are especially
-dangerous with background saves.
+Multi-tab editing uses optimistic writes plus `BroadcastChannel` invalidation,
+not an opening-time writer lock. A tab may open a project that is already open
+elsewhere. After a local draft write succeeds, the writer broadcasts a compact
+summary: project id, runtime revision, whether project/UI metadata changed, and
+which glyph ids were saved or deleted. Other open tabs use that summary to
+reload clean project state or to surface a conflict warning when they already
+have unsaved local edits. Silent last-write-wins is not acceptable for the same
+dirty glyph: a later revision must either merge independent glyph changes or
+warn before overwriting local edits.
 
 The queue can start on the main thread using `requestIdleCallback` or a short
 debounce. If serialization or IndexedDB writes become visible in profiling, move

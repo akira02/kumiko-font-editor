@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next'
 import { useToast } from '@chakra-ui/react'
 import { flushPendingDraft } from 'src/lib/project/flushPendingDraft'
 import { createProjectUiStateSnapshot } from 'src/lib/project/projectUiState'
-import { releaseProjectWriteLock } from 'src/lib/project/projectWriteLock'
 import { useStore } from 'src/store'
 
 export function useCloseProjectWithDraftSave() {
@@ -12,6 +11,7 @@ export function useCloseProjectWithDraftSave() {
   const closeProjectState = useStore((state) => state.closeProjectState)
   const markDraftSaved = useStore((state) => state.markDraftSaved)
   const setPersistenceStatus = useStore((state) => state.setPersistenceStatus)
+  const persistenceStatus = useStore((state) => state.persistenceStatus)
   const isDirty = useStore((state) => state.isDirty)
   const projectId = useStore((state) => state.projectId)
   const projectTitle = useStore((state) => state.projectTitle)
@@ -34,18 +34,24 @@ export function useCloseProjectWithDraftSave() {
     }
 
     if (!isDirty) {
-      if (projectId) {
-        await releaseProjectWriteLock(projectId)
-      }
       closeProjectState()
       return
     }
 
     if (!fontData || !projectId || !projectTitle) {
-      if (projectId) {
-        await releaseProjectWriteLock(projectId)
-      }
       closeProjectState()
+      return
+    }
+
+    if (persistenceStatus === 'error') {
+      toast({
+        title: t('fontOverview.closeProjectSaveFailed'),
+        description:
+          'This project has a pending save conflict. Reload or resolve it before closing.',
+        status: 'warning',
+        duration: 3200,
+        isClosable: true,
+      })
       return
     }
 
@@ -73,7 +79,6 @@ export function useCloseProjectWithDraftSave() {
         setPersistenceStatus,
         markDraftSaved,
       })
-      await releaseProjectWriteLock(projectId)
       closeProjectState()
     } catch (error) {
       console.warn('Save before closing project failed.', error)
@@ -100,6 +105,7 @@ export function useCloseProjectWithDraftSave() {
     overviewGridState,
     overviewSectionId,
     overviewTopGlyphId,
+    persistenceStatus,
     persistenceQueue.projectQueued,
     persistenceQueue.revision,
     persistenceQueue.uiStateQueued,

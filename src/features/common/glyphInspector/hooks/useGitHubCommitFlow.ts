@@ -96,6 +96,7 @@ export const useGitHubCommitFlow = ({
   const toast = useToast()
   const { t } = useTranslation()
   const setPersistenceStatus = useStore((state) => state.setPersistenceStatus)
+  const persistenceStatus = useStore((state) => state.persistenceStatus)
   const persistenceQueue = useStore((state) => state.persistenceQueue)
   const selectedGlyphId = useStore((state) => state.selectedGlyphId)
   const activeMasterId = useStore((state) => state.activeMasterId)
@@ -307,7 +308,7 @@ export const useGitHubCommitFlow = ({
       ? await loadGitHubForkStatus(gitHubBranchName.trim() || undefined)
       : null
 
-    if (!canCommitToGitHub) {
+    if (!canCommitToGitHub || persistenceStatus === 'error') {
       return
     }
 
@@ -456,6 +457,10 @@ export const useGitHubCommitFlow = ({
         duration: 3600,
         isClosable: true,
       })
+      return
+    }
+
+    if (persistenceStatus === 'error') {
       return
     }
 

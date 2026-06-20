@@ -5,11 +5,16 @@ import type { FontData } from 'src/store'
 const mocks = vi.hoisted(() => ({
   saveDraftSnapshotInWorker: vi.fn(),
   saveProjectUiStateInWorker: vi.fn(),
+  publishProjectDraftSaved: vi.fn(),
 }))
 
 vi.mock('src/lib/project/draftSaveWorkerClient', () => ({
   saveDraftSnapshotInWorker: mocks.saveDraftSnapshotInWorker,
   saveProjectUiStateInWorker: mocks.saveProjectUiStateInWorker,
+}))
+
+vi.mock('src/lib/project/projectBroadcast', () => ({
+  publishProjectDraftSaved: mocks.publishProjectDraftSaved,
 }))
 
 const fontData: FontData = {
@@ -116,5 +121,27 @@ describe('flushPendingDraft', () => {
     const input = mocks.saveDraftSnapshotInWorker.mock.calls[0]?.[0]
     expect(input.fontData.glyphOrder).toEqual(['A', 'B'])
     expect(Object.keys(input.fontData.glyphs)).toEqual(['A'])
+  })
+
+  it('broadcasts the saved draft summary after persistence succeeds', async () => {
+    mocks.saveDraftSnapshotInWorker.mockResolvedValueOnce(undefined)
+    const input = {
+      ...makeFlushInput(7),
+      projectQueued: true,
+      uiStateQueued: true,
+      dirtyGlyphIds: ['A', 'B'],
+      deletedGlyphIds: ['C'],
+    }
+
+    await flushPendingDraft(input)
+
+    expect(mocks.publishProjectDraftSaved).toHaveBeenCalledWith({
+      projectId: 'project-a',
+      revision: 7,
+      projectChanged: true,
+      uiStateChanged: true,
+      glyphIds: ['A', 'B'],
+      deletedGlyphIds: ['C'],
+    })
   })
 })

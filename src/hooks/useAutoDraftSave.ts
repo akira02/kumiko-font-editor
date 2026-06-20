@@ -23,12 +23,19 @@ export function useAutoDraftSave() {
   const overviewTopGlyphId = useStore((state) => state.overviewTopGlyphId)
   const overviewGridState = useStore((state) => state.overviewGridState)
   const isDirty = useStore((state) => state.isDirty)
+  const persistenceStatus = useStore((state) => state.persistenceStatus)
   const markDraftSaved = useStore((state) => state.markDraftSaved)
   const setPersistenceStatus = useStore((state) => state.setPersistenceStatus)
   const autosaveTimerRef = useRef<number | null>(null)
 
   useEffect(() => {
-    if (!fontData || !projectId || !projectTitle || !isDirty) {
+    if (
+      !fontData ||
+      !projectId ||
+      !projectTitle ||
+      !isDirty ||
+      persistenceStatus === 'error'
+    ) {
       if (autosaveTimerRef.current !== null) {
         window.clearTimeout(autosaveTimerRef.current)
         autosaveTimerRef.current = null
@@ -85,6 +92,7 @@ export function useAutoDraftSave() {
     overviewGridState,
     overviewSectionId,
     overviewTopGlyphId,
+    persistenceStatus,
     persistenceQueue.projectQueued,
     persistenceQueue.revision,
     persistenceQueue.uiStateQueued,

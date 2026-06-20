@@ -12,6 +12,7 @@ export const useFlushCurrentDraft = () => {
       projectId,
       projectTitle,
       fontData,
+      persistenceStatus,
       persistenceQueue,
       dirtyGlyphIds,
       deletedGlyphIds,
@@ -24,7 +25,12 @@ export const useFlushCurrentDraft = () => {
       overviewGridState,
     } = useStore.getState()
 
-    if (!projectId || !projectTitle || !fontData) {
+    if (
+      !projectId ||
+      !projectTitle ||
+      !fontData ||
+      persistenceStatus === 'error'
+    ) {
       return false
     }
 
