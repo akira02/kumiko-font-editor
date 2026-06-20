@@ -5,7 +5,11 @@ import {
   type GlyphData,
   type GlyphLayerData,
 } from 'src/store'
-import { activeLayer, getGlyphLayer } from 'src/store/glyphLayer'
+import {
+  activeLayer,
+  getActiveLayerId,
+  getGlyphLayer,
+} from 'src/store/glyphLayer'
 import type { GlyphEditTimes } from 'src/lib/glyph/glyphEditTimes'
 import { getPrimaryGlyphUnicode } from 'src/lib/glyph/glyphUnicode'
 import {
@@ -373,9 +377,14 @@ export interface GlyphPreviewData {
   shapes: GlyphPreviewShape[]
 }
 
+interface GlyphPreviewCacheEntry {
+  layerRef: GlyphLayerData
+  preview: GlyphPreviewData
+}
+
 const glyphPreviewCache = new WeakMap<
   Record<string, GlyphData>,
-  WeakMap<GlyphData, GlyphPreviewData>
+  WeakMap<GlyphData, Map<string, GlyphPreviewCacheEntry>>
 >()
 
 // Frame tuned for a 1000-UPM design space; scaled by the font's actual UPM.
@@ -485,16 +494,17 @@ export const buildGlyphPreviewData = (
   const headroom = 100 * scale
 
   const layer = getGlyphLayer(glyph, layerId)
+  const cacheKey = layerId ?? getActiveLayerId(glyph)
+  const glyphCache = glyphMapCache.get(glyph)
   if (!layer) {
     glyphMapCache.delete(glyph)
   }
 
-  // Only the glyph's own active layer is cached (keyed by glyph identity); an
-  // explicitly requested layer bypasses the cache. The cache is valid only while
-  // the glyph still has loaded geometry; eviction deletes layers in place.
-  const cachedPreview = layer && !layerId ? glyphMapCache.get(glyph) : undefined
-  if (cachedPreview) {
-    return cachedPreview
+  // Cache each resolved layer separately. Entries are valid only while the same
+  // layer object is still resident; geometry eviction deletes layers in place.
+  const cachedPreview = layer ? glyphCache?.get(cacheKey) : undefined
+  if (cachedPreview?.layerRef === layer) {
+    return cachedPreview.preview
   }
 
   const width = Math.max(layer?.metrics.width ?? 0, 240 * scale)
@@ -507,8 +517,11 @@ export const buildGlyphPreviewData = (
     flipY: PREVIEW_FLIP_BASELINE * scale,
     shapes,
   }
-  if (!layerId) {
-    glyphMapCache.set(glyph, preview)
+  if (layer) {
+    const nextGlyphCache =
+      glyphCache ?? new Map<string, GlyphPreviewCacheEntry>()
+    nextGlyphCache.set(cacheKey, { layerRef: layer, preview })
+    glyphMapCache.set(glyph, nextGlyphCache)
   }
   return preview
 }
