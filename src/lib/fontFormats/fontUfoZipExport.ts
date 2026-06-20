@@ -1,5 +1,10 @@
 import { strToU8, zipSync } from 'fflate'
-import type { FontData, GlyphData, GlyphLayerData } from 'src/store'
+import type {
+  FontData,
+  GlyphData,
+  GlyphLayerContent,
+  GlyphLayerData,
+} from 'src/store'
 import {
   buildUfoLibFromFontData,
   fontInfoToUfoFontInfo,
@@ -80,63 +85,105 @@ const getGlyphGuidelines = (glyph: GlyphData, selectedLayerId: string | null) =>
 const getGlyphImage = (glyph: GlyphData, selectedLayerId: string | null) =>
   getExportLayer(glyph, selectedLayerId)?.image ?? null
 
+const toGlyphRecordFromContent = (input: {
+  glyph: GlyphData
+  projectId: string
+  layerId: string
+  content: GlyphLayerContent
+  fileName: string
+  unicodes?: string[]
+  image?: UfoGlyphRecord['image']
+}): UfoGlyphRecord => ({
+  projectId: input.projectId,
+  ufoId: 'font-export',
+  layerId: input.layerId,
+  glyphName: input.glyph.id,
+  fileName: input.fileName,
+  sourceHash: null,
+  unicodes: input.unicodes ?? [],
+  advance: {
+    width: input.content.metrics.width,
+    height: null,
+  },
+  anchors: input.content.anchors.map((anchor) => ({
+    x: anchor.x,
+    y: anchor.y,
+    name: anchor.name,
+    color: serializeUfoColor(anchor.color),
+    identifier: anchor.id,
+  })),
+  guidelines: input.content.guidelines.map((guide) => ({
+    x: guide.x,
+    y: guide.y,
+    angle: guide.angle,
+    name: guide.name ?? null,
+    color: serializeUfoColor(guide.color),
+    identifier: guide.id,
+  })),
+  contours: input.content.paths.map(pathToUfoContour),
+  components: input.content.componentRefs.map((component) => ({
+    base: component.glyphId,
+    identifier: component.id,
+    xScale: component.scaleX,
+    xyScale: component.xyScale,
+    yxScale: component.yxScale,
+    yScale: component.scaleY,
+    xOffset: component.x,
+    yOffset: component.y,
+  })),
+  note: null,
+  image: input.image ?? null,
+  lib: null,
+  dirty: false,
+  dirtyIndex: 0,
+  updatedAt: Date.now(),
+})
+
 const toGlyphRecord = (
   glyph: GlyphData,
   projectId: string,
   selectedLayerId: string | null,
   fileName: string
 ): UfoGlyphRecord => {
-  const metrics = getGlyphMetrics(glyph, selectedLayerId)
   const image = getGlyphImage(glyph, selectedLayerId)
-
-  return {
+  return toGlyphRecordFromContent({
+    glyph,
     projectId,
-    ufoId: 'font-export',
     layerId: DEFAULT_LAYER_ID,
-    glyphName: glyph.id,
-    fileName,
-    sourceHash: null,
-    unicodes: glyph.unicodes ?? [],
-    advance: {
-      width: metrics.width,
-      height: null,
+    content: {
+      paths: getGlyphPaths(glyph, selectedLayerId),
+      componentRefs: getGlyphComponents(glyph, selectedLayerId),
+      anchors: getGlyphAnchors(glyph, selectedLayerId),
+      guidelines: getGlyphGuidelines(glyph, selectedLayerId),
+      metrics: getGlyphMetrics(glyph, selectedLayerId),
     },
-    anchors: getGlyphAnchors(glyph, selectedLayerId).map((anchor) => ({
-      x: anchor.x,
-      y: anchor.y,
-      name: anchor.name,
-      color: serializeUfoColor(anchor.color),
-      identifier: anchor.id,
-    })),
-    guidelines: getGlyphGuidelines(glyph, selectedLayerId).map((guide) => ({
-      x: guide.x,
-      y: guide.y,
-      angle: guide.angle,
-      name: guide.name ?? null,
-      color: serializeUfoColor(guide.color),
-      identifier: guide.id,
-    })),
-    contours: getGlyphPaths(glyph, selectedLayerId).map(pathToUfoContour),
-    components: getGlyphComponents(glyph, selectedLayerId).map((component) => ({
-      base: component.glyphId,
-      identifier: component.id,
-      xScale: component.scaleX,
-      yScale: component.scaleY,
-      xOffset: component.x,
-      yOffset: component.y,
-    })),
-    note: null,
+    fileName,
+    unicodes: glyph.unicodes ?? [],
     image: image
       ? {
           ...image,
           color: serializeUfoColor(image.color),
         }
       : null,
-    lib: null,
-    dirty: false,
-    dirtyIndex: 0,
-    updatedAt: Date.now(),
-  }
+  })
+}
+
+const toBackgroundGlyphRecord = (
+  glyph: GlyphData,
+  projectId: string,
+  selectedLayerId: string | null,
+  fileName: string
+): UfoGlyphRecord | null => {
+  const background = getExportLayer(glyph, selectedLayerId)?.background
+  return background
+    ? toGlyphRecordFromContent({
+        glyph,
+        projectId,
+        layerId: 'public.background',
+        content: background,
+        fileName,
+      })
+    : null
 }
 
 // Build the file map for one .ufo (under ufoDir), reading each glyph's content
@@ -171,6 +218,17 @@ const buildUfoFileMap = (input: {
       fileName
     )
   })
+  const backgroundRecords = glyphs
+    .map((glyph, index) =>
+      toBackgroundGlyphRecord(
+        glyph,
+        input.projectId,
+        input.selectedLayerId,
+        glyphRecords[index]?.fileName ?? `${sanitizeFilePart(glyph.id)}.glif`
+      )
+    )
+    .filter((record): record is UfoGlyphRecord => Boolean(record))
+  const hasBackgroundLayer = backgroundRecords.length > 0
 
   files[`${ufoDir}/metainfo.plist`] = strToU8(
     serializeXmlPlist({
@@ -220,7 +278,12 @@ const buildUfoFileMap = (input: {
     files[`${ufoDir}/features.fea`] = strToU8(featureText)
   }
   files[`${ufoDir}/layercontents.plist`] = strToU8(
-    serializeXmlPlist([[DEFAULT_LAYER_ID, DEFAULT_GLYPH_DIR]])
+    serializeXmlPlist([
+      [DEFAULT_LAYER_ID, DEFAULT_GLYPH_DIR],
+      ...(hasBackgroundLayer
+        ? [['public.background', 'glyphs.background']]
+        : []),
+    ])
   )
   files[`${ufoDir}/${DEFAULT_GLYPH_DIR}/contents.plist`] = strToU8(
     serializeXmlPlist(
@@ -235,6 +298,20 @@ const buildUfoFileMap = (input: {
       serializeGlifRecord(glyph)
     )
   })
+  if (hasBackgroundLayer) {
+    files[`${ufoDir}/glyphs.background/contents.plist`] = strToU8(
+      serializeXmlPlist(
+        Object.fromEntries(
+          backgroundRecords.map((glyph) => [glyph.glyphName, glyph.fileName])
+        )
+      )
+    )
+    backgroundRecords.forEach((glyph) => {
+      files[`${ufoDir}/glyphs.background/${glyph.fileName}`] = strToU8(
+        serializeGlifRecord(glyph)
+      )
+    })
+  }
 
   return files
 }

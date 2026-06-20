@@ -355,4 +355,84 @@ describe('Kumiko GitHub UFO sync', () => {
     expect(storedGlyph?.exportedDigest).toBe('export-hash')
     expect(project?.exportDirty).toBe(0)
   })
+
+  it('exports canonical UFO background layers from glyph background content', async () => {
+    const fontData = makeFontData()
+    fontData.glyphs.A.layers!['public.default']!.background = {
+      paths: [
+        {
+          id: 'bg-path',
+          closed: false,
+          nodes: [
+            {
+              id: 'bg-node',
+              kind: 'oncurve',
+              segmentType: 'line',
+              x: 12,
+              y: 34,
+            },
+          ],
+        },
+      ],
+      componentRefs: [],
+      anchors: [],
+      guidelines: [],
+      metrics: { width: 500, lsb: 12, rsb: 488 },
+    }
+    await saveProjectDraft({
+      id: 'github-sync-background-export',
+      title: 'Kumiko',
+      lastModified: 2,
+      createdAt: 1,
+      updatedAt: 2,
+      sourceName: 'Kumiko.ufo',
+      sourceType: 'github',
+      githubSource: {
+        owner: 'owner',
+        repo: 'repo',
+        ref: 'main',
+        defaultBranch: 'main',
+        commitSha: 'base',
+      },
+      fontData,
+      projectMetadata: null,
+      projectSourceData: {
+        ufo: {
+          ...sourceData.ufo,
+          ufos: sourceData.ufo.ufos.map((ufo) => ({
+            ...ufo,
+            layers: [
+              ...ufo.layers,
+              { layerId: 'public.background', glyphDir: 'glyphs.background' },
+            ],
+          })),
+        },
+      },
+      projectSourceFormat: 'ufo',
+      projectRoundTripFormat: 'ufo',
+      projectGlyphsPackage: null,
+    })
+
+    const manifest = await buildKumikoUfoExportManifest(
+      'github-sync-background-export'
+    )
+    const ufoManifest = manifest.ufos[0]!
+    const backgroundLayer = ufoManifest.metadata.layers.find(
+      (layer) => layer.layerId === 'public.background'
+    )!
+    const backgroundBatch = await loadKumikoUfoExportGlyphBatch({
+      project: manifest.project,
+      activeUfoId: ufoManifest.metadata.ufoId,
+      contents: ufoManifest.contents,
+      glyphIds: ufoManifest.glyphIds,
+      targetLayer: backgroundLayer,
+    })
+
+    expect(backgroundBatch).toHaveLength(1)
+    expect(backgroundBatch[0]?.unicodes).toEqual([])
+    expect(backgroundBatch[0]?.contours[0]?.points[0]).toMatchObject({
+      x: 12,
+      y: 34,
+    })
+  })
 })

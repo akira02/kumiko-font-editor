@@ -33,6 +33,7 @@ import {
   buildBoundsResolver,
   buildWorkspaceFileMapFromEntries,
   glyphRecordToLayerContent,
+  isUfoBackgroundLayer,
   pathToUfoContour,
   parseGlifText,
   serializeGlifRecord,
@@ -162,6 +163,11 @@ const selectLayerForUfo = (glyph: KumikoGlyphRecord, defaultLayerId: string) =>
   glyph.layerOrder.map((layerId) => glyph.layers[layerId]).find(Boolean) ??
   Object.values(glyph.layers)[0]
 
+type KumikoUfoLayerContent = Pick<
+  KumikoGlyphLayerRecord,
+  'paths' | 'componentRefs' | 'anchors' | 'guidelines' | 'metrics'
+>
+
 const makeContents = (
   project: KumikoProjectRecord,
   glyphs: Array<Pick<KumikoGlyphRecord, 'glyphId' | 'sourceData'>>,
@@ -188,14 +194,33 @@ const toUfoGlyphRecord = (input: {
   glyph: KumikoGlyphRecord
   activeUfoId: string
   fileName: string
+  targetLayer?: UfoLayerRecord
 }): UfoGlyphRecord => {
   const { source, defaultLayer } = getUfoSource(
     input.project,
     input.activeUfoId
   )
+  const targetLayer = input.targetLayer ?? defaultLayer
   const layer = selectLayerForUfo(input.glyph, source.defaultLayerId)
   if (!layer) {
     throw new Error(`字圖 ${input.glyph.glyphId} 沒有可寫入 UFO 的 layer`)
+  }
+  const content: KumikoUfoLayerContent | null =
+    targetLayer.layerId === defaultLayer.layerId
+      ? {
+          paths: layer.paths,
+          componentRefs: layer.componentRefs,
+          anchors: layer.anchors,
+          guidelines: layer.guidelines,
+          metrics: layer.metrics,
+        }
+      : isUfoBackgroundLayer(targetLayer, defaultLayer)
+        ? (layer.background ?? null)
+        : null
+  if (!content) {
+    throw new Error(
+      `字圖 ${input.glyph.glyphId} 沒有可寫入 UFO layer ${targetLayer.layerId} 的內容`
+    )
   }
   const glyphSource = readGlyphUfoSource(input.glyph)
   const layerSource = readLayerUfoSource(layer)
@@ -203,25 +228,34 @@ const toUfoGlyphRecord = (input: {
   return {
     projectId: input.project.projectId,
     ufoId: source.ufoId,
-    layerId: defaultLayer.layerId,
+    layerId: targetLayer.layerId,
     glyphName: input.glyph.glyphId,
     fileName: input.fileName,
-    sourceHash: glyphSource.sourceHash ?? layerSource.sourceHash ?? null,
+    sourceHash:
+      targetLayer.layerId === defaultLayer.layerId
+        ? (glyphSource.sourceHash ?? layerSource.sourceHash ?? null)
+        : null,
     remoteBlobSha:
-      glyphSource.remoteBlobSha ?? layerSource.remoteBlobSha ?? null,
-    unicodes: input.glyph.unicodes,
+      targetLayer.layerId === defaultLayer.layerId
+        ? (glyphSource.remoteBlobSha ?? layerSource.remoteBlobSha ?? null)
+        : null,
+    unicodes:
+      targetLayer.layerId === defaultLayer.layerId ? input.glyph.unicodes : [],
     advance: {
-      width: layer.metrics.width,
-      height: layer.verticalMetrics?.height ?? null,
+      width: content.metrics.width,
+      height:
+        targetLayer.layerId === defaultLayer.layerId
+          ? (layer.verticalMetrics?.height ?? null)
+          : null,
     },
-    anchors: layer.anchors.map((anchor) => ({
+    anchors: content.anchors.map((anchor) => ({
       x: anchor.x,
       y: anchor.y,
       name: anchor.name,
       color: serializeUfoColor(anchor.color),
       identifier: anchor.identifier ?? anchor.id,
     })),
-    guidelines: layer.guidelines.map((guide) => ({
+    guidelines: content.guidelines.map((guide) => ({
       x: guide.x,
       y: guide.y,
       angle: guide.angle,
@@ -229,8 +263,8 @@ const toUfoGlyphRecord = (input: {
       color: serializeUfoColor(guide.color),
       identifier: guide.identifier ?? guide.id,
     })),
-    contours: layer.paths.map((path) => pathToUfoContour(path)),
-    components: layer.componentRefs.map((component) => {
+    contours: content.paths.map((path) => pathToUfoContour(path)),
+    components: content.componentRefs.map((component) => {
       const matrix = component.transform
       return {
         base: component.glyphId,
@@ -243,14 +277,21 @@ const toUfoGlyphRecord = (input: {
         yOffset: matrix.f,
       }
     }),
-    note: layerSource.note ?? input.glyph.note ?? null,
-    image: layer.image
-      ? {
-          ...layer.image,
-          color: serializeUfoColor(layer.image.color),
-        }
-      : null,
-    lib: layerSource.lib ?? null,
+    note:
+      targetLayer.layerId === defaultLayer.layerId
+        ? (layerSource.note ?? input.glyph.note ?? null)
+        : null,
+    image:
+      targetLayer.layerId === defaultLayer.layerId && layer.image
+        ? {
+            ...layer.image,
+            color: serializeUfoColor(layer.image.color),
+          }
+        : null,
+    lib:
+      targetLayer.layerId === defaultLayer.layerId
+        ? (layerSource.lib ?? null)
+        : null,
     dirty: input.glyph.syncDirty === 1,
     dirtyIndex: input.glyph.syncDirty,
     updatedAt: input.glyph.updatedAt,
@@ -461,20 +502,36 @@ export const loadKumikoUfoExportGlyphBatch = async (input: {
   activeUfoId: string
   contents: Record<string, string>
   glyphIds: string[]
+  targetLayer?: UfoLayerRecord
 }): Promise<UfoGlyphRecord[]> => {
   const glyphs = await loadKumikoGlyphRecords(
     input.glyphIds.map((glyphId) =>
       makeKumikoGlyphKey(input.project.projectId, glyphId)
     )
   )
-  return glyphs.map((glyph) =>
-    toUfoGlyphRecord({
-      project: input.project,
-      glyph,
-      activeUfoId: input.activeUfoId,
-      fileName: input.contents[glyph.glyphId] ?? `${glyph.glyphId}.glif`,
-    })
+  const { source, defaultLayer } = getUfoSource(
+    input.project,
+    input.activeUfoId
   )
+  const targetLayer = input.targetLayer ?? defaultLayer
+  return glyphs.flatMap((glyph) => {
+    const layer = selectLayerForUfo(glyph, source.defaultLayerId)
+    if (
+      targetLayer.layerId !== defaultLayer.layerId &&
+      (!isUfoBackgroundLayer(targetLayer, defaultLayer) || !layer?.background)
+    ) {
+      return []
+    }
+    return [
+      toUfoGlyphRecord({
+        project: input.project,
+        glyph,
+        activeUfoId: input.activeUfoId,
+        fileName: input.contents[glyph.glyphId] ?? `${glyph.glyphId}.glif`,
+        targetLayer,
+      }),
+    ]
+  })
 }
 
 export const buildKumikoUfoExportState = async (

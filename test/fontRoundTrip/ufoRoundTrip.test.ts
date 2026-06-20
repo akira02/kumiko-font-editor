@@ -12,6 +12,7 @@ import {
   importUfoWorkspaceEntries,
   parseGlifText,
   serializeGlifRecord,
+  serializeXmlPlist,
   type UfoWorkspaceEntry,
 } from 'src/lib/fontFormats/ufoFormat'
 import type { UfoGlyphRecord } from 'src/lib/fontFormats/ufoTypes'
@@ -160,6 +161,85 @@ describe('UFO import → export → reimport round-trip', () => {
       )?.color
     ).toEqual([0.2, 0.3, 0.4, 0.5])
     expect(layerOf(glyphWithImage!).sourceData?.ufo).not.toHaveProperty('image')
+  })
+
+  it('folds UFO background layers into canonical layer background and re-emits them', async () => {
+    const entries = await readUfoEntries()
+    const firstGlif = entries.find((entry) =>
+      entry.relativePath.endsWith('.glif')
+    )
+    expect(firstGlif).toBeDefined()
+    const fileName = firstGlif!.relativePath.split('/').pop() ?? 'A.glif'
+    const glyphName = parseGlifText(firstGlif!.text, fileName).glyphName
+    const backgroundGlif = `<?xml version="1.0" encoding="UTF-8"?>
+<glyph name="${glyphName}" format="2">
+  <advance width="500"/>
+  <outline>
+    <contour>
+      <point x="10" y="20" type="move"/>
+      <point x="110" y="20" type="line"/>
+      <point x="110" y="120" type="line"/>
+    </contour>
+  </outline>
+</glyph>`
+    const withBackground = entries.filter(
+      (entry) =>
+        !entry.relativePath.endsWith('layercontents.plist') &&
+        !entry.relativePath.includes('/glyphs.background/')
+    )
+    withBackground.push({
+      relativePath: `${UFO_NAME}/layercontents.plist`,
+      text: serializeXmlPlist([
+        ['public.default', 'glyphs'],
+        ['public.background', 'glyphs.background'],
+      ]),
+    })
+    withBackground.push({
+      relativePath: `${UFO_NAME}/glyphs.background/contents.plist`,
+      text: serializeXmlPlist({ [glyphName]: fileName }),
+    })
+    withBackground.push({
+      relativePath: `${UFO_NAME}/glyphs.background/${fileName}`,
+      text: backgroundGlif,
+    })
+
+    const imported = await importWorkspace(withBackground, UFO_NAME)
+    const importedBackground = layerOf(
+      imported.fontData.glyphs[glyphName]
+    ).background
+
+    expect(importedBackground?.paths).toHaveLength(1)
+    expect(importedBackground?.paths[0]?.nodes[0]).toMatchObject({
+      x: 10,
+      y: 20,
+    })
+
+    const blob = exportFontDataAsUfoZip({
+      fontData: imported.fontData,
+      projectId: imported.project.projectId,
+      projectTitle: 'OpenSourceFont',
+      selectedLayerId: null,
+    })
+    const files = unzipSync(new Uint8Array(await blob.arrayBuffer()))
+    expect(
+      Object.keys(files).some((path) =>
+        path.endsWith('.ufo/glyphs.background/contents.plist')
+      )
+    ).toBe(true)
+    expect(
+      Object.keys(files).some((path) =>
+        /^.+\.ufo\/glyphs\.background\/.+\.glif$/.test(path)
+      )
+    ).toBe(true)
+
+    const reimported = await importWorkspace(
+      zipToEntries(new Uint8Array(await blob.arrayBuffer())),
+      'OpenSourceFont.ufo'
+    )
+    expect(
+      layerOf(reimported.fontData.glyphs[glyphName]).background?.paths[0]
+        ?.nodes[0]
+    ).toMatchObject({ x: 10, y: 20 })
   })
 })
 

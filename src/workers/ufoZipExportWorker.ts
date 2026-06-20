@@ -2,6 +2,7 @@
 import { Zip, ZipDeflate } from 'fflate'
 import { hashString } from 'src/lib/hash'
 import {
+  isUfoBackgroundLayer,
   serializeGlifRecord,
   serializeXmlPlist,
 } from 'src/lib/fontFormats/adapters/ufo'
@@ -200,17 +201,13 @@ self.onmessage = async (event: MessageEvent<ZipExportRequest>) => {
       for (const layer of metadata.layers) {
         const layerDir = await ensureOpfsDir(ufoDir, layer.glyphDir)
         const isDefaultLayer = layer.layerId === ufo.defaultLayer.layerId
-
-        await writeOpfsFile(
-          layerDir,
-          'contents.plist',
-          serializeXmlPlist(isDefaultLayer ? ufo.contents : {})
-        )
-
-        if (!isDefaultLayer) {
+        const isBackgroundLayer = isUfoBackgroundLayer(layer, ufo.defaultLayer)
+        if (!isDefaultLayer && !isBackgroundLayer) {
+          await writeOpfsFile(layerDir, 'contents.plist', serializeXmlPlist({}))
           continue
         }
 
+        const writtenContents: Record<string, string> = {}
         let glyphStartIndex = 0
         while (glyphStartIndex < ufo.glyphIds.length) {
           const glyphIds = ufo.glyphIds.slice(
@@ -222,6 +219,7 @@ self.onmessage = async (event: MessageEvent<ZipExportRequest>) => {
             activeUfoId: metadata.ufoId,
             contents: ufo.contents,
             glyphIds,
+            targetLayer: layer,
           })
 
           let writeStartIndex = 0
@@ -235,8 +233,9 @@ self.onmessage = async (event: MessageEvent<ZipExportRequest>) => {
                 const glifText = serializeGlifRecord(glyph)
                 const nextHash = hashString(glifText)
                 await writeOpfsFile(layerDir, glyph.fileName, glifText)
+                writtenContents[glyph.glyphName] = glyph.fileName
 
-                if (markClean) {
+                if (markClean && isDefaultLayer) {
                   exportStateUpdates.push({
                     activeUfoId: glyph.ufoId,
                     glyphId: glyph.glyphName,
@@ -246,12 +245,20 @@ self.onmessage = async (event: MessageEvent<ZipExportRequest>) => {
                 }
               })
             )
-            completedGlyphs += batch.length
-            progressWrite()
+            if (isDefaultLayer) {
+              completedGlyphs += batch.length
+              progressWrite()
+            }
             writeStartIndex += batch.length
           }
           glyphStartIndex += glyphIds.length
         }
+
+        await writeOpfsFile(
+          layerDir,
+          'contents.plist',
+          serializeXmlPlist(writtenContents)
+        )
       }
     }
 

@@ -705,9 +705,29 @@ export const glyphRecordToLayerContent = (
 
 const buildFontDataFromUfoGlyphs = (
   glyphRecords: UfoGlyphRecord[],
-  metadata: UfoMetadataRecord
+  metadata: UfoMetadataRecord,
+  allLayerGlyphRecords: UfoGlyphRecord[] = glyphRecords
 ): FontData => {
   const resolveBounds = buildBoundsResolver(glyphRecords)
+  const defaultLayer = pickDefaultLayer(metadata)
+  const backgroundLayers = metadata.layers.filter((layer) =>
+    isUfoBackgroundLayer(layer, defaultLayer)
+  )
+  const backgroundGlyphRecords = allLayerGlyphRecords.filter(
+    (record) =>
+      record.ufoId === metadata.ufoId &&
+      backgroundLayers.some((layer) => layer.layerId === record.layerId)
+  )
+  const backgroundBounds = buildBoundsResolver([
+    ...glyphRecords,
+    ...backgroundGlyphRecords,
+  ])
+  const backgroundByGlyphName = new Map(
+    backgroundGlyphRecords.map((record) => [
+      record.glyphName,
+      glyphRecordToLayerContent(record, backgroundBounds),
+    ])
+  )
 
   const axes = fontAxesFromLib(metadata.lib)
   const fontInfo = fontInfoFromUfoFontInfo(metadata.fontinfo)
@@ -772,6 +792,7 @@ const buildFontDataFromUfoGlyphs = (
                       color: parseUfoColor(record.image.color),
                     }
                   : null,
+                background: backgroundByGlyphName.get(record.glyphName) ?? null,
                 ...glyphRecordToLayerContent(record, resolveBounds),
               },
             },
@@ -817,6 +838,14 @@ export const pickDefaultLayer = (metadata: UfoMetadataRecord) =>
     layerId: 'public.default',
     glyphDir: 'glyphs',
   }
+
+export const isUfoBackgroundLayer = (
+  layer: UfoLayerRecord,
+  defaultLayer: UfoLayerRecord
+) =>
+  layer.layerId !== defaultLayer.layerId &&
+  (layer.layerId.toLowerCase().includes('background') ||
+    layer.glyphDir.toLowerCase().includes('background'))
 
 const basename = (path: string) => path.split('/').filter(Boolean).pop() ?? path
 
@@ -894,6 +923,10 @@ export const resolveDefaultSourceRef = (
 interface MasterSource extends SourceRef {
   metadata: UfoMetadataRecord
   resolveBounds: ReturnType<typeof buildBoundsResolver>
+  backgroundByGlyphName: Map<
+    string,
+    ReturnType<typeof glyphRecordToLayerContent>
+  >
   recordsByName: Map<string, UfoGlyphRecord>
 }
 
@@ -912,10 +945,29 @@ export const buildMultiMasterFontData = (
     const records = glyphRecords.filter(
       (record) => record.ufoId === ref.ufoId && record.layerId === ref.layerId
     )
+    const defaultLayer = pickDefaultLayer(metadata)
+    const backgroundLayers = metadata.layers.filter((layer) =>
+      isUfoBackgroundLayer(layer, defaultLayer)
+    )
+    const backgroundRecords = glyphRecords.filter(
+      (record) =>
+        record.ufoId === ref.ufoId &&
+        backgroundLayers.some((layer) => layer.layerId === record.layerId)
+    )
+    const backgroundBounds = buildBoundsResolver([
+      ...records,
+      ...backgroundRecords,
+    ])
     return {
       ...ref,
       metadata,
       resolveBounds: buildBoundsResolver(records),
+      backgroundByGlyphName: new Map(
+        backgroundRecords.map((record) => [
+          record.glyphName,
+          glyphRecordToLayerContent(record, backgroundBounds),
+        ])
+      ),
       recordsByName: new Map(
         records.map((record) => [record.glyphName, record])
       ),
@@ -1000,6 +1052,7 @@ export const buildMultiMasterFontData = (
               color: parseUfoColor(record.image.color),
             }
           : null,
+        background: master.backgroundByGlyphName.get(glyphId) ?? null,
         ...glyphRecordToLayerContent(record, master.resolveBounds),
       }
       layerOrder.push(master.sourceId)
@@ -1214,24 +1267,41 @@ export const importUfoWorkspaceEntries = async (
     }
     metadataRecords.push(metadataRecord)
 
-    for (const [, fileName] of Object.entries(contents)) {
-      const glifText = ufo.files[`${defaultLayer.glyphDir}/${fileName}`]
-      if (!glifText) {
+    for (const layer of layers) {
+      const layerContents =
+        layer.layerId === defaultLayer.layerId
+          ? contents
+          : ((ufo.files[`${layer.glyphDir}/contents.plist`]
+              ? parseXmlPlist(ufo.files[`${layer.glyphDir}/contents.plist`])
+              : {}) as Record<string, string>)
+
+      if (
+        layer.layerId !== defaultLayer.layerId &&
+        !isUfoBackgroundLayer(layer, defaultLayer)
+      ) {
         continue
       }
-      const parsedGlyph = parseGlifText(glifText, fileName)
-      glyphRecords.push({
-        ...parsedGlyph,
-        projectId,
-        ufoId: ufo.ufoId,
-        layerId: defaultLayer.layerId,
-        remoteBlobSha: options.githubSource
-          ? await gitBlobShaFromText(glifText)
-          : null,
-        dirty: false,
-        dirtyIndex: 0,
-        updatedAt: createdAt,
-      })
+
+      for (const [, fileName] of Object.entries(layerContents)) {
+        const glifText = ufo.files[`${layer.glyphDir}/${fileName}`]
+        if (!glifText) {
+          continue
+        }
+        const parsedGlyph = parseGlifText(glifText, fileName)
+        glyphRecords.push({
+          ...parsedGlyph,
+          projectId,
+          ufoId: ufo.ufoId,
+          layerId: layer.layerId,
+          remoteBlobSha:
+            options.githubSource && layer.layerId === defaultLayer.layerId
+              ? await gitBlobShaFromText(glifText)
+              : null,
+          dirty: false,
+          dirtyIndex: 0,
+          updatedAt: createdAt,
+        })
+      }
     }
   }
 
@@ -1270,7 +1340,7 @@ export const importUfoWorkspaceEntries = async (
   const fontData = designspace
     ? buildMultiMasterFontData(metadataRecords, glyphRecords, designspace)
     : activeMetadata
-      ? buildFontDataFromUfoGlyphs(activeGlyphs, activeMetadata)
+      ? buildFontDataFromUfoGlyphs(activeGlyphs, activeMetadata, glyphRecords)
       : { glyphs: {} }
   const projectMetadata = {
     activeUfoId,

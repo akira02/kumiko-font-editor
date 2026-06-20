@@ -1,6 +1,7 @@
 export {
   importUfoWorkspace,
   importUfoWorkspaceEntries,
+  isUfoBackgroundLayer,
   isRelevantUfoTextFile,
   pathToUfoContour,
   pickDefaultLayer,
