@@ -223,7 +223,7 @@ export function OverviewContent({
                 rangeChanged={onRangeChange}
                 readyStateChanged={handleReadyStateChange}
                 stateChanged={onGridStateChange}
-                increaseViewportBy={{ top: 800, bottom: 1000 }}
+                increaseViewportBy={{ top: 320, bottom: 480 }}
                 components={gridComponents}
                 itemContent={(index) => {
                   const glyph = activeSection.glyphs[index]

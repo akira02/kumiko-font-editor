@@ -15,6 +15,10 @@ import { useHistoryShortcuts } from 'src/features/fontOverview/hooks/useHistoryS
 import { useOverviewGridPersistence } from 'src/features/fontOverview/hooks/useOverviewGridPersistence'
 import { useOverviewSections } from 'src/features/fontOverview/hooks/useOverviewSections'
 import { useOverviewSelection } from 'src/features/fontOverview/hooks/useOverviewSelection'
+import {
+  collectOverviewGeometryGlyphIds,
+  OVERVIEW_MAX_RESIDENT_GLYPH_GEOMETRY,
+} from 'src/features/fontOverview/utils/overviewGeometryWindow'
 
 export function FontOverviewScreen() {
   useHistoryShortcuts()
@@ -36,6 +40,7 @@ export function FontOverviewScreen() {
   const loadingGlyphGeometryPromisesRef = useRef(
     new Map<string, Promise<void>>()
   )
+  const overviewGeometryRequestIdRef = useRef(0)
 
   const { closeProject, isClosingProject } = useCloseProjectWithDraftSave()
   const {
@@ -101,7 +106,13 @@ export function FontOverviewScreen() {
   )
 
   const ensureGlyphGeometryLoaded = useCallback(
-    async (glyphIds: string[]) => {
+    async (
+      glyphIds: string[],
+      options: {
+        maxLoadedGlyphs?: number
+        shouldHydrate?: () => boolean
+      } = {}
+    ) => {
       if (!projectId) {
         return
       }
@@ -133,7 +144,15 @@ export function FontOverviewScreen() {
         if (useStore.getState().projectId !== projectId) {
           return
         }
-        hydrateGlyphGeometry(glyphs)
+        if (options.shouldHydrate && !options.shouldHydrate()) {
+          return
+        }
+        hydrateGlyphGeometry(
+          glyphs,
+          options.maxLoadedGlyphs
+            ? { maxLoadedGlyphs: options.maxLoadedGlyphs }
+            : undefined
+        )
       })().finally(() => {
         for (const glyphId of missingGlyphIds) {
           loadingGlyphGeometryPromisesRef.current.delete(glyphId)
@@ -150,15 +169,16 @@ export function FontOverviewScreen() {
   const handleRangeChange = useCallback(
     (range: ListRange) => {
       handleGridRangeChange(range)
-      const startIndex = Math.max(0, range.startIndex - 12)
-      const endIndex = Math.min(
-        activeSection.glyphs.length - 1,
-        range.endIndex + 12
+      overviewGeometryRequestIdRef.current += 1
+      const requestId = overviewGeometryRequestIdRef.current
+      const glyphIds = collectOverviewGeometryGlyphIds(
+        activeSection.glyphs,
+        range
       )
-      const glyphIds = activeSection.glyphs
-        .slice(startIndex, endIndex + 1)
-        .map((glyph) => glyph.id)
-      void ensureGlyphGeometryLoaded(glyphIds)
+      void ensureGlyphGeometryLoaded(glyphIds, {
+        maxLoadedGlyphs: OVERVIEW_MAX_RESIDENT_GLYPH_GEOMETRY,
+        shouldHydrate: () => overviewGeometryRequestIdRef.current === requestId,
+      })
     },
     [activeSection.glyphs, ensureGlyphGeometryLoaded, handleGridRangeChange]
   )
