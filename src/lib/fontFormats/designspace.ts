@@ -45,6 +45,13 @@ export interface DesignspaceSource {
 export interface Designspace {
   axes: DesignspaceAxis[]
   sources: DesignspaceSource[]
+  rules?: DesignspaceRule[]
+}
+
+export interface DesignspaceRule {
+  name: string
+  conditions: Record<string, { minimum?: number; maximum?: number }>
+  substitutions: Array<{ name: string; with: string }>
 }
 
 const toNumber = (value: string | null | undefined, fallback = 0): number => {
@@ -113,7 +120,39 @@ export const parseDesignspace = (
     }
   })
 
-  return { axes, sources }
+  const rules: DesignspaceRule[] = Array.from(
+    document.querySelectorAll('rules > rule')
+  ).map((rule) => {
+    const conditions: Record<string, { minimum?: number; maximum?: number }> =
+      {}
+    for (const condition of Array.from(rule.querySelectorAll('condition'))) {
+      const name = condition.getAttribute('name')
+      if (!name) {
+        continue
+      }
+      conditions[name] = {
+        ...(condition.hasAttribute('minimum')
+          ? { minimum: toNumber(condition.getAttribute('minimum')) }
+          : {}),
+        ...(condition.hasAttribute('maximum')
+          ? { maximum: toNumber(condition.getAttribute('maximum')) }
+          : {}),
+      }
+    }
+    const substitutions = Array.from(rule.querySelectorAll('sub')).map(
+      (substitution) => ({
+        name: substitution.getAttribute('name') ?? '',
+        with: substitution.getAttribute('with') ?? '',
+      })
+    )
+    return {
+      name: rule.getAttribute('name') ?? '',
+      conditions,
+      substitutions,
+    }
+  })
+
+  return { axes, sources, ...(rules.length > 0 ? { rules } : {}) }
 }
 
 export const designspaceToFontAxes = (designspace: Designspace): FontAxes => ({
@@ -140,13 +179,16 @@ export interface DesignspaceSourceOut {
   filename: string
   name: string
   location: Record<string, number>
+  familyName?: string
+  styleName?: string
 }
 
 // Serialize FontData axes + sources back to a .designspace document. The source
 // at the axis-defaults location is marked default via <info copy="1"/>.
 export const serializeDesignspace = (
   axes: FontAxes | undefined,
-  sources: DesignspaceSourceOut[]
+  sources: DesignspaceSourceOut[],
+  rules: DesignspaceRule[] = []
 ): string => {
   const axisEntries = axes?.axes ?? []
   const defaultLocation = Object.fromEntries(
@@ -176,12 +218,50 @@ export const serializeDesignspace = (
         .join('\n')
       const isDefault = sameLocation(source.location, defaultLocation)
       return [
-        `    <source filename="${escapeXmlAttr(source.filename)}" name="${escapeXmlAttr(source.name)}" stylename="${escapeXmlAttr(source.name)}">`,
+        `    <source filename="${escapeXmlAttr(source.filename)}" name="${escapeXmlAttr(source.name)}" stylename="${escapeXmlAttr(source.styleName ?? source.name)}">`,
+        ...(source.familyName
+          ? [
+              `      <familyname>${escapeXmlAttr(source.familyName)}</familyname>`,
+            ]
+          : []),
         ...(isDefault ? ['      <info copy="1"/>'] : []),
         '      <location>',
         dimensions,
         '      </location>',
         '    </source>',
+      ].join('\n')
+    })
+    .join('\n')
+
+  const rulesXml = rules
+    .map((rule) => {
+      const conditions = Object.entries(rule.conditions)
+        .map(([name, condition]) =>
+          [
+            `        <condition name="${escapeXmlAttr(name)}"`,
+            condition.minimum !== undefined
+              ? ` minimum="${condition.minimum}"`
+              : '',
+            condition.maximum !== undefined
+              ? ` maximum="${condition.maximum}"`
+              : '',
+            '/>',
+          ].join('')
+        )
+        .join('\n')
+      const substitutions = rule.substitutions
+        .map(
+          (substitution) =>
+            `      <sub name="${escapeXmlAttr(substitution.name)}" with="${escapeXmlAttr(substitution.with)}"/>`
+        )
+        .join('\n')
+      return [
+        `    <rule name="${escapeXmlAttr(rule.name)}">`,
+        '      <conditionset>',
+        conditions,
+        '      </conditionset>',
+        substitutions,
+        '    </rule>',
       ].join('\n')
     })
     .join('\n')
@@ -194,6 +274,6 @@ ${axesXml}
   <sources>
 ${sourcesXml}
   </sources>
-</designspace>
+${rulesXml ? `  <rules processing="last">\n${rulesXml}\n  </rules>\n` : ''}</designspace>
 `
 }

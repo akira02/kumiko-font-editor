@@ -15,7 +15,11 @@ import {
   serializeXmlPlist,
 } from 'src/lib/fontFormats/adapters/ufo'
 import { selectUfoFeatureText } from 'src/lib/openTypeFeatures/legacyFeatureText'
-import { serializeDesignspace } from 'src/lib/fontFormats/designspace'
+import {
+  serializeDesignspace,
+  type DesignspaceRule,
+  type DesignspaceSourceOut,
+} from 'src/lib/fontFormats/designspace'
 import type { UfoGlyphRecord } from 'src/lib/fontFormats/ufoTypes'
 import { serializeUfoColor } from 'src/lib/color/kumikoColor'
 
@@ -87,6 +91,7 @@ const getGlyphImage = (glyph: GlyphData, selectedLayerId: string | null) =>
 
 const toGlyphRecordFromContent = (input: {
   glyph: GlyphData
+  glyphName?: string
   projectId: string
   layerId: string
   content: GlyphLayerContent
@@ -97,7 +102,7 @@ const toGlyphRecordFromContent = (input: {
   projectId: input.projectId,
   ufoId: 'font-export',
   layerId: input.layerId,
-  glyphName: input.glyph.id,
+  glyphName: input.glyphName ?? input.glyph.id,
   fileName: input.fileName,
   sourceHash: null,
   unicodes: input.unicodes ?? [],
@@ -186,6 +191,33 @@ const toBackgroundGlyphRecord = (
     : null
 }
 
+const layerToContent = (layer: GlyphLayerData): GlyphLayerContent => ({
+  paths: layer.paths,
+  componentRefs: layer.componentRefs,
+  anchors: layer.anchors,
+  guidelines: layer.guidelines,
+  metrics: layer.metrics,
+})
+
+const substituteGlyphName = (glyphId: string, layerId: string) =>
+  `${glyphId}.bracket.${sanitizeFilePart(layerId)}`
+
+const extraGlyphRecordFromLayer = (input: {
+  glyph: GlyphData
+  glyphName: string
+  projectId: string
+  layer: GlyphLayerData
+}): UfoGlyphRecord =>
+  toGlyphRecordFromContent({
+    glyph: input.glyph,
+    glyphName: input.glyphName,
+    projectId: input.projectId,
+    layerId: DEFAULT_LAYER_ID,
+    content: layerToContent(input.layer),
+    fileName: `${sanitizeFilePart(input.glyphName)}.glif`,
+    unicodes: [],
+  })
+
 // Build the file map for one .ufo (under ufoDir), reading each glyph's content
 // from the given layer (a source id for multi-master). Shared by the single-ufo
 // and multi-master (designspace) exporters.
@@ -195,6 +227,7 @@ const buildUfoFileMap = (input: {
   fontInfoName: string
   selectedLayerId: string | null
   ufoDir: string
+  extraGlyphRecords?: UfoGlyphRecord[]
 }): Record<string, Uint8Array> => {
   const ufoDir = input.ufoDir
   const files: Record<string, Uint8Array> = {}
@@ -218,6 +251,7 @@ const buildUfoFileMap = (input: {
       fileName
     )
   })
+  const allGlyphRecords = [...glyphRecords, ...(input.extraGlyphRecords ?? [])]
   const backgroundRecords = glyphs
     .map((glyph, index) =>
       toBackgroundGlyphRecord(
@@ -288,12 +322,12 @@ const buildUfoFileMap = (input: {
   files[`${ufoDir}/${DEFAULT_GLYPH_DIR}/contents.plist`] = strToU8(
     serializeXmlPlist(
       Object.fromEntries(
-        glyphRecords.map((glyph) => [glyph.glyphName, glyph.fileName])
+        allGlyphRecords.map((glyph) => [glyph.glyphName, glyph.fileName])
       )
     )
   )
 
-  glyphRecords.forEach((glyph) => {
+  allGlyphRecords.forEach((glyph) => {
     files[`${ufoDir}/${DEFAULT_GLYPH_DIR}/${glyph.fileName}`] = strToU8(
       serializeGlifRecord(glyph)
     )
@@ -363,6 +397,24 @@ export const exportMultiMasterUfoZip = (input: {
     usedDirs.add(dir.toLowerCase())
     return { source, dir }
   })
+  const bracketLayers = Object.values(input.fontData.glyphs).flatMap((glyph) =>
+    Object.values(glyph.layers ?? {})
+      .filter((layer) => layer.type === 'bracket' && layer.bracketAxisRules)
+      .map((layer) => ({ glyph, layer }))
+  )
+  const braceLayers = Object.values(input.fontData.glyphs).flatMap((glyph) =>
+    Object.values(glyph.layers ?? {})
+      .filter((layer) => layer.type === 'brace' && layer.braceLocation)
+      .map((layer) => ({ glyph, layer }))
+  )
+  const bracketExtraRecords = bracketLayers.map(({ glyph, layer }) =>
+    extraGlyphRecordFromLayer({
+      glyph,
+      glyphName: substituteGlyphName(glyph.id, layer.id),
+      projectId: input.projectId,
+      layer,
+    })
+  )
 
   for (const { source, dir } of sourceDirs) {
     Object.assign(
@@ -373,18 +425,70 @@ export const exportMultiMasterUfoZip = (input: {
         fontInfoName: family,
         selectedLayerId: source.id,
         ufoDir: dir,
+        extraGlyphRecords: bracketExtraRecords,
       })
     )
   }
 
+  const braceSources: DesignspaceSourceOut[] = []
+  braceLayers.forEach(({ glyph, layer }) => {
+    const dir = `${sanitizeFilePart(`${glyph.id}-${layer.id}`)}.brace.ufo`
+    braceSources.push({
+      filename: dir,
+      name: layer.name || layer.id,
+      styleName: layer.name || layer.id,
+      location: layer.braceLocation ?? {},
+    })
+    Object.assign(
+      files,
+      buildUfoFileMap({
+        fontData: { ...input.fontData, glyphs: {} },
+        projectId: input.projectId,
+        fontInfoName: family,
+        selectedLayerId: null,
+        ufoDir: dir,
+        extraGlyphRecords: [
+          extraGlyphRecordFromLayer({
+            glyph,
+            glyphName: glyph.id,
+            projectId: input.projectId,
+            layer,
+          }),
+        ],
+      })
+    )
+  })
+
+  const bracketRules: DesignspaceRule[] = bracketLayers.map(
+    ({ glyph, layer }) => ({
+      name: `${glyph.id}.${layer.id}`,
+      conditions: Object.fromEntries(
+        Object.entries(layer.bracketAxisRules ?? {}).map(([axis, rule]) => [
+          axis,
+          {
+            ...(rule.min !== undefined ? { minimum: rule.min } : {}),
+            ...(rule.max !== undefined ? { maximum: rule.max } : {}),
+          },
+        ])
+      ),
+      substitutions: [
+        { name: glyph.id, with: substituteGlyphName(glyph.id, layer.id) },
+      ],
+    })
+  )
+
   files[`${sanitizeFilePart(family)}.designspace`] = strToU8(
     serializeDesignspace(
       input.fontData.axes,
-      sourceDirs.map(({ source, dir }) => ({
-        filename: dir,
-        name: source.name,
-        location: source.location,
-      }))
+      [
+        ...sourceDirs.map(({ source, dir }) => ({
+          filename: dir,
+          name: source.name,
+          location: source.location,
+        })),
+        ...braceSources,
+      ],
+      bracketRules
     )
   )
 

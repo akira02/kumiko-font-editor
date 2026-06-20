@@ -10,6 +10,8 @@ import { describe, expect, it } from 'vitest'
 import { exportFontDataAsUfoZip } from 'src/lib/fontFormats/fontUfoZipExport'
 import {
   importUfoWorkspaceEntries,
+  glyphRecordToLayerContent,
+  pathToUfoContour,
   parseGlifText,
   serializeGlifRecord,
   serializeXmlPlist,
@@ -254,7 +256,7 @@ describe('GLIF parse ↔ serialize round-trip', () => {
   <image fileName="sketch.png" xScale="1.2" yScale="0.8" xOffset="12" yOffset="34" color="0.1,0.2,0.3,0.4"/>
   <outline>
     <contour>
-      <point x="100" y="0" type="line"/>
+      <point x="100" y="0" type="line" name="start" identifier="pt-start" color="0.6,0.5,0.4,0.3"/>
       <point x="100" y="200"/>
       <point x="300" y="200"/>
       <point x="300" y="0" type="curve" smooth="yes"/>
@@ -302,6 +304,11 @@ describe('GLIF parse ↔ serialize round-trip', () => {
       'curve',
       'qcurve',
     ])
+    expect(closed.points[0]).toMatchObject({
+      name: 'start',
+      identifier: 'pt-start',
+      color: '0.6,0.5,0.4,0.3',
+    })
     expect(closed.points[3].smooth).toBe(true)
     expect(open.points[0].type).toBe('move')
     expect(first.components[0]).toMatchObject({
@@ -323,6 +330,24 @@ describe('GLIF parse ↔ serialize round-trip', () => {
       xOffset: 12,
       yOffset: 34,
       color: '0.1,0.2,0.3,0.4',
+    })
+
+    const canonical = glyphRecordToLayerContent(augment(first), () => ({
+      xMin: 0,
+      xMax: 300,
+      yMin: -50,
+      yMax: 700,
+    }))
+    expect(canonical.paths[0].nodes[0]).toMatchObject({
+      id: 'pt-start',
+      identifier: 'pt-start',
+      name: 'start',
+      color: [0.6, 0.5, 0.4, 0.3],
+    })
+    expect(pathToUfoContour(canonical.paths[0]).points[0]).toMatchObject({
+      identifier: 'pt-start',
+      name: 'start',
+      color: '0.6,0.5,0.4,0.3',
     })
   })
 })

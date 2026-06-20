@@ -1,5 +1,8 @@
 import {
   extractGlyphsMetadata,
+  extractGlyphsDocumentFields,
+  extractGlyphsFontMasterFields,
+  getGlyphsFormatVersion,
   type GlyphsDocument,
 } from 'src/lib/fontFormats/glyphsDocument'
 import { buildFontDataFromGlyphsDocument } from 'src/lib/fontFormats/glyphsImport'
@@ -30,6 +33,20 @@ const familyTitle = (document: GlyphsDocument, fallback: string) =>
     ? document.familyName
     : fallback
 
+const glyphsSourceData = (input: {
+  document: GlyphsDocument
+  packageName: string | null
+  repoPath: string | null
+}): KumikoProjectSourceData => ({
+  glyphs: {
+    formatVersion: getGlyphsFormatVersion(input.document),
+    packageName: input.packageName,
+    repoPath: input.repoPath,
+    documentFields: extractGlyphsDocumentFields(input.document),
+    fontMasterFields: extractGlyphsFontMasterFields(input.document),
+  },
+})
+
 // Single-file .glyphs: parse the OpenStep document, then keep only Kumiko's
 // canonical FontData plus compact non-vector metadata.
 export const importGlyphsFile = async (
@@ -46,14 +63,11 @@ export const importGlyphsFile = async (
     title: familyTitle(document, stripExtension(file.name)),
     fontData: buildFontDataFromGlyphsDocument(document),
     projectMetadata: extractGlyphsMetadata(document) ?? {},
-    projectSourceData: {
-      glyphs: {
-        formatVersion: document.formatVersion === 3 ? 3 : 2,
-        packageName: null,
-        repoPath: null,
-        documentFields: extractGlyphsMetadata(document) ?? {},
-      },
-    },
+    projectSourceData: glyphsSourceData({
+      document,
+      packageName: null,
+      repoPath: null,
+    }),
     projectSourceFormat: 'glyphs',
     projectGlyphsPackage: null,
   }
@@ -73,14 +87,11 @@ export const importGlyphsPackage = async (
     title: familyTitle(document, stripExtension(packageData.packageName)),
     fontData: buildFontDataFromGlyphsDocument(document),
     projectMetadata,
-    projectSourceData: {
-      glyphs: {
-        formatVersion: document.formatVersion === 3 ? 3 : 2,
-        packageName: packageData.packageName,
-        repoPath: null,
-        documentFields: projectMetadata,
-      },
-    },
+    projectSourceData: glyphsSourceData({
+      document,
+      packageName: packageData.packageName,
+      repoPath: null,
+    }),
     projectSourceFormat: 'glyphspackage',
     projectGlyphsPackage: packageData,
   }

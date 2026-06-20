@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises'
 import { describe, expect, it } from 'vitest'
 import { parseOpenStep } from 'src/lib/fontFormats/openstepParser'
 import { buildFontDataFromGlyphsDocument } from 'src/lib/fontFormats/glyphsImport'
+import { importGlyphsFile } from 'src/lib/fontFormats/adapters/glyphs'
 import { serializeGlyphsFileToBlob } from 'src/lib/fontFormats/glyphsExport'
 import {
   extractGlyphsMetadata,
@@ -26,6 +27,7 @@ leftMetricsKey = H;
 rightMetricsKey = O;
 userData = { reviewed = 1; };
 script = latin;
+color = 4;
 layers = (
 {
 layerId = "m01";
@@ -36,6 +38,7 @@ userData = { layerFlag = 1; };
 color = 3;
 backgroundImage = { path = "Images/A.png"; transform = "{1, 0.1, 0.2, 1, 30, 40}"; alpha = 60; };
 background = { width = 500; paths = ( { closed = 0; nodes = ( "10 10 LINE", "90 10 LINE" ); } ); };
+hints = ( { type = stem; horizontal = 1; position = 120; width = 20; } );
 paths = (
 { identifier = "path-A"; name = outline; userData = { pathFlag = 1; }; pathRole = primary; closed = 1; nodes = ( "100 0 LINE", "400 0 LINE", "400 700 CURVE SMOOTH", "250 750 OFFCURVE", "100 700 LINE" ); }
 );
@@ -180,7 +183,8 @@ describe('buildFontDataFromGlyphsDocument (Glyphs 2)', () => {
       leftMetricsKey: 'H',
       rightMetricsKey: 'O',
       customData: { reviewed: 1 },
-      sourceData: { glyphs: { fields: { script: 'latin' } } },
+      sourceData: { glyphs: { fields: { script: 'latin', color: 4 } } },
+      color: [0.18, 0.55, 0.85, 1],
     })
     expect(m01).toMatchObject({
       locked: true,
@@ -206,6 +210,8 @@ describe('buildFontDataFromGlyphsDocument (Glyphs 2)', () => {
           },
         ],
       },
+      hints: [{ type: 'stem', horizontal: 1, position: 120, width: 20 }],
+      color: [0.3, 0.69, 0.31, 1],
       customData: { layerFlag: 1 },
       sourceData: { glyphs: { fields: { color: 3 } } },
     })
@@ -329,6 +335,53 @@ layers = (
       segmentType: 'quadratic',
       smooth: true,
     })
+  })
+})
+
+describe('importGlyphsFile project source data', () => {
+  it('keeps non-vector document and font master fields in sourceData', async () => {
+    const imported = await importGlyphsFile(
+      new File(
+        [
+          `{
+.formatVersion = 3;
+familyName = SourceData;
+designer = "Designer";
+customParameters = ( { name = note; value = keep; } );
+fontMaster = ( { id = "M1"; name = Regular; axesValues = ( 100 ); customMasterField = keepMaster; } );
+glyphs = (
+{
+glyphname = A;
+unicode = 65;
+layers = ( { layerId = "M1"; width = 500; shapes = ( { closed = 0; nodes = ( (0,0,l), (100,0,l) ); } ); } );
+}
+);
+}`,
+        ],
+        'SourceData.glyphs'
+      )
+    )
+
+    expect(imported.projectSourceData.glyphs).toMatchObject({
+      formatVersion: 3,
+      packageName: null,
+      repoPath: null,
+      documentFields: {
+        '.formatVersion': 3,
+        familyName: 'SourceData',
+        designer: 'Designer',
+      },
+      fontMasterFields: {
+        M1: {
+          id: 'M1',
+          name: 'Regular',
+          customMasterField: 'keepMaster',
+        },
+      },
+    })
+    expect(
+      imported.projectSourceData.glyphs?.documentFields
+    ).not.toHaveProperty('glyphs')
   })
 })
 

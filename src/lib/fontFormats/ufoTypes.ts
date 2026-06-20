@@ -50,6 +50,8 @@ export interface UfoGlyphPoint {
   type?: 'move' | 'line' | 'offcurve' | 'curve' | 'qcurve'
   smooth?: boolean
   name?: string | null
+  color?: string | null
+  identifier?: string | null
 }
 
 export interface UfoGlyphContour {

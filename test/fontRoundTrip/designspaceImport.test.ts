@@ -238,6 +238,113 @@ describe('exportMultiMasterUfoZip', () => {
     ])
   })
 
+  it('projects brace layers to sparse sources and bracket layers to rules', async () => {
+    const data = fontData()
+    data.glyphs.A.layers = {
+      ...data.glyphs.A.layers,
+      brace: {
+        id: 'brace',
+        name: 'A Brace',
+        type: 'brace',
+        associatedMasterId: 'Light',
+        braceLocation: { Weight: 50 },
+        paths: [
+          {
+            id: 'brace-path',
+            closed: false,
+            nodes: [
+              {
+                id: 'n1',
+                kind: 'oncurve',
+                segmentType: 'line',
+                x: 40,
+                y: 0,
+              },
+              {
+                id: 'n2',
+                kind: 'oncurve',
+                segmentType: 'line',
+                x: 140,
+                y: 0,
+              },
+            ],
+          },
+        ],
+        componentRefs: [],
+        anchors: [],
+        guidelines: [],
+        metrics: { width: 550, lsb: 40, rsb: 410 },
+      },
+      bracket: {
+        id: 'bracket',
+        name: 'A Bracket',
+        type: 'bracket',
+        associatedMasterId: 'Light',
+        bracketAxisRules: { Weight: { min: 80, max: 100 } },
+        paths: [
+          {
+            id: 'bracket-path',
+            closed: false,
+            nodes: [
+              {
+                id: 'n1',
+                kind: 'oncurve',
+                segmentType: 'line',
+                x: 90,
+                y: 0,
+              },
+              {
+                id: 'n2',
+                kind: 'oncurve',
+                segmentType: 'line',
+                x: 190,
+                y: 0,
+              },
+            ],
+          },
+        ],
+        componentRefs: [],
+        anchors: [],
+        guidelines: [],
+        metrics: { width: 560, lsb: 90, rsb: 370 },
+      },
+    }
+    data.glyphs.A.layerOrder = [
+      ...(data.glyphs.A.layerOrder ?? []),
+      'brace',
+      'bracket',
+    ]
+
+    const blob = exportMultiMasterUfoZip({
+      fontData: data,
+      projectId: 'p',
+      projectTitle: 'Fam',
+    })
+    const files = unzipSync(new Uint8Array(await blob.arrayBuffer()))
+    const designspaceText = strFromU8(files['Fam.designspace'])
+    const designspace = parseDesignspace(designspaceText)
+
+    expect(
+      designspace.sources.some((source) =>
+        source.filename.includes('brace.ufo')
+      )
+    ).toBe(true)
+    expect(designspace.rules?.[0]).toMatchObject({
+      conditions: { Weight: { minimum: 80, maximum: 100 } },
+      substitutions: [{ name: 'A', with: 'A.bracket.bracket' }],
+    })
+    expect(
+      Object.keys(files).some((path) =>
+        path.endsWith('glyphs/A.bracket.bracket.glif')
+      )
+    ).toBe(true)
+    expect(
+      Object.keys(files).some(
+        (path) => path.includes('brace.ufo/glyphs/') && path.endsWith('A.glif')
+      )
+    ).toBe(true)
+  })
+
   it("each source ufo carries that source's outline", async () => {
     const blob = exportMultiMasterUfoZip({
       fontData: fontData(),

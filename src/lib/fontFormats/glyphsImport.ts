@@ -11,6 +11,7 @@ import type {
   GlyphLayerContent,
   GlyphSourceData,
   GlyphMetrics,
+  KumikoColor,
   PathData,
   PathNode,
   PathSegmentType,
@@ -300,6 +301,28 @@ const parseOptionalBoolean = (value: unknown): boolean | undefined => {
   return value === 1 || value === true
 }
 
+const GLYPHS_LABEL_COLORS: KumikoColor[] = [
+  [0.85, 0.26, 0.22, 1],
+  [0.9, 0.5, 0.18, 1],
+  [0.95, 0.75, 0.18, 1],
+  [0.3, 0.69, 0.31, 1],
+  [0.18, 0.55, 0.85, 1],
+  [0.43, 0.36, 0.84, 1],
+  [0.75, 0.32, 0.76, 1],
+  [0.55, 0.55, 0.55, 1],
+  [0.35, 0.35, 0.35, 1],
+  [0, 0, 0, 1],
+  [1, 1, 1, 1],
+]
+
+const parseGlyphsLabelColor = (value: unknown): KumikoColor | null => {
+  const index = asNumber(value, Number.NaN)
+  if (!Number.isInteger(index) || index < 0) {
+    return null
+  }
+  return GLYPHS_LABEL_COLORS[index] ?? null
+}
+
 const parseCustomData = (value: unknown): GlyphSourceData | undefined => {
   const record = compactRecord(asRecord(value))
   return record ?? undefined
@@ -337,6 +360,7 @@ const GLYPHS_LAYER_CANONICAL_KEYS = new Set([
   'backgroundImage',
   'background',
   'image',
+  'hints',
   'locked',
   'visible',
   'userData',
@@ -471,6 +495,13 @@ const parseGlyphsBackground = (layer: Raw): GlyphLayerContent | null => {
     },
   }
   return isNonEmptyLayerContent(background) ? background : null
+}
+
+const parseGlyphsHints = (value: unknown): GlyphLayerData['hints'] => {
+  const hints = asArray(value)
+    .map((entry) => compactRecord(asRecord(entry)))
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry))
+  return hints.length > 0 ? hints : undefined
 }
 
 const componentFromMatrix = (
@@ -909,6 +940,8 @@ export const buildFontDataFromGlyphsDocument = (
       visible?: boolean
       background?: GlyphLayerContent | null
       image?: GlyphImage | null
+      hints?: GlyphLayerData['hints']
+      color?: KumikoColor | null
       customData?: GlyphSourceData
       sourceData?: GlyphSourceData
       content: ParsedLayerContent
@@ -919,6 +952,7 @@ export const buildFontDataFromGlyphsDocument = (
     widthMetricsKey: string | null
     customData?: GlyphSourceData
     sourceData?: GlyphSourceData
+    color?: KumikoColor | null
   }
 
   const contentByMaster = new Map<string, Map<string, ParsedLayerContent>>()
@@ -965,6 +999,8 @@ export const buildFontDataFromGlyphsDocument = (
         visible: parseOptionalBoolean(rawLayer.visible),
         background: parseGlyphsBackground(rawLayer),
         image: parseGlyphsImage(rawLayer),
+        hints: parseGlyphsHints(rawLayer.hints),
+        color: parseGlyphsLabelColor(rawLayer.color),
         customData: parseCustomData(rawLayer.userData),
         sourceData: glyphsSourceData(
           extractGlyphsSourceFields(rawLayer, GLYPHS_LAYER_CANONICAL_KEYS)
@@ -991,6 +1027,7 @@ export const buildFontDataFromGlyphsDocument = (
       sourceData: glyphsSourceData(
         extractGlyphsSourceFields(rawGlyph, GLYPHS_GLYPH_CANONICAL_KEYS)
       ),
+      color: parseGlyphsLabelColor(rawGlyph.color),
       layers,
     }
   })
@@ -1037,6 +1074,8 @@ export const buildFontDataFromGlyphsDocument = (
         visible: layer.visible,
         background: layer.background,
         image: layer.image,
+        hints: layer.hints,
+        color: layer.color,
         customData: layer.customData,
         sourceData: layer.sourceData,
       }
@@ -1065,6 +1104,7 @@ export const buildFontDataFromGlyphsDocument = (
       widthMetricsKey: parsed.widthMetricsKey,
       customData: parsed.customData,
       sourceData: parsed.sourceData,
+      color: parsed.color,
     }
     glyphOrder.push(parsed.glyphName)
   }

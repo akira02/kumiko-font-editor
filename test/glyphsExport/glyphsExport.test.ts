@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { serializeGlyphsFileToBlob } from 'src/lib/fontFormats/glyphsExport'
+import {
+  getGlyphsExportWarnings,
+  serializeGlyphsFileToBlob,
+} from 'src/lib/fontFormats/glyphsExport'
 import { createGlyphsPackageDataFromFontData } from 'src/lib/fontFormats/glyphsPackage'
 import type { GlyphsDocument } from 'src/lib/fontFormats/glyphsDocument'
 import type { FontData, GlyphData } from 'src/store'
@@ -208,6 +211,15 @@ describe('serializeGlyphsFileToBlob glyph matching', () => {
     expect(text).toContain('transform = (1,0.2,0,1,20,30)')
     expect(text).toContain('automaticAlignment = 0')
     expect(text).not.toContain('scale = (1,1)')
+    expect(getGlyphsExportWarnings(fontData, 3)).toMatchObject([
+      {
+        code: 'glyphs3-shear-transform-unverified',
+        glyphId: 'composite',
+        layerId: 'M1',
+        componentId: 'c1',
+      },
+    ])
+    expect(getGlyphsExportWarnings(fontData, 2)).toEqual([])
   })
 
   it('emits brace and bracket layer attributes from canonical layer metadata', async () => {
@@ -275,6 +287,7 @@ describe('serializeGlyphsFileToBlob glyph matching', () => {
           note: 'Needs review',
           leftMetricsKey: 'H',
           rightMetricsKey: 'O',
+          color: [0.18, 0.55, 0.85, 1],
           customData: { reviewed: 1 },
           sourceData: { glyphs: { fields: { script: 'latin' } } },
           layers: {
@@ -284,6 +297,7 @@ describe('serializeGlyphsFileToBlob glyph matching', () => {
               associatedMasterId: 'M1',
               locked: true,
               visible: false,
+              color: [0.3, 0.69, 0.31, 1],
               image: {
                 fileName: 'Images/A.png',
                 xScale: 1,
@@ -322,6 +336,9 @@ describe('serializeGlyphsFileToBlob glyph matching', () => {
                 guidelines: [],
                 metrics: { width: 500, lsb: 0, rsb: 500 },
               },
+              hints: [
+                { type: 'stem', horizontal: 1, position: 120, width: 20 },
+              ],
               customData: { layerFlag: 1 },
               sourceData: { glyphs: { fields: { color: 3 } } },
               paths: [],
@@ -343,12 +360,16 @@ describe('serializeGlyphsFileToBlob glyph matching', () => {
     expect(text).toContain('leftMetricsKey = H')
     expect(text).toContain('rightMetricsKey = O')
     expect(text).toContain('script = latin')
+    expect(text).toContain('color = 4')
     expect(text).toContain('userData = {')
     expect(text).toContain('reviewed = 1')
     expect(text).toContain('locked = 1')
     expect(text).toContain('visible = 0')
     expect(text).toContain('layerFlag = 1')
     expect(text).toContain('color = 3')
+    expect(text).toContain('hints = (')
+    expect(text).toContain('type = stem')
+    expect(text).toContain('position = 120')
     expect(text).toContain('backgroundImage = {')
     expect(text).toContain('path = Images/A.png')
     expect(text).toContain('transform = "{1, 0.1, 0.2, 1, 30, 40}"')

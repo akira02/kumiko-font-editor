@@ -23,7 +23,7 @@ import type { ProjectSourceFormat } from 'src/lib/project/projectFormats'
 import type { KumikoProjectSourceData } from 'src/lib/project/kumikoProjectTypes'
 import { hashString } from 'src/lib/hash'
 import { normalizeUnicodeHex } from 'src/lib/project/unicode'
-import { parseUfoColor } from 'src/lib/color/kumikoColor'
+import { parseUfoColor, serializeUfoColor } from 'src/lib/color/kumikoColor'
 import { gitBlobShaFromText } from 'src/lib/github/sync/gitBlobSha'
 import {
   defaultFontSource,
@@ -261,6 +261,8 @@ const inferOffcurveType = (
     type?: 'move' | 'line' | 'offcurve' | 'curve' | 'qcurve'
     smooth?: boolean
     name?: string | null
+    color?: string | null
+    identifier?: string | null
   }>
 ) => {
   const normalized = points.map((point) => ({ ...point }))
@@ -354,6 +356,8 @@ export const parseGlifText = (
                     | null) ?? undefined,
                 smooth: point.getAttribute('smooth') === 'yes',
                 name: point.getAttribute('name'),
+                color: point.getAttribute('color'),
+                identifier: point.getAttribute('identifier'),
               })
             )
           ),
@@ -480,7 +484,10 @@ const getUnitsPerEm = (fontinfo: Record<string, unknown> | null | undefined) =>
 
 const buildPathNodesFromContour = (contour: UfoGlyphContour): PathNode[] =>
   contour.points.map((point, index) => ({
-    id: `n${index}`,
+    id: point.identifier ?? `n${index}`,
+    identifier: point.identifier,
+    name: point.name,
+    color: parseUfoColor(point.color),
     x: point.x,
     y: point.y,
     ...(point.type === undefined || point.type === 'offcurve'
@@ -528,6 +535,9 @@ export const pathToUfoContour = (path: PathData): UfoGlyphContour => {
         return {
           x: node.x,
           y: node.y,
+          name: node.name,
+          identifier: node.identifier,
+          color: serializeUfoColor(node.color),
         }
       }
 
@@ -545,6 +555,9 @@ export const pathToUfoContour = (path: PathData): UfoGlyphContour => {
         y: node.y,
         type: pointType,
         smooth: getNodeType(node) === 'smooth',
+        name: node.name,
+        identifier: node.identifier,
+        color: serializeUfoColor(node.color),
       }
     }),
   }
@@ -1418,6 +1431,10 @@ ${contour.points
         : []),
       ...(point.smooth ? ['smooth="yes"'] : []),
       ...(point.name ? [`name="${escapeXml(point.name)}"`] : []),
+      ...(point.color ? [`color="${escapeXml(point.color)}"`] : []),
+      ...(point.identifier
+        ? [`identifier="${escapeXml(point.identifier)}"`]
+        : []),
     ]
     return `      <point ${attrs.join(' ')}/>`
   })

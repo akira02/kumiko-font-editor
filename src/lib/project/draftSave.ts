@@ -12,7 +12,6 @@ import {
   loadKumikoProjectRecord,
   loadKumikoUiValue,
   makeKumikoGlyphKey,
-  patchKumikoGlyphMetadata,
   patchKumikoProjectData,
 } from 'src/lib/project/kumikoProjectPersistence'
 import { isGlyphGeometryLoaded } from 'src/lib/glyph/glyphGeometryState'
@@ -129,6 +128,14 @@ export const saveDraftSnapshot = async (input: SaveDraftSnapshotInput) => {
     glyphKeysToDelete: [...new Set(input.deletedGlyphIds)].map((glyphId) =>
       makeKumikoGlyphKey(input.projectId, glyphId)
     ),
+    glyphMetadataPatches: metadataOnlyGlyphs.map((glyph) => ({
+      projectId: input.projectId,
+      glyphId: glyph.id,
+      patch: toGlyphMetadataPatch(glyph),
+      updatedAt: now,
+      exportDirty: true,
+      syncDirty: true,
+    })),
     uiStateToSave: [
       {
         projectId: input.projectId,
@@ -147,17 +154,4 @@ export const saveDraftSnapshot = async (input: SaveDraftSnapshotInput) => {
       },
     ],
   })
-
-  await Promise.all(
-    metadataOnlyGlyphs.map((glyph) =>
-      patchKumikoGlyphMetadata({
-        projectId: input.projectId,
-        glyphId: glyph.id,
-        patch: toGlyphMetadataPatch(glyph),
-        updatedAt: now,
-        exportDirty: true,
-        syncDirty: true,
-      })
-    )
-  )
 }

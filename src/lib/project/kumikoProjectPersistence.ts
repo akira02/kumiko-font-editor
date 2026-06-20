@@ -59,6 +59,15 @@ export type KumikoGlyphMetadataPatch = Partial<
   >
 >
 
+export interface KumikoGlyphMetadataPatchInput {
+  projectId: string
+  glyphId: string
+  patch: KumikoGlyphMetadataPatch
+  updatedAt?: number
+  exportDirty?: boolean | 0 | 1
+  syncDirty?: boolean | 0 | 1
+}
+
 const normalizeGlyphRecordUnicodes = (
   unicodes: KumikoGlyphRecord['unicodes']
 ) => {
@@ -118,6 +127,7 @@ export const patchKumikoProjectData = async (input: {
   project: KumikoProjectRecord
   glyphsToSave?: KumikoGlyphRecord[]
   glyphKeysToDelete?: KumikoGlyphPrimaryKey[]
+  glyphMetadataPatches?: KumikoGlyphMetadataPatchInput[]
   uiStateToSave?: KumikoUiStateRecord[]
 }) => {
   const database = await openDatabase()
@@ -135,6 +145,12 @@ export const patchKumikoProjectData = async (input: {
   }
   for (const key of input.glyphKeysToDelete ?? []) {
     glyphStore.delete(key)
+  }
+  for (const patchInput of input.glyphMetadataPatches ?? []) {
+    const patched = await patchGlyphMetadataInStore(glyphStore, patchInput)
+    if (patched) {
+      glyphStore.put(patched)
+    }
   }
   for (const record of input.uiStateToSave ?? []) {
     uiStore.put(record)
@@ -229,24 +245,16 @@ export const loadKumikoGlyphRecords = async (keys: KumikoGlyphPrimaryKey[]) => {
   )
 }
 
-export const patchKumikoGlyphMetadata = async (input: {
-  projectId: string
-  glyphId: string
-  patch: KumikoGlyphMetadataPatch
-  updatedAt?: number
-  exportDirty?: boolean | 0 | 1
-  syncDirty?: boolean | 0 | 1
-}) => {
-  const database = await openDatabase()
-  const transaction = database.transaction(KUMIKO_GLYPHS_STORE, 'readwrite')
-  const store = transaction.objectStore(KUMIKO_GLYPHS_STORE)
+const patchGlyphMetadataInStore = async (
+  store: IDBObjectStore,
+  input: KumikoGlyphMetadataPatchInput
+) => {
   const key = makeKumikoGlyphKey(input.projectId, input.glyphId)
   const record = (await requestToPromise(store.get(key))) as
     | KumikoGlyphRecord
     | undefined
 
   if (!record) {
-    await transactionDone(transaction)
     return null
   }
 
@@ -295,7 +303,19 @@ export const patchKumikoGlyphMetadata = async (input: {
     syncedDigest: nextRecord.syncDirty ? record.syncedDigest : digest,
   }
 
-  store.put(persistedRecord)
+  return persistedRecord
+}
+
+export const patchKumikoGlyphMetadata = async (
+  input: KumikoGlyphMetadataPatchInput
+) => {
+  const database = await openDatabase()
+  const transaction = database.transaction(KUMIKO_GLYPHS_STORE, 'readwrite')
+  const store = transaction.objectStore(KUMIKO_GLYPHS_STORE)
+  const persistedRecord = await patchGlyphMetadataInStore(store, input)
+  if (persistedRecord) {
+    store.put(persistedRecord)
+  }
   await transactionDone(transaction)
   return persistedRecord
 }

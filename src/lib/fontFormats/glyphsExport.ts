@@ -11,6 +11,7 @@ import type {
   GlyphLayerData,
   GlyphLayerContent,
   GlyphSourceData,
+  KumikoColor,
   PathNode,
 } from 'src/store'
 import { getPrimaryGlyphUnicode } from 'src/lib/glyph/glyphUnicode'
@@ -78,6 +79,41 @@ const serializeGlyphsImage = (image: GlyphImage): Record<string, unknown> => {
     path: image.fileName,
     transform: `{${xScale}, ${xyScale}, ${yxScale}, ${yScale}, ${xOffset}, ${yOffset}}`,
   }
+}
+
+const GLYPHS_LABEL_COLORS: KumikoColor[] = [
+  [0.85, 0.26, 0.22, 1],
+  [0.9, 0.5, 0.18, 1],
+  [0.95, 0.75, 0.18, 1],
+  [0.3, 0.69, 0.31, 1],
+  [0.18, 0.55, 0.85, 1],
+  [0.43, 0.36, 0.84, 1],
+  [0.75, 0.32, 0.76, 1],
+  [0.55, 0.55, 0.55, 1],
+  [0.35, 0.35, 0.35, 1],
+  [0, 0, 0, 1],
+  [1, 1, 1, 1],
+]
+
+const nearestGlyphsLabelColorIndex = (
+  color: KumikoColor | null | undefined
+) => {
+  if (!color) {
+    return null
+  }
+  let bestIndex = 0
+  let bestDistance = Infinity
+  GLYPHS_LABEL_COLORS.forEach((candidate, index) => {
+    const distance = candidate.reduce((sum, value, channel) => {
+      const delta = value - color[channel]
+      return sum + delta * delta
+    }, 0)
+    if (distance < bestDistance) {
+      bestDistance = distance
+      bestIndex = index
+    }
+  })
+  return bestIndex
 }
 
 const serializeOpenStepValueToChunks = (
@@ -235,11 +271,45 @@ const serializeLayerGuides = (layer: GlyphLayerData) =>
 
 export type GlyphsFormatVersion = 2 | 3
 
+export interface GlyphsExportWarning {
+  code: 'glyphs3-shear-transform-unverified'
+  glyphId: string
+  layerId: string
+  componentId: string
+  message: string
+}
+
 // A Glyphs 3 source declares `.formatVersion = 3`; .glyphspackage is always G3.
 export const detectGlyphsFormatVersion = (
   document: Record<string, unknown> | null | undefined
 ): GlyphsFormatVersion =>
   document && Number(document['.formatVersion']) >= 3 ? 3 : 2
+
+export const getGlyphsExportWarnings = (
+  fontData: FontData,
+  formatVersion: GlyphsFormatVersion
+): GlyphsExportWarning[] => {
+  if (formatVersion < 3) {
+    return []
+  }
+  return Object.values(fontData.glyphs).flatMap((glyph) =>
+    Object.values(glyph.layers ?? {}).flatMap((layer) =>
+      layer.componentRefs
+        .filter(
+          (component) =>
+            (component.xyScale ?? 0) !== 0 || (component.yxScale ?? 0) !== 0
+        )
+        .map((component) => ({
+          code: 'glyphs3-shear-transform-unverified' as const,
+          glyphId: glyph.id,
+          layerId: layer.id,
+          componentId: component.id,
+          message:
+            'Glyphs 3 export uses a matrix transform to preserve component shear; verify save/reopen behavior in Glyphs for this file.',
+        }))
+    )
+  )
+}
 
 const getG3OnCurveCode = (node: PathNode) => {
   const segmentType = getNodeSegmentType(node)
@@ -393,6 +463,13 @@ export const applyLayerEdits = (
   targetLayer.associatedMasterId = layer.associatedMasterId ?? layer.id
   targetLayer.name = layer.name
   targetLayer.width = Math.round(layer.metrics.width)
+  if (targetLayer.color === undefined) {
+    assignOptional(
+      targetLayer,
+      'color',
+      nearestGlyphsLabelColorIndex(layer.color)
+    )
+  }
   assignOptional(
     targetLayer,
     'locked',
@@ -421,6 +498,11 @@ export const applyLayerEdits = (
     )
   } else {
     delete targetLayer.background
+  }
+  if (layer.hints && layer.hints.length > 0) {
+    targetLayer.hints = layer.hints
+  } else {
+    delete targetLayer.hints
   }
   const attributes =
     targetLayer.attributes &&
@@ -542,6 +624,13 @@ export const createGlyphsRecordFromFontDataGlyph = (
     ...sourceGlyphsFields(glyph.sourceData),
     glyphname: glyph.id,
     export: glyph.export === false ? 0 : 1,
+  }
+  if (patchedGlyph.color === undefined) {
+    assignOptional(
+      patchedGlyph,
+      'color',
+      nearestGlyphsLabelColorIndex(glyph.color)
+    )
   }
   assignOptional(patchedGlyph, 'unicode', getPrimaryGlyphUnicode(glyph))
   assignOptional(patchedGlyph, 'category', glyph.category)
