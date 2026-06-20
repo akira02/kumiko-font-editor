@@ -167,7 +167,24 @@ export const useStore = create<GlobalState>()(
       ...buildPathActions(set),
 
       // ── Project lifecycle actions ────────────────────────────────────────
-      ...buildProjectActions(set, () => useStore.temporal.getState().clear()),
+      ...buildProjectActions(
+        set,
+        () => useStore.temporal.getState().clear(),
+        (callback) => {
+          const temporal = useStore.temporal.getState()
+          const wasTracking = temporal.isTracking
+          if (wasTracking) {
+            temporal.pause()
+          }
+          try {
+            callback()
+          } finally {
+            if (wasTracking) {
+              temporal.resume()
+            }
+          }
+        }
+      ),
     })),
     {
       partialize: (state) => ({ fontData: state.fontData }),

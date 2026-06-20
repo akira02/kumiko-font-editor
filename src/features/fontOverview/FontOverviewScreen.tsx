@@ -1,7 +1,7 @@
 import { Grid, GridItem } from '@chakra-ui/react'
 import { useCallback, useMemo, useRef, useState } from 'react'
 import type { ListRange } from 'react-virtuoso'
-import { useStore } from 'src/store'
+import { useStore, type GlyphData } from 'src/store'
 import { getGlyphUnicodeChar } from 'src/lib/glyph/glyphUnicode'
 import { isGlyphGeometryLoaded } from 'src/lib/glyph/glyphGeometryState'
 import { loadProjectGlyphGeometryClosure } from 'src/lib/project/projectRepository'
@@ -31,14 +31,13 @@ export function FontOverviewScreen() {
   const setEditorTextState = useStore((state) => state.setEditorTextState)
   const setWorkspaceView = useStore((state) => state.setWorkspaceView)
   const projectTitle = useStore((state) => state.projectTitle)
-  const projectId = useStore((state) => state.projectId)
   const fontData = useStore((state) => state.fontData)
   const glyphEditTimes = useStore((state) => state.glyphEditTimes)
   const selectedSectionId = useStore((state) => state.overviewSectionId)
   const setOverviewSectionId = useStore((state) => state.setOverviewSectionId)
   const hydrateGlyphGeometry = useStore((state) => state.hydrateGlyphGeometry)
   const loadingGlyphGeometryPromisesRef = useRef(
-    new Map<string, Promise<void>>()
+    new Map<string, Promise<GlyphData[]>>()
   )
   const overviewGeometryRequestIdRef = useRef(0)
 
@@ -113,12 +112,15 @@ export function FontOverviewScreen() {
         shouldHydrate?: () => boolean
       } = {}
     ) => {
-      if (!projectId) {
+      const currentState = useStore.getState()
+      const currentProjectId = currentState.projectId
+      const currentGlyphMap = currentState.fontData?.glyphs
+      if (!currentProjectId || !currentGlyphMap) {
         return
       }
-      const pendingLoads: Promise<void>[] = []
+      const pendingLoads: Promise<GlyphData[]>[] = []
       const missingGlyphIds = [...new Set(glyphIds)].filter((glyphId) => {
-        const glyph = glyphMap[glyphId]
+        const glyph = currentGlyphMap[glyphId]
         const pendingLoad = loadingGlyphGeometryPromisesRef.current.get(glyphId)
         if (pendingLoad) {
           pendingLoads.push(pendingLoad)
@@ -126,44 +128,53 @@ export function FontOverviewScreen() {
         }
         return glyph && !isGlyphGeometryLoaded(glyph)
       })
+      const loadPromises = [...new Set(pendingLoads)]
 
-      if (missingGlyphIds.length === 0) {
-        await Promise.all(pendingLoads)
+      if (missingGlyphIds.length > 0) {
+        const loadPromise = (async () => {
+          const latestState = useStore.getState()
+          const latestGlyphMap =
+            latestState.projectId === currentProjectId
+              ? (latestState.fontData?.glyphs ?? {})
+              : {}
+          const loadedGlyphIds = Object.values(latestGlyphMap)
+            .filter(isGlyphGeometryLoaded)
+            .map((glyph) => glyph.id)
+          return loadProjectGlyphGeometryClosure(
+            currentProjectId,
+            missingGlyphIds,
+            { loadedGlyphIds }
+          )
+        })().finally(() => {
+          for (const glyphId of missingGlyphIds) {
+            loadingGlyphGeometryPromisesRef.current.delete(glyphId)
+          }
+        })
+        for (const glyphId of missingGlyphIds) {
+          loadingGlyphGeometryPromisesRef.current.set(glyphId, loadPromise)
+        }
+        loadPromises.push(loadPromise)
+      }
+
+      if (loadPromises.length === 0) {
         return
       }
 
-      const loadPromise = (async () => {
-        const loadedGlyphIds = Object.values(glyphMap)
-          .filter(isGlyphGeometryLoaded)
-          .map((glyph) => glyph.id)
-        const glyphs = await loadProjectGlyphGeometryClosure(
-          projectId,
-          missingGlyphIds,
-          { loadedGlyphIds }
-        )
-        if (useStore.getState().projectId !== projectId) {
-          return
-        }
-        if (options.shouldHydrate && !options.shouldHydrate()) {
-          return
-        }
-        hydrateGlyphGeometry(
-          glyphs,
-          options.maxLoadedGlyphs
-            ? { maxLoadedGlyphs: options.maxLoadedGlyphs }
-            : undefined
-        )
-      })().finally(() => {
-        for (const glyphId of missingGlyphIds) {
-          loadingGlyphGeometryPromisesRef.current.delete(glyphId)
-        }
-      })
-      for (const glyphId of missingGlyphIds) {
-        loadingGlyphGeometryPromisesRef.current.set(glyphId, loadPromise)
+      const loadedGlyphs = (await Promise.all(loadPromises)).flat()
+      if (useStore.getState().projectId !== currentProjectId) {
+        return
       }
-      await Promise.all([...pendingLoads, loadPromise])
+      if (options.shouldHydrate && !options.shouldHydrate()) {
+        return
+      }
+      hydrateGlyphGeometry(
+        loadedGlyphs,
+        options.maxLoadedGlyphs
+          ? { maxLoadedGlyphs: options.maxLoadedGlyphs }
+          : undefined
+      )
     },
-    [glyphMap, hydrateGlyphGeometry, projectId]
+    [hydrateGlyphGeometry]
   )
 
   const handleRangeChange = useCallback(

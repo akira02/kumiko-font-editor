@@ -1,7 +1,7 @@
 import type { GlyphData } from 'src/store'
 
-export const OVERVIEW_GEOMETRY_PRELOAD_MARGIN = 4
-export const OVERVIEW_MAX_RESIDENT_GLYPH_GEOMETRY = 240
+export const OVERVIEW_GEOMETRY_PRELOAD_MARGIN = 48
+export const OVERVIEW_MAX_RESIDENT_GLYPH_GEOMETRY = 480
 
 export const collectOverviewGeometryGlyphIds = (
   glyphs: GlyphData[],

@@ -107,8 +107,6 @@ export const GlyphCard = memo(function GlyphCard({
       h="140px"
       sx={{
         contain: 'layout paint style',
-        contentVisibility: 'auto',
-        containIntrinsicSize: '140px',
       }}
       borderRadius="sm"
       bg={isSelected ? 'field.yellow.300' : 'field.panel'}

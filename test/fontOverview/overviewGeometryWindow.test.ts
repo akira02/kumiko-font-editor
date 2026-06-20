@@ -15,15 +15,25 @@ const makeGlyphs = (count: number): GlyphData[] =>
   }))
 
 describe('overview geometry window', () => {
-  it('loads only the visible range plus a small bounded margin', () => {
+  it('loads the visible range plus a bounded preload margin', () => {
     const glyphs = makeGlyphs(100)
+    const startIndex = Math.max(0, 20 - OVERVIEW_GEOMETRY_PRELOAD_MARGIN)
+    const endIndex = Math.min(
+      glyphs.length - 1,
+      29 + OVERVIEW_GEOMETRY_PRELOAD_MARGIN
+    )
 
     expect(
       collectOverviewGeometryGlyphIds(glyphs, {
         startIndex: 20,
         endIndex: 29,
       })
-    ).toEqual(Array.from({ length: 18 }, (_, index) => `glyph-${index + 16}`))
+    ).toEqual(
+      Array.from(
+        { length: endIndex - startIndex + 1 },
+        (_, index) => `glyph-${index + startIndex}`
+      )
+    )
   })
 
   it('clamps preload ranges at section boundaries', () => {
@@ -34,33 +44,19 @@ describe('overview geometry window', () => {
         startIndex: 0,
         endIndex: 2,
       })
-    ).toEqual([
-      'glyph-0',
-      'glyph-1',
-      'glyph-2',
-      'glyph-3',
-      'glyph-4',
-      'glyph-5',
-      'glyph-6',
-    ])
+    ).toEqual(glyphs.map((glyph) => glyph.id))
 
     expect(
       collectOverviewGeometryGlyphIds(glyphs, {
         startIndex: 8,
         endIndex: 9,
       })
-    ).toEqual([
-      'glyph-4',
-      'glyph-5',
-      'glyph-6',
-      'glyph-7',
-      'glyph-8',
-      'glyph-9',
-    ])
+    ).toEqual(glyphs.map((glyph) => glyph.id))
   })
 
   it('keeps CJK overview residency below the general editor cache ceiling', () => {
-    expect(OVERVIEW_GEOMETRY_PRELOAD_MARGIN).toBe(4)
-    expect(OVERVIEW_MAX_RESIDENT_GLYPH_GEOMETRY).toBe(240)
+    expect(OVERVIEW_GEOMETRY_PRELOAD_MARGIN).toBe(48)
+    expect(OVERVIEW_MAX_RESIDENT_GLYPH_GEOMETRY).toBe(480)
+    expect(OVERVIEW_MAX_RESIDENT_GLYPH_GEOMETRY).toBeLessThan(800)
   })
 })

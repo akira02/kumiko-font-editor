@@ -58,7 +58,8 @@ const syncDirtyListsFromQueue = (state: GlobalState) => {
 
 export const buildProjectActions = (
   set: ImmerSet,
-  clearTemporal: () => void
+  clearTemporal: () => void,
+  withTemporalPaused: (callback: () => void) => void
 ) => ({
   loadProjectState: (
     id: string,
@@ -176,55 +177,57 @@ export const buildProjectActions = (
     glyphs: FontData['glyphs'][string][],
     options?: { maxLoadedGlyphs?: number }
   ) =>
-    set((state) => {
-      if (!state.fontData || glyphs.length === 0) {
-        return
-      }
-
-      for (const glyph of glyphs) {
-        const existing = state.fontData.glyphs[glyph.id]
-        if (!existing) {
-          continue
+    withTemporalPaused(() => {
+      set((state) => {
+        if (!state.fontData || glyphs.length === 0) {
+          return
         }
-        const activeLayerId =
-          existing.activeLayerId && glyph.layers?.[existing.activeLayerId]
-            ? existing.activeLayerId
-            : glyph.activeLayerId
-        state.fontData.glyphs[glyph.id] = {
-          ...existing,
-          ...glyph,
-          activeLayerId,
-        }
-        state.glyphGeometryAccessCounter += 1
-        state.glyphGeometryAccess[glyph.id] = state.glyphGeometryAccessCounter
-      }
 
-      evictGlyphGeometry({
-        glyphs: state.fontData.glyphs,
-        accessByGlyphId: state.glyphGeometryAccess,
-        dirtyGlyphIds: state.dirtyGlyphIds,
-        localDirtyGlyphIds: state.localDirtyGlyphIds,
-        deletedGlyphIds: state.deletedGlyphIds,
-        localDeletedGlyphIds: state.localDeletedGlyphIds,
-        editorGlyphIds: state.editorGlyphIds,
-        selectedGlyphId: state.selectedGlyphId,
-        keepGlyphIds: glyphs.map((glyph) => glyph.id),
-        maxLoadedGlyphs: options?.maxLoadedGlyphs,
+        for (const glyph of glyphs) {
+          const existing = state.fontData.glyphs[glyph.id]
+          if (!existing) {
+            continue
+          }
+          const activeLayerId =
+            existing.activeLayerId && glyph.layers?.[existing.activeLayerId]
+              ? existing.activeLayerId
+              : glyph.activeLayerId
+          state.fontData.glyphs[glyph.id] = {
+            ...existing,
+            ...glyph,
+            activeLayerId,
+          }
+          state.glyphGeometryAccessCounter += 1
+          state.glyphGeometryAccess[glyph.id] = state.glyphGeometryAccessCounter
+        }
+
+        evictGlyphGeometry({
+          glyphs: state.fontData.glyphs,
+          accessByGlyphId: state.glyphGeometryAccess,
+          dirtyGlyphIds: state.dirtyGlyphIds,
+          localDirtyGlyphIds: state.localDirtyGlyphIds,
+          deletedGlyphIds: state.deletedGlyphIds,
+          localDeletedGlyphIds: state.localDeletedGlyphIds,
+          editorGlyphIds: state.editorGlyphIds,
+          selectedGlyphId: state.selectedGlyphId,
+          keepGlyphIds: glyphs.map((glyph) => glyph.id),
+          maxLoadedGlyphs: options?.maxLoadedGlyphs,
+        })
+
+        if (
+          state.selectedGlyphId &&
+          state.selectedLayerId &&
+          state.fontData.glyphs[state.selectedGlyphId]?.layers?.[
+            state.selectedLayerId
+          ]
+        ) {
+          setGlyphActiveLayer(
+            state.fontData.glyphs[state.selectedGlyphId],
+            state.selectedLayerId
+          )
+        }
+        syncFilteredGlyphList(state)
       })
-
-      if (
-        state.selectedGlyphId &&
-        state.selectedLayerId &&
-        state.fontData.glyphs[state.selectedGlyphId]?.layers?.[
-          state.selectedLayerId
-        ]
-      ) {
-        setGlyphActiveLayer(
-          state.fontData.glyphs[state.selectedGlyphId],
-          state.selectedLayerId
-        )
-      }
-      syncFilteredGlyphList(state)
     }),
 
   closeProjectState: () =>
