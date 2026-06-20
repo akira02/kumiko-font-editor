@@ -39,7 +39,7 @@ export function FontOverviewScreen() {
     if (!mountedWithBackTransition.current) return
     const timerId = setTimeout(() => setTransitioningGlyphId(null), 500)
     return () => clearTimeout(timerId)
-  }, [])  
+  }, [])
   const currentSearchQuery = useStore((state) => state.currentSearchQuery)
   const setSearchQuery = useStore((state) => state.setSearchQuery)
   const filteredGlyphList = useStore((state) => state.filteredGlyphList)
@@ -294,7 +294,9 @@ export function FontOverviewScreen() {
     },
     [
       activeSection.glyphs,
+      activeMasterId,
       getEditorTextForGlyphIds,
+      glyphMap,
       overviewSelectedGlyphIds,
       savePendingGridState,
       selectedGlyphId,
