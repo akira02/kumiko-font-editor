@@ -22,6 +22,7 @@ import {
 } from 'src/lib/fontFormats/designspace'
 import type { UfoGlyphRecord } from 'src/lib/fontFormats/ufoTypes'
 import { serializeUfoColor } from 'src/lib/color/kumikoColor'
+import { getComponentMatrix } from 'src/lib/components/componentTransform'
 
 const DEFAULT_LAYER_ID = 'public.default'
 const DEFAULT_GLYPH_DIR = 'glyphs'
@@ -126,16 +127,19 @@ const toGlyphRecordFromContent = (input: {
     identifier: guide.id,
   })),
   contours: input.content.paths.map(pathToUfoContour),
-  components: input.content.componentRefs.map((component) => ({
-    base: component.glyphId,
-    identifier: component.id,
-    xScale: component.scaleX,
-    xyScale: component.xyScale,
-    yxScale: component.yxScale,
-    yScale: component.scaleY,
-    xOffset: component.x,
-    yOffset: component.y,
-  })),
+  components: input.content.componentRefs.map((component) => {
+    const matrix = getComponentMatrix(component)
+    return {
+      base: component.glyphId,
+      identifier: component.id,
+      xScale: matrix.a,
+      xyScale: matrix.b,
+      yxScale: matrix.c,
+      yScale: matrix.d,
+      xOffset: matrix.e,
+      yOffset: matrix.f,
+    }
+  }),
   note: null,
   image: input.image ?? null,
   lib: null,

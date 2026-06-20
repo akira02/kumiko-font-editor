@@ -82,6 +82,26 @@ describe('OTF import → export round-trip', () => {
     expect(result.unitsPerEm).toBe(prepared.unitsPerEm)
   })
 
+  it('keeps binary import sourceData minimal', async () => {
+    const imported = await importBinaryFontFile(await loadFixtureFile())
+    expect(imported.projectSourceData.binary).toMatchObject({
+      format: 'otf',
+      repoPath: null,
+      fontFingerprint: {
+        glyphCount: imported.fontData.glyphOrder?.length,
+        unitsPerEm: imported.fontData.unitsPerEm,
+      },
+    })
+    expect(
+      imported.projectSourceData.binary.tableInventory?.some(
+        (table) => table.tag === 'CFF '
+      )
+    ).toBe(true)
+    expect(JSON.stringify(imported.projectSourceData.binary)).not.toContain(
+      'sfntBuffer'
+    )
+  })
+
   it('keeps control-character glyphs but drops their cmap mapping', () => {
     // Public Sans ships a uni0000 control glyph. Industry practice (SIL FDBP /
     // fontbakery) is to keep the glyph but not encode it; export must not throw.

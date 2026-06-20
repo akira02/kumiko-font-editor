@@ -51,6 +51,20 @@ const sourceGlyphsFields = (
     ? asRecord(asRecord(asRecord(sourceData).glyphs).fields)
     : {}
 
+const sourceGlyphsNodeExtraTokens = (
+  sourceData: GlyphSourceData | null | undefined
+) => {
+  const tokens = sourceGlyphsFields(sourceData).nodeExtraTokens
+  return Array.isArray(tokens) ? tokens.map(String) : []
+}
+
+const sourceGlyphsNodeTupleExtra = (
+  sourceData: GlyphSourceData | null | undefined
+) => {
+  const extra = sourceGlyphsFields(sourceData).nodeTupleExtra
+  return Array.isArray(extra) ? extra : []
+}
+
 const hasRecordEntries = (value: Record<string, unknown> | undefined) =>
   Boolean(value && Object.keys(value).length > 0)
 
@@ -199,14 +213,16 @@ const getG2NodeKeyword = (node: PathNode) => {
 
 const serializeGlyphNode = (node: PathNode) => {
   const coords = `${Math.round(node.x)} ${Math.round(node.y)}`
+  const extra = sourceGlyphsNodeExtraTokens(node.sourceData)
+  const extraText = extra.length > 0 ? ` ${extra.join(' ')}` : ''
 
   if (isOffCurveNode(node)) {
-    return `${coords} OFFCURVE`
+    return `${coords} OFFCURVE${extraText}`
   }
 
   const keyword = getG2NodeKeyword(node)
   const smooth = getNodeType(node) === 'smooth' ? ' SMOOTH' : ''
-  return `${coords} ${keyword}${smooth}`
+  return `${coords} ${keyword}${smooth}${extraText}`
 }
 
 const serializeLayerPaths = (layer: GlyphLayerData) =>
@@ -295,10 +311,10 @@ export const getGlyphsExportWarnings = (
   return Object.values(fontData.glyphs).flatMap((glyph) =>
     Object.values(glyph.layers ?? {}).flatMap((layer) =>
       layer.componentRefs
-        .filter(
-          (component) =>
-            (component.xyScale ?? 0) !== 0 || (component.yxScale ?? 0) !== 0
-        )
+        .filter((component) => {
+          const matrix = getComponentMatrix(component)
+          return matrix.b !== 0 || matrix.c !== 0
+        })
         .map((component) => ({
           code: 'glyphs3-shear-transform-unverified' as const,
           glyphId: glyph.id,
@@ -322,7 +338,10 @@ const getG3OnCurveCode = (node: PathNode) => {
 const serializeG3Node = (node: PathNode) => {
   const coords = `${Math.round(node.x)},${Math.round(node.y)}`
   const code = isOffCurveNode(node) ? 'o' : getG3OnCurveCode(node)
-  return new RawGlyphsValue(`(${coords},${code})`)
+  const extra = sourceGlyphsNodeTupleExtra(node.sourceData)
+  return new RawGlyphsValue(
+    `(${[coords, code, ...extra.map((value) => serializeOpenStepValue(value))].join(',')})`
+  )
 }
 
 const serializeLayerShapesG3 = (layer: GlyphLayerData) => {
@@ -341,8 +360,7 @@ const serializeLayerShapesG3 = (layer: GlyphLayerData) => {
     // Keep the compact native fields when possible, but fall back to the full
     // component matrix for sheared refs so Glyphs 3 exports remain lossless.
     const matrix = getComponentMatrix(component)
-    const hasShear =
-      (component.xyScale ?? 0) !== 0 || (component.yxScale ?? 0) !== 0
+    const hasShear = matrix.b !== 0 || matrix.c !== 0
     if (hasShear) {
       return {
         ...sourceGlyphsFields(component.sourceData),
@@ -359,9 +377,9 @@ const serializeLayerShapesG3 = (layer: GlyphLayerData) => {
         ),
       }
     }
-    const x = Math.round(component.x)
-    const y = Math.round(component.y)
-    const hasScale = component.scaleX !== 1 || component.scaleY !== 1
+    const x = Math.round(matrix.e)
+    const y = Math.round(matrix.f)
+    const hasScale = matrix.a !== 1 || matrix.d !== 1
     return {
       ...sourceGlyphsFields(component.sourceData),
       ref: component.glyphId,
@@ -375,9 +393,7 @@ const serializeLayerShapesG3 = (layer: GlyphLayerData) => {
       ...(x !== 0 || y !== 0 ? { pos: new RawGlyphsValue(`(${x},${y})`) } : {}),
       ...(hasScale
         ? {
-            scale: new RawGlyphsValue(
-              `(${component.scaleX},${component.scaleY})`
-            ),
+            scale: new RawGlyphsValue(`(${matrix.a},${matrix.d})`),
           }
         : {}),
       ...(component.rotation ? { angle: component.rotation } : {}),

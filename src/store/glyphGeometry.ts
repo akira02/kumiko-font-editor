@@ -10,6 +10,7 @@ import type {
   PathSegmentType,
 } from 'src/store/types'
 import { activeLayer } from 'src/store/glyphLayer'
+import { translateComponentRef } from 'src/lib/components/componentTransform'
 
 export const createOnCurveNode = (
   id: string,
@@ -131,7 +132,7 @@ export const translateGlyphHorizontally = (
   }
 
   for (const componentRef of layer.componentRefs) {
-    componentRef.x = Math.round(componentRef.x + deltaX)
+    translateComponentRef(componentRef, deltaX)
   }
 
   for (const anchor of layer.anchors ?? []) {

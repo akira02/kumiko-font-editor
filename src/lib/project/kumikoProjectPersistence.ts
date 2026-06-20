@@ -510,6 +510,23 @@ export const listExportDirtyKumikoGlyphIds = async (projectId: string) =>
 export const listSyncDirtyKumikoGlyphIds = async (projectId: string) =>
   listDirtyKumikoGlyphIds(projectId, 'byProjectSyncDirty')
 
+export const getKumikoProjectDirtyState = async (projectId: string) => {
+  const [project, exportDirtyGlyphIds, syncDirtyGlyphIds] = await Promise.all([
+    loadKumikoProjectRecord(projectId),
+    listExportDirtyKumikoGlyphIds(projectId),
+    listSyncDirtyKumikoGlyphIds(projectId),
+  ])
+
+  return {
+    projectExportDirty: project?.exportDirty === 1,
+    projectSyncDirty: project?.syncDirty === 1,
+    exportDirtyGlyphIds,
+    syncDirtyGlyphIds,
+    exportDirty: project?.exportDirty === 1 || exportDirtyGlyphIds.length > 0,
+    syncDirty: project?.syncDirty === 1 || syncDirtyGlyphIds.length > 0,
+  }
+}
+
 export const updateKumikoGlyphExportDirtyState = async (
   keys: KumikoGlyphPrimaryKey[],
   exportDirty: boolean | 0 | 1

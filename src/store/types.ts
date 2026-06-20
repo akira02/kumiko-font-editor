@@ -67,6 +67,16 @@ export interface GlyphComponentRef {
   identifier?: string | null
   name?: string | null
   glyphId: string
+  // Canonical affine transform in DOMMatrix order. Legacy decomposed fields are
+  // kept for UI controls and format adapter convenience.
+  transform?: {
+    a: number
+    b: number
+    c: number
+    d: number
+    e: number
+    f: number
+  }
   x: number
   y: number
   scaleX: number

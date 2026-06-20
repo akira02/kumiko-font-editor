@@ -10,6 +10,7 @@ import {
 } from 'src/lib/project/projectRepository'
 import {
   findKumikoGlyphRecordsByUnicode,
+  getKumikoProjectDirtyState,
   listExportDirtyKumikoGlyphIds,
   listExportDirtyKumikoGlyphRecords,
   listKumikoGlyphMetadataForProject,
@@ -93,6 +94,16 @@ describe('projectRepository canonical storage', () => {
       'A',
     ])
     await expect(listSyncDirtyKumikoGlyphIds('project-1')).resolves.toEqual([])
+    await expect(
+      getKumikoProjectDirtyState('project-1')
+    ).resolves.toMatchObject({
+      projectExportDirty: false,
+      projectSyncDirty: false,
+      exportDirtyGlyphIds: ['A'],
+      syncDirtyGlyphIds: [],
+      exportDirty: true,
+      syncDirty: false,
+    })
     expect(unicodeGlyphs.map((glyph) => glyph.glyphId)).toEqual(['A'])
     expect(shortUnicodeGlyphs.map((glyph) => glyph.glyphId)).toEqual(['A'])
     expect(dirtyGlyphs[0]?.exportedDigest).toBeNull()
@@ -357,9 +368,108 @@ describe('projectRepository canonical storage', () => {
     })
 
     const project = await loadKumikoProjectRecord('project-only-autosave')
+    const dirtyState = await getKumikoProjectDirtyState('project-only-autosave')
     expect(project?.fontInfo?.familyName).toBe('Renamed Family')
     expect(project?.exportDirty).toBe(1)
     expect(project?.syncDirty).toBe(1)
+    expect(dirtyState).toMatchObject({
+      projectExportDirty: true,
+      projectSyncDirty: true,
+      exportDirtyGlyphIds: [],
+      syncDirtyGlyphIds: [],
+      exportDirty: true,
+      syncDirty: true,
+    })
+  })
+
+  it('rejects interpolable source layers that mix outline kinds', async () => {
+    const mixedOutlineFontData: FontData = {
+      ...fontData,
+      settings: { outlineType: 'cubic' },
+      glyphs: {
+        A: {
+          ...fontData.glyphs.A,
+          layers: {
+            master1: {
+              ...fontData.glyphs.A.layers!['public.default']!,
+              id: 'master1',
+              name: 'master1',
+              type: 'master',
+              paths: [
+                {
+                  id: 'cubic-path',
+                  closed: false,
+                  nodes: [
+                    {
+                      id: 'n1',
+                      kind: 'oncurve',
+                      segmentType: 'line',
+                      x: 0,
+                      y: 0,
+                    },
+                    { id: 'h1', kind: 'offcurve', x: 10, y: 0 },
+                    { id: 'h2', kind: 'offcurve', x: 20, y: 0 },
+                    {
+                      id: 'n2',
+                      kind: 'oncurve',
+                      segmentType: 'cubic',
+                      x: 30,
+                      y: 0,
+                    },
+                  ],
+                },
+              ],
+            },
+            master2: {
+              ...fontData.glyphs.A.layers!['public.default']!,
+              id: 'master2',
+              name: 'master2',
+              type: 'master',
+              paths: [
+                {
+                  id: 'quad-path',
+                  closed: false,
+                  nodes: [
+                    {
+                      id: 'q1',
+                      kind: 'oncurve',
+                      segmentType: 'line',
+                      x: 0,
+                      y: 0,
+                    },
+                    { id: 'qh1', kind: 'offcurve', x: 10, y: 0 },
+                    {
+                      id: 'q2',
+                      kind: 'oncurve',
+                      segmentType: 'quadratic',
+                      x: 20,
+                      y: 0,
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+          layerOrder: ['master1', 'master2'],
+        },
+      },
+    }
+
+    await expect(
+      saveProjectDraft({
+        id: 'project-mixed-outline',
+        title: 'Mixed Outline',
+        lastModified: 20,
+        createdAt: 10,
+        updatedAt: 20,
+        sourceName: 'Mixed.ufo',
+        sourceType: 'local',
+        fontData: mixedOutlineFontData,
+        projectMetadata: null,
+        projectSourceData: null,
+        projectSourceFormat: 'ufo',
+      })
+    ).rejects.toThrow(/mixed outline kinds|outlineKind quadratic/)
   })
 
   it('persists editor UI state outside canonical glyph records', async () => {

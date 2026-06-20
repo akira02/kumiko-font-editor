@@ -151,12 +151,7 @@ export const importLocalProjectFiles = async (
       githubSource: null,
       fontData: importedBinary.fontData,
       projectMetadata: { importedFrom: extension },
-      projectSourceData: {
-        binary: {
-          format: importedBinary.sourceFormat,
-          repoPath: null,
-        },
-      },
+      projectSourceData: importedBinary.projectSourceData,
       projectSourceFormat: importedBinary.sourceFormat,
       projectRoundTripFormat: null,
       projectGlyphsPackage: null,

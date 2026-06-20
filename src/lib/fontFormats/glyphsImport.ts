@@ -176,7 +176,8 @@ const createOnCurveNode = (
   x: number,
   y: number,
   segmentType: PathSegmentType,
-  smooth: boolean
+  smooth: boolean,
+  sourceData?: GlyphSourceData
 ): PathNode => ({
   id: `n${index}`,
   x,
@@ -184,13 +185,20 @@ const createOnCurveNode = (
   kind: 'oncurve',
   segmentType,
   smooth,
+  sourceData,
 })
 
-const createOffCurveNode = (index: number, x: number, y: number): PathNode => ({
+const createOffCurveNode = (
+  index: number,
+  x: number,
+  y: number,
+  sourceData?: GlyphSourceData
+): PathNode => ({
   id: `n${index}`,
   x,
   y,
   kind: 'offcurve',
+  sourceData,
 })
 
 // Glyphs 2 node line: "x y TYPE [SMOOTH]".
@@ -206,12 +214,17 @@ const parseG2Node = (raw: string, index: number): PathNode | null => {
   }
   const keyword = parts[2].toUpperCase()
   const smooth = parts[3]?.toUpperCase() === 'SMOOTH'
+  const extraTokens = parts.slice(smooth ? 4 : 3)
+  const sourceData =
+    extraTokens.length > 0
+      ? glyphsSourceData({ nodeExtraTokens: extraTokens })
+      : undefined
   if (keyword === 'OFFCURVE') {
-    return createOffCurveNode(index, x, y)
+    return createOffCurveNode(index, x, y, sourceData)
   }
   const segmentType =
     keyword === 'QCURVE' ? 'quadratic' : keyword === 'CURVE' ? 'cubic' : 'line'
-  return createOnCurveNode(index, x, y, segmentType, smooth)
+  return createOnCurveNode(index, x, y, segmentType, smooth, sourceData)
 }
 
 // Glyphs 3 node tuple: (x, y, type) where type is l/ls/c/cs/o/q/qs.
@@ -223,15 +236,26 @@ const parseG3Node = (raw: unknown, index: number): PathNode | null => {
   const x = asNumber(tuple[0])
   const y = asNumber(tuple[1])
   const code = (asString(tuple[2]) ?? 'l').toLowerCase()
+  const sourceData =
+    tuple.length > 3
+      ? glyphsSourceData({ nodeTupleExtra: tuple.slice(3) })
+      : undefined
   if (code.startsWith('o')) {
-    return createOffCurveNode(index, x, y)
+    return createOffCurveNode(index, x, y, sourceData)
   }
   const segmentType = code.startsWith('q')
     ? 'quadratic'
     : code.startsWith('c')
       ? 'cubic'
       : 'line'
-  return createOnCurveNode(index, x, y, segmentType, code.endsWith('s'))
+  return createOnCurveNode(
+    index,
+    x,
+    y,
+    segmentType,
+    code.endsWith('s'),
+    sourceData
+  )
 }
 
 const parseTransformString = (value: string): number[] | null => {

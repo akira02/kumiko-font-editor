@@ -23,7 +23,11 @@ import type {
 import { hashString } from 'src/lib/hash'
 import { deterministicStringify } from 'src/store/deterministicStringify'
 import { normalizeUnicodeHex } from 'src/lib/project/unicode'
-import { getComponentMatrix } from 'src/lib/components/componentTransform'
+import {
+  componentMatrixToRefFields,
+  getComponentMatrix,
+  withComponentMatrix,
+} from 'src/lib/components/componentTransform'
 
 const getGlyphUnicodes = (glyph: GlyphData) => {
   const values = glyph.unicodes ?? []
@@ -131,9 +135,37 @@ const deriveLayerOutlineKind = (
       }
     }
   }
-  return segmentTypes.has('quadratic') && !segmentTypes.has('cubic')
-    ? 'quadratic'
-    : 'cubic'
+  if (segmentTypes.has('quadratic') && segmentTypes.has('cubic')) {
+    throw new Error('Kumiko glyph layer mixes cubic and quadratic segments')
+  }
+  return segmentTypes.has('quadratic') ? 'quadratic' : 'cubic'
+}
+
+const validateInterpolableLayerOutlineKind = (
+  glyph: GlyphData,
+  layers: Record<string, KumikoGlyphLayerRecord>,
+  projectOutlineType?: 'cubic' | 'quadratic'
+) => {
+  const masterLayers = Object.values(layers).filter(
+    (layer) => layer.type === 'master'
+  )
+  if (masterLayers.length === 0) {
+    return
+  }
+
+  const firstKind = masterLayers[0].outlineKind
+  for (const layer of masterLayers) {
+    if (layer.outlineKind !== firstKind) {
+      throw new Error(
+        `Glyph ${glyph.id} has interpolable master layers with mixed outline kinds`
+      )
+    }
+    if (projectOutlineType && layer.outlineKind !== projectOutlineType) {
+      throw new Error(
+        `Glyph ${glyph.id} layer ${layer.id} outlineKind ${layer.outlineKind} does not match project outlineType ${projectOutlineType}`
+      )
+    }
+  }
 }
 
 const deriveComponentGlyphIds = (
@@ -168,7 +200,7 @@ const toKumikoComponentRefRecord = (
     autoAlign: componentRef.autoAlign,
     customData: componentRef.customData,
     sourceData: componentRef.sourceData,
-    transform: getComponentMatrix(componentRef),
+    transform: getComponentMatrix(withComponentMatrix(componentRef)),
   }
 }
 
@@ -225,23 +257,19 @@ const toKumikoLayerContentRecord = (
 
 const toGlyphComponentRef = (
   componentRef: KumikoGlyphComponentRefRecord
-): GlyphComponentRef => ({
-  id: componentRef.id,
-  identifier: componentRef.identifier,
-  name: componentRef.name,
-  glyphId: componentRef.glyphId,
-  x: componentRef.transform.e,
-  y: componentRef.transform.f,
-  scaleX: componentRef.transform.a,
-  xyScale: componentRef.transform.b,
-  yxScale: componentRef.transform.c,
-  scaleY: componentRef.transform.d,
-  rotation: 0,
-  color: componentRef.color,
-  autoAlign: componentRef.autoAlign,
-  customData: componentRef.customData,
-  sourceData: componentRef.sourceData,
-})
+): GlyphComponentRef =>
+  withComponentMatrix({
+    id: componentRef.id,
+    identifier: componentRef.identifier,
+    name: componentRef.name,
+    glyphId: componentRef.glyphId,
+    ...componentMatrixToRefFields(componentRef.transform),
+    transform: componentRef.transform,
+    color: componentRef.color,
+    autoAlign: componentRef.autoAlign,
+    customData: componentRef.customData,
+    sourceData: componentRef.sourceData,
+  })
 
 const toGlyphLayerContent = (
   content: KumikoGlyphLayerContentRecord
@@ -344,6 +372,7 @@ export const glyphDataToKumikoGlyphRecord = (input: {
   updatedAt: number
   exportDirty?: boolean
   syncDirty?: boolean
+  projectOutlineType?: 'cubic' | 'quadratic'
 }): KumikoGlyphRecord => {
   if (!input.glyph.layers || Object.keys(input.glyph.layers).length === 0) {
     throw new Error(
@@ -361,6 +390,11 @@ export const glyphDataToKumikoGlyphRecord = (input: {
   const syncDirty = input.syncDirty ?? false
   const unicodes = getGlyphUnicodes(input.glyph)
   const componentGlyphIds = deriveComponentGlyphIds(layers)
+  validateInterpolableLayerOutlineKind(
+    input.glyph,
+    layers,
+    input.projectOutlineType
+  )
   assertSourceDataHasNoGeometry(
     input.glyph.sourceData,
     `glyph(${input.glyph.id}).sourceData`
@@ -423,6 +457,7 @@ export const fontDataToKumikoGlyphRecords = (input: {
       updatedAt: input.updatedAt,
       exportDirty: exportDirtyGlyphIds.has(glyph.id),
       syncDirty: syncDirtyGlyphIds.has(glyph.id),
+      projectOutlineType: input.fontData.settings?.outlineType,
     })
   )
 }

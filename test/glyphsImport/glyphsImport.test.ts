@@ -336,6 +336,39 @@ layers = (
       smooth: true,
     })
   })
+
+  it('round-trips Glyphs node-level extra metadata without storing raw geometry', async () => {
+    const source = parse(`{
+.formatVersion = 3;
+fontMaster = ( { id = "M1"; name = Regular; } );
+glyphs = (
+{
+glyphname = nodeExtra;
+layers = (
+{ layerId = "M1"; width = 500; shapes = ( { closed = 0; nodes = ( (0,0,l,7), (100,0,ls,{ color = 4; }) ); } ); }
+);
+}
+);
+}`)
+    const imported = buildFontDataFromGlyphsDocument(source)
+    const layer = getGlyphLayer(imported.glyphs.nodeExtra, 'M1')
+
+    expect(layer?.paths[0].nodes[0].sourceData).toEqual({
+      glyphs: { fields: { nodeTupleExtra: [7] } },
+    })
+    expect(layer?.paths[0].nodes[1].sourceData).toEqual({
+      glyphs: { fields: { nodeTupleExtra: [{ color: 4 }] } },
+    })
+
+    const exported = await serializeGlyphsFileToBlob(
+      imported,
+      null,
+      source
+    ).text()
+    expect(exported).toContain('(0,0,l,7)')
+    expect(exported).toContain('(100,0,ls,{')
+    expect(exported).not.toContain('nodeTupleExtra')
+  })
 })
 
 describe('importGlyphsFile project source data', () => {
