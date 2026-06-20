@@ -6,6 +6,7 @@ import {
   exportFontDataAsUfoZip,
   exportMultiMasterUfoZip,
 } from 'src/lib/fontFormats/fontUfoZipExport'
+import { exportUfoAsZipBlob } from 'src/lib/fontFormats/ufoZipExportClient'
 import {
   createCompilerRuntimeStatus,
   deriveOpenTypeExportWarnings,
@@ -23,6 +24,10 @@ import { createGlyphsPackageDataFromFontData } from 'src/lib/fontFormats/glyphsP
 import { flushPendingDraft } from 'src/lib/project/flushPendingDraft'
 import { createProjectUiStateSnapshot } from 'src/lib/project/projectUiState'
 import { loadProjectDraft } from 'src/lib/project/projectRepository'
+import {
+  canUseCanonicalUfoZipExport,
+  shouldLoadFullDraftForExport,
+} from 'src/features/common/fontExport/exportDraftPolicy'
 import { useStore } from 'src/store'
 import type { FontExportFormat } from 'src/features/common/fontExport/ExportFontModal'
 
@@ -136,7 +141,16 @@ export function useFontExport() {
         markDraftSaved,
       })
 
-      const fullDraft = await loadProjectDraft(projectId)
+      const sourceFormat = getProjectArchiveSourceFormat()
+      const usesCanonicalUfoZipExport =
+        canUseCanonicalUfoZipExport(sourceFormat)
+      const needsFullDraft = shouldLoadFullDraftForExport(
+        selectedFormats,
+        sourceFormat
+      )
+      const fullDraft = needsFullDraft
+        ? await loadProjectDraft(projectId)
+        : null
       const exportFontData = fullDraft?.fontData ?? fontData
       const exportProjectMetadata =
         fullDraft?.projectMetadata ?? getProjectArchiveMetadata()
@@ -211,6 +225,25 @@ export function useFontExport() {
             fileName: `${baseFileName}.${format}`,
             label: format.toUpperCase(),
             totalGlyphs: null,
+          }
+        }
+
+        if (format === 'zip' && usesCanonicalUfoZipExport) {
+          const result = await exportUfoAsZipBlob({
+            projectId,
+            markClean: true,
+            onProgress: setUfoExportProgress,
+          })
+          markLocalSaved()
+          return {
+            blob: result.blob,
+            fileName:
+              sourceFormat === 'designspace'
+                ? `${baseFileName}.designspace.zip`
+                : `${baseFileName}.ufo.zip`,
+            label:
+              sourceFormat === 'designspace' ? 'Designspace + UFO' : 'UFO ZIP',
+            totalGlyphs: result.totalGlyphs,
           }
         }
 
