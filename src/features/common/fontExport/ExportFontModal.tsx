@@ -17,6 +17,7 @@ import {
   Text,
 } from '@chakra-ui/react'
 import { useState } from 'react'
+import type { GlyphsExportWarning } from 'src/lib/fontFormats/glyphsExport'
 import type { OpenTypeExportWarning } from 'src/lib/openTypeFeatures'
 import { requiresDropUnsupportedConfirmation } from 'src/lib/openTypeFeatures/exportPolicy'
 import type { ProjectSourceFormat } from 'src/lib/project/projectFormats'
@@ -38,6 +39,7 @@ interface ExportFontModalProps {
   isExporting: boolean
   loadingText: string
   openTypeWarnings?: OpenTypeExportWarning[]
+  glyphsWarnings?: GlyphsExportWarning[]
   // Source format of the open project; gates the .glyphspackage round-trip option.
   sourceFormat?: ProjectSourceFormat | null
   onClose: () => void
@@ -94,7 +96,9 @@ const exportOptions: Array<{
   },
 ]
 
-const getAlertStatus = (severity: OpenTypeExportWarning['severity']) => {
+type ExportWarningSeverity = OpenTypeExportWarning['severity']
+
+const getAlertStatus = (severity: ExportWarningSeverity) => {
   if (severity === 'error') {
     return 'error'
   }
@@ -102,6 +106,53 @@ const getAlertStatus = (severity: OpenTypeExportWarning['severity']) => {
     return 'warning'
   }
   return 'info'
+}
+
+function GlyphsExportWarnings({
+  warnings,
+}: {
+  warnings: GlyphsExportWarning[]
+}) {
+  if (warnings.length === 0) {
+    return null
+  }
+
+  const previewWarnings = warnings.slice(0, 5)
+  const hiddenCount = warnings.length - previewWarnings.length
+
+  return (
+    <Alert
+      status="warning"
+      variant="subtle"
+      alignItems="flex-start"
+      borderRadius="md"
+    >
+      <AlertIcon mt={1} />
+      <Stack spacing={1}>
+        <AlertTitle fontSize="sm">Glyphs 3 component transform</AlertTitle>
+        <AlertDescription fontSize="sm">
+          匯出會用 matrix transform 保留 sheared components，請在 Glyphs
+          重新開啟確認。
+        </AlertDescription>
+        <Stack as="ul" spacing={1} mt={2} pl={4}>
+          {previewWarnings.map((warning) => (
+            <Text
+              key={`${warning.glyphId}:${warning.layerId}:${warning.componentId}`}
+              as="li"
+              fontSize="sm"
+            >
+              {warning.glyphId} / {warning.layerId} / {warning.componentId}
+            </Text>
+          ))}
+          {hiddenCount > 0 && (
+            <Text as="li" fontSize="sm">
+              還有 {hiddenCount} 個 component
+            </Text>
+          )}
+        </Stack>
+      </Stack>
+    </Alert>
+  )
 }
 
 function OpenTypeExportWarnings({
@@ -171,6 +222,7 @@ export function ExportFontModal({
   isExporting,
   loadingText,
   openTypeWarnings = [],
+  glyphsWarnings = [],
   sourceFormat = null,
   onClose,
   onExport,
@@ -188,6 +240,10 @@ export function ExportFontModal({
     useState(false)
   const needsDropUnsupportedConfirmation =
     requiresDropUnsupportedConfirmation(openTypeWarnings)
+  const showsGlyphs3Warnings =
+    selectedFormats.includes('glyphs3') ||
+    selectedFormats.includes('glyphspackage')
+  const visibleGlyphsWarnings = showsGlyphs3Warnings ? glyphsWarnings : []
   const canSubmit =
     canExport &&
     selectedFormats.length > 0 &&
@@ -216,6 +272,7 @@ export function ExportFontModal({
         <ModalBody>
           <Stack spacing={3}>
             <OpenTypeExportWarnings warnings={openTypeWarnings} />
+            <GlyphsExportWarnings warnings={visibleGlyphsWarnings} />
             {needsDropUnsupportedConfirmation && (
               <DropUnsupportedConfirmation
                 isChecked={confirmedDropUnsupported}

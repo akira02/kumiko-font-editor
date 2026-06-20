@@ -9,6 +9,7 @@ import { buildGlyphActions } from 'src/store/actions/glyphActions'
 import { buildPathActions } from 'src/store/actions/pathActions'
 import { buildProjectActions } from 'src/store/actions/projectActions'
 import { buildBehaviorActions } from 'src/store/actions/behaviorActions'
+import { partializeTemporalState } from 'src/store/temporalSnapshot'
 
 export {
   getGlyphLayer,
@@ -187,7 +188,7 @@ export const useStore = create<GlobalState>()(
       ),
     })),
     {
-      partialize: (state) => ({ fontData: state.fontData }),
+      partialize: partializeTemporalState,
       // Treat any transition that involves a null fontData (project open/close)
       // as "unchanged" so it is never recorded. Otherwise the null→loaded open
       // transition becomes the bottom of the undo stack, and undoing far enough

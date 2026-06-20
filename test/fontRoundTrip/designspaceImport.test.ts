@@ -134,6 +134,72 @@ describe('buildMultiMasterFontData', () => {
     expect(getGlyphLayer(glyph, 'Bold')?.metrics.width).toBe(700)
   })
 
+  it('folds brace sources and bracket rules into canonical layers', () => {
+    const designspace = parseDesignspace(`<?xml version="1.0" encoding="UTF-8"?>
+<designspace format="4.1">
+  <axes>
+    <axis name="Weight" tag="wght" minimum="0" default="0" maximum="100"/>
+  </axes>
+  <sources>
+    <source filename="sources/Light.ufo" name="Light" stylename="Light">
+      <location><dimension name="Weight" xvalue="0"/></location>
+    </source>
+    <source filename="sources/Bold.ufo" name="Bold" stylename="Bold">
+      <location><dimension name="Weight" xvalue="100"/></location>
+    </source>
+    <source filename="A-brace.brace.ufo" name="A Brace" stylename="A Brace">
+      <location><dimension name="Weight" xvalue="50"/></location>
+    </source>
+  </sources>
+  <rules processing="last">
+    <rule name="A.bracket">
+      <conditionset>
+        <condition name="Weight" minimum="80" maximum="100"/>
+      </conditionset>
+      <sub name="A" with="A.bracket.bracket"/>
+    </rule>
+  </rules>
+</designspace>`)
+    const fontData = buildMultiMasterFontData(
+      [
+        metadata('sources/Light.ufo'),
+        metadata('sources/Bold.ufo'),
+        metadata('A-brace.brace.ufo'),
+      ],
+      [
+        glyphRecord('sources/Light.ufo', 10, 500),
+        glyphRecord('sources/Bold.ufo', 80, 700),
+        glyphRecord('A-brace.brace.ufo', 40, 550),
+        {
+          ...glyphRecord('sources/Light.ufo', 90, 560),
+          glyphName: 'A.bracket.bracket',
+          fileName: 'A.bracket.bracket.glif',
+        },
+      ],
+      designspace
+    )
+
+    const glyph = fontData.glyphs.A
+    expect(fontData.sources).toEqual({
+      Light: { id: 'Light', name: 'Light', location: { Weight: 0 } },
+      Bold: { id: 'Bold', name: 'Bold', location: { Weight: 100 } },
+    })
+    expect(fontData.glyphs['A.bracket.bracket']).toBeUndefined()
+    expect(glyph.layerOrder).toEqual(['Light', 'Bold', 'A Brace', 'bracket'])
+    expect(glyph.layers?.['A Brace']).toMatchObject({
+      type: 'brace',
+      associatedMasterId: 'Light',
+      braceLocation: { Weight: 50 },
+    })
+    expect(glyph.layers?.['A Brace'].metrics.width).toBe(550)
+    expect(glyph.layers?.bracket).toMatchObject({
+      type: 'bracket',
+      associatedMasterId: 'Light',
+      bracketAxisRules: { Weight: { min: 80, max: 100 } },
+    })
+    expect(glyph.layers?.bracket.metrics.width).toBe(560)
+  })
+
   it('points activeLayerId at the default-location source', () => {
     expect(build().glyphs.A.activeLayerId).toBe('Light')
   })

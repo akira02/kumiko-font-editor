@@ -943,6 +943,53 @@ interface MasterSource extends SourceRef {
   recordsByName: Map<string, UfoGlyphRecord>
 }
 
+const isBraceSource = (master: Pick<MasterSource, 'metadata' | 'ufoId'>) =>
+  /\.brace\.ufo$/i.test(basename(master.metadata.relativePath)) ||
+  /\.brace\.ufo$/i.test(basename(master.ufoId))
+
+const ruleConditionsToBracketAxisRules = (
+  conditions: NonNullable<Designspace['rules']>[number]['conditions']
+): NonNullable<GlyphLayerData['bracketAxisRules']> =>
+  Object.fromEntries(
+    Object.entries(conditions).map(([axis, condition]) => [
+      axis,
+      {
+        ...(condition.minimum !== undefined ? { min: condition.minimum } : {}),
+        ...(condition.maximum !== undefined ? { max: condition.maximum } : {}),
+      },
+    ])
+  )
+
+const getBracketLayerId = (
+  rule: NonNullable<Designspace['rules']>[number],
+  substitution: NonNullable<
+    Designspace['rules']
+  >[number]['substitutions'][number]
+) => {
+  const rulePrefix = `${substitution.name}.`
+  if (rule.name.startsWith(rulePrefix)) {
+    return rule.name.slice(rulePrefix.length)
+  }
+  const exportedPrefix = `${substitution.name}.bracket.`
+  if (substitution.with.startsWith(exportedPrefix)) {
+    return substitution.with.slice(exportedPrefix.length)
+  }
+  return substitution.with
+}
+
+const uniqueLayerId = (
+  layers: Record<string, GlyphLayerData>,
+  preferredId: string
+) => {
+  let id = preferredId || 'layer'
+  let counter = 2
+  while (layers[id]) {
+    id = `${preferredId}-${counter}`
+    counter += 1
+  }
+  return id
+}
+
 // Merge several UFO sources (one per designspace <source>) into one FontData with
 // one master layer per source. Pure: takes already-parsed records + designspace.
 export const buildMultiMasterFontData = (
@@ -987,14 +1034,17 @@ export const buildMultiMasterFontData = (
     }
   })
 
-  if (masters.length === 0) {
+  const regularMasters = masters.filter((master) => !isBraceSource(master))
+  const braceMasters = masters.filter(isBraceSource)
+
+  if (regularMasters.length === 0) {
     return { glyphs: {} }
   }
 
   const defaultRef = resolveDefaultSourceRef(refs, designspace)
   const defaultMaster =
-    masters.find((master) => master.sourceId === defaultRef?.sourceId) ??
-    masters[0]
+    regularMasters.find((master) => master.sourceId === defaultRef?.sourceId) ??
+    regularMasters[0]
 
   const base = buildFontDataFromUfoGlyphs(
     [...defaultMaster.recordsByName.values()],
@@ -1019,13 +1069,26 @@ export const buildMultiMasterFontData = (
       orderedNames.push(name)
     }
   }
+  const bracketSubstitutions = (designspace.rules ?? []).flatMap((rule) =>
+    rule.substitutions.map((substitution) => ({ rule, substitution }))
+  )
+  const substitutedGlyphNames = new Set(
+    bracketSubstitutions.map(({ substitution }) => substitution.with)
+  )
+
   for (const name of defaultMaster.metadata.glyphOrder) {
-    if (masters.some((master) => master.recordsByName.has(name))) {
+    if (substitutedGlyphNames.has(name)) {
+      continue
+    }
+    if (regularMasters.some((master) => master.recordsByName.has(name))) {
       push(name)
     }
   }
-  for (const master of masters) {
+  for (const master of regularMasters) {
     for (const name of master.recordsByName.keys()) {
+      if (substitutedGlyphNames.has(name)) {
+        continue
+      }
       push(name)
     }
   }
@@ -1072,7 +1135,7 @@ export const buildMultiMasterFontData = (
     }
 
     addLayer(defaultMaster)
-    for (const master of masters) {
+    for (const master of regularMasters) {
       if (master !== defaultMaster) {
         addLayer(master)
       }
@@ -1084,6 +1147,89 @@ export const buildMultiMasterFontData = (
     const activeLayerId = layers[defaultMaster.sourceId]
       ? defaultMaster.sourceId
       : layerOrder[0]
+
+    for (const braceMaster of braceMasters) {
+      const record = braceMaster.recordsByName.get(glyphId)
+      if (!record) {
+        continue
+      }
+      const layerId = uniqueLayerId(layers, braceMaster.sourceId)
+      layers[layerId] = {
+        id: layerId,
+        name: braceMaster.name,
+        type: 'brace',
+        associatedMasterId: defaultMaster.sourceId,
+        braceLocation: braceMaster.location,
+        sourceData: {
+          ufo: {
+            ufoId: record.ufoId,
+            layerId: record.layerId,
+            glyphDir: pickDefaultLayer(braceMaster.metadata).glyphDir,
+            fileName: record.fileName,
+            sourceHash: record.sourceHash,
+            remoteBlobSha: record.remoteBlobSha ?? null,
+            note: record.note,
+            lib: record.lib,
+          },
+        },
+        image: record.image
+          ? {
+              ...record.image,
+              color: parseUfoColor(record.image.color),
+            }
+          : null,
+        background: braceMaster.backgroundByGlyphName.get(glyphId) ?? null,
+        ...glyphRecordToLayerContent(record, braceMaster.resolveBounds),
+      }
+      layerOrder.push(layerId)
+    }
+
+    for (const { rule, substitution } of bracketSubstitutions) {
+      if (substitution.name !== glyphId) {
+        continue
+      }
+      const substituteMaster =
+        regularMasters.find((master) =>
+          master.recordsByName.has(substitution.with)
+        ) ?? defaultMaster
+      const record = substituteMaster.recordsByName.get(substitution.with)
+      if (!record) {
+        continue
+      }
+      const layerId = uniqueLayerId(
+        layers,
+        getBracketLayerId(rule, substitution)
+      )
+      layers[layerId] = {
+        id: layerId,
+        name: layerId,
+        type: 'bracket',
+        associatedMasterId: substituteMaster.sourceId,
+        bracketAxisRules: ruleConditionsToBracketAxisRules(rule.conditions),
+        sourceData: {
+          ufo: {
+            ufoId: record.ufoId,
+            layerId: record.layerId,
+            glyphDir: pickDefaultLayer(substituteMaster.metadata).glyphDir,
+            fileName: record.fileName,
+            sourceHash: record.sourceHash,
+            remoteBlobSha: record.remoteBlobSha ?? null,
+            note: record.note,
+            lib: record.lib,
+          },
+        },
+        image: record.image
+          ? {
+              ...record.image,
+              color: parseUfoColor(record.image.color),
+            }
+          : null,
+        background:
+          substituteMaster.backgroundByGlyphName.get(substitution.with) ?? null,
+        ...glyphRecordToLayerContent(record, substituteMaster.resolveBounds),
+      }
+      layerOrder.push(layerId)
+    }
 
     glyphs[glyphId] = {
       id: glyphId,
@@ -1105,7 +1251,7 @@ export const buildMultiMasterFontData = (
   }
 
   const sources: Record<string, FontSource> = {}
-  for (const master of masters) {
+  for (const master of regularMasters) {
     sources[master.sourceId] = {
       id: master.sourceId,
       name: master.name,

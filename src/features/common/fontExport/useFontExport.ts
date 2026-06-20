@@ -19,7 +19,10 @@ import {
   getProjectArchiveMetadata,
   getProjectArchiveSourceFormat,
 } from 'src/lib/project/projectArchive'
-import { serializeGlyphsFileToBlob } from 'src/lib/fontFormats/glyphsExport'
+import {
+  getGlyphsExportWarnings,
+  serializeGlyphsFileToBlob,
+} from 'src/lib/fontFormats/glyphsExport'
 import { createGlyphsPackageDataFromFontData } from 'src/lib/fontFormats/glyphsPackage'
 import { flushPendingDraft } from 'src/lib/project/flushPendingDraft'
 import { createProjectUiStateSnapshot } from 'src/lib/project/projectUiState'
@@ -94,6 +97,9 @@ export function useFontExport() {
   const hasBlockingOpenTypeWarnings = hasBlockingExportWarnings(
     openTypeExportWarnings
   )
+  const glyphsExportWarnings = fontData
+    ? getGlyphsExportWarnings(fontData, 3)
+    : []
 
   const canExport = Boolean(
     fontData && projectId && !isExporting && !hasBlockingOpenTypeWarnings
@@ -154,6 +160,13 @@ export function useFontExport() {
       const exportFontData = fullDraft?.fontData ?? fontData
       const exportProjectMetadata =
         fullDraft?.projectMetadata ?? getProjectArchiveMetadata()
+      const selectedGlyphs3Formats = selectedFormats.filter(
+        (format) => format === 'glyphs3' || format === 'glyphspackage'
+      )
+      const fullGlyphsExportWarnings =
+        selectedGlyphs3Formats.length > 0
+          ? getGlyphsExportWarnings(exportFontData, 3)
+          : []
       const selectedBinaryFormats = selectedFormats.filter(
         (format) =>
           format !== 'zip' &&
@@ -292,6 +305,16 @@ export function useFontExport() {
         triggerBlobDownload(makeZipBlob(files), `${baseFileName}-exports.zip`)
       }
 
+      if (fullGlyphsExportWarnings.length > 0) {
+        toast({
+          title: 'Glyphs export warning',
+          description: `匯出的 Glyphs 3 資料包含 ${fullGlyphsExportWarnings.length} 個 sheared component，已用 matrix transform 保留；請在 Glyphs 重新開啟確認。`,
+          status: 'warning',
+          duration: 5200,
+          isClosable: true,
+        })
+      }
+
       const totalUfoGlyphs = assets.find(
         (asset) => asset.totalGlyphs !== null
       )?.totalGlyphs
@@ -328,6 +351,7 @@ export function useFontExport() {
     canExport,
     exportFont,
     openTypeExportWarnings,
+    glyphsExportWarnings,
     isExporting,
     loadingText,
     ufoExportProgress,
