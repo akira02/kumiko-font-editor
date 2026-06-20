@@ -256,10 +256,38 @@ const parsePoint = (value: unknown): { x: number; y: number } | null => {
   return null
 }
 
+const parseNumberRecord = (value: unknown): Record<string, number> | null => {
+  const record = asRecord(value)
+  const entries = Object.entries(record)
+    .map(
+      ([key, entryValue]) => [key, asNumber(entryValue, Number.NaN)] as const
+    )
+    .filter(([, entryValue]) => Number.isFinite(entryValue))
+  return entries.length > 0 ? Object.fromEntries(entries) : null
+}
+
+const parseAxisRules = (
+  value: unknown
+): Record<string, { min?: number; max?: number }> | null => {
+  const record = asRecord(value)
+  const entries = Object.entries(record).flatMap(([axisName, axisValue]) => {
+    const axisRule = asRecord(axisValue)
+    const min = asNumber(axisRule.min, Number.NaN)
+    const max = asNumber(axisRule.max, Number.NaN)
+    const rule = {
+      ...(Number.isFinite(min) ? { min } : {}),
+      ...(Number.isFinite(max) ? { max } : {}),
+    }
+    return Object.keys(rule).length > 0 ? [[axisName, rule] as const] : []
+  })
+  return entries.length > 0 ? Object.fromEntries(entries) : null
+}
+
 const componentFromMatrix = (
   name: string,
   matrix: number[],
-  index: number
+  index: number,
+  autoAlign?: boolean | null
 ): GlyphComponentRef => ({
   id: `c${index}`,
   glyphId: name,
@@ -270,6 +298,7 @@ const componentFromMatrix = (
   x: matrix[4],
   y: matrix[5],
   rotation: 0,
+  autoAlign,
 })
 
 interface ParsedLayerContent {
@@ -341,8 +370,24 @@ const parseLayerContent = (layer: Raw): ParsedLayerContent => {
         : null
     componentRefs.push(
       transform
-        ? componentFromMatrix(name, transform, index)
-        : componentFromMatrix(name, [1, 0, 0, 1, 0, 0], index)
+        ? componentFromMatrix(
+            name,
+            transform,
+            index,
+            component.automaticAlignment === undefined
+              ? null
+              : component.automaticAlignment === 1 ||
+                  component.automaticAlignment === true
+          )
+        : componentFromMatrix(
+            name,
+            [1, 0, 0, 1, 0, 0],
+            index,
+            component.automaticAlignment === undefined
+              ? null
+              : component.automaticAlignment === 1 ||
+                  component.automaticAlignment === true
+          )
     )
   }
 
@@ -360,7 +405,17 @@ const parseLayerContent = (layer: Raw): ParsedLayerContent => {
               ? shape.transform.map((v) => asNumber(v))
               : null
         if (transform && transform.length === 6) {
-          componentRefs.push(componentFromMatrix(ref, transform, index))
+          componentRefs.push(
+            componentFromMatrix(
+              ref,
+              transform,
+              index,
+              shape.automaticAlignment === undefined
+                ? null
+                : shape.automaticAlignment === 1 ||
+                    shape.automaticAlignment === true
+            )
+          )
           return
         }
         const pos = asArray(shape.pos)
@@ -375,6 +430,11 @@ const parseLayerContent = (layer: Raw): ParsedLayerContent => {
           rotation: asNumber(shape.angle),
           xyScale: 0,
           yxScale: 0,
+          autoAlign:
+            shape.automaticAlignment === undefined
+              ? null
+              : shape.automaticAlignment === 1 ||
+                shape.automaticAlignment === true,
         })
         return
       }
@@ -612,8 +672,10 @@ export const buildFontDataFromGlyphsDocument = (
     layers: Array<{
       key: string
       name: string
-      type: 'master' | 'backup'
+      type: NonNullable<GlyphLayerData['type']>
       associatedMasterId: string | null
+      braceLocation: Record<string, number> | null
+      bracketAxisRules: Record<string, { min?: number; max?: number }> | null
       content: ParsedLayerContent
     }>
   }
@@ -639,14 +701,25 @@ export const buildFontDataFromGlyphsDocument = (
         asString(rawLayer.associatedMasterId) ??
         (masterIdSet.has(layerId) ? layerId : defaultMasterId)
       const isMaster = masterIdSet.has(layerId)
+      const attributes = asRecord(rawLayer.attributes)
+      const braceLocation = parseNumberRecord(attributes.coordinates)
+      const bracketAxisRules = parseAxisRules(attributes.axisRules)
       const content = parseLayerContent(rawLayer)
       // A master layer is keyed by its master id so getGlyphLayer(glyph, masterId)
       // and the store's master switcher resolve it; backup layers keep their own id.
       layers.push({
         key: layerId,
         name: asString(rawLayer.name) ?? layerId,
-        type: isMaster ? 'master' : 'backup',
+        type: isMaster
+          ? 'master'
+          : bracketAxisRules
+            ? 'bracket'
+            : braceLocation
+              ? 'brace'
+              : 'backup',
         associatedMasterId: associated,
+        braceLocation,
+        bracketAxisRules,
         content,
       })
       if (isMaster) {
@@ -696,6 +769,8 @@ export const buildFontDataFromGlyphsDocument = (
         name: layer.name,
         type: layer.type,
         associatedMasterId: layer.associatedMasterId,
+        braceLocation: layer.braceLocation,
+        bracketAxisRules: layer.bracketAxisRules,
         paths: layer.content.paths,
         componentRefs: layer.content.componentRefs,
         anchors: layer.content.anchors,

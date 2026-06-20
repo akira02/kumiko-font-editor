@@ -176,6 +176,7 @@ describe('serializeGlyphsFileToBlob glyph matching', () => {
                   rotation: 0,
                   xyScale: 0.2,
                   yxScale: 0,
+                  autoAlign: false,
                 },
               ],
               anchors: [],
@@ -205,7 +206,65 @@ describe('serializeGlyphsFileToBlob glyph matching', () => {
 
     expect(text).toContain('ref = base')
     expect(text).toContain('transform = (1,0.2,0,1,20,30)')
+    expect(text).toContain('automaticAlignment = 0')
     expect(text).not.toContain('scale = (1,1)')
+  })
+
+  it('emits brace and bracket layer attributes from canonical layer metadata', async () => {
+    const fontData = {
+      glyphs: {
+        A: {
+          ...glyph('A', 'A', '0041'),
+          layers: {
+            M1: {
+              id: 'M1',
+              name: 'Regular',
+              type: 'master',
+              associatedMasterId: 'M1',
+              paths: [],
+              componentRefs: [],
+              anchors: [],
+              guidelines: [],
+              metrics: { width: 500, lsb: 0, rsb: 500 },
+            },
+            brace: {
+              id: 'brace',
+              name: 'Brace',
+              type: 'brace',
+              associatedMasterId: 'M1',
+              braceLocation: { Weight: 150 },
+              paths: [],
+              componentRefs: [],
+              anchors: [],
+              guidelines: [],
+              metrics: { width: 520, lsb: 0, rsb: 520 },
+            },
+            bracket: {
+              id: 'bracket',
+              name: 'Bracket',
+              type: 'bracket',
+              associatedMasterId: 'M1',
+              bracketAxisRules: { Weight: { min: 150, max: 200 } },
+              paths: [],
+              componentRefs: [],
+              anchors: [],
+              guidelines: [],
+              metrics: { width: 530, lsb: 0, rsb: 530 },
+            },
+          },
+          layerOrder: ['M1', 'brace', 'bracket'],
+          activeLayerId: 'M1',
+        },
+      },
+    } as unknown as FontData
+
+    const text = await serializeGlyphsFileToBlob(fontData, null, null, 3).text()
+
+    expect(text).toContain('coordinates = {')
+    expect(text).toContain('Weight = 150')
+    expect(text).toContain('axisRules = {')
+    expect(text).toContain('min = 150')
+    expect(text).toContain('max = 200')
   })
 
   it('generates a Glyphs package from canonical fontData', () => {

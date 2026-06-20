@@ -137,6 +137,9 @@ const serializeLayerComponents = (layer: GlyphLayerData) =>
     const matrix = getComponentMatrix(component)
     return {
       name: component.glyphId,
+      ...(component.autoAlign === undefined || component.autoAlign === null
+        ? {}
+        : { automaticAlignment: component.autoAlign ? 1 : 0 }),
       ...(isIdentityComponentMatrix(matrix)
         ? {}
         : {
@@ -200,6 +203,9 @@ const serializeLayerShapesG3 = (layer: GlyphLayerData) => {
     if (hasShear) {
       return {
         ref: component.glyphId,
+        ...(component.autoAlign === undefined || component.autoAlign === null
+          ? {}
+          : { automaticAlignment: component.autoAlign ? 1 : 0 }),
         transform: new RawGlyphsValue(
           `(${matrix.a},${matrix.b},${matrix.c},${matrix.d},${Math.round(matrix.e)},${Math.round(matrix.f)})`
         ),
@@ -210,6 +216,9 @@ const serializeLayerShapesG3 = (layer: GlyphLayerData) => {
     const hasScale = component.scaleX !== 1 || component.scaleY !== 1
     return {
       ref: component.glyphId,
+      ...(component.autoAlign === undefined || component.autoAlign === null
+        ? {}
+        : { automaticAlignment: component.autoAlign ? 1 : 0 }),
       ...(x !== 0 || y !== 0 ? { pos: new RawGlyphsValue(`(${x},${y})`) } : {}),
       ...(hasScale
         ? {
@@ -250,6 +259,27 @@ export const applyLayerEdits = (
   targetLayer.associatedMasterId = layer.associatedMasterId ?? layer.id
   targetLayer.name = layer.name
   targetLayer.width = Math.round(layer.metrics.width)
+  const attributes =
+    targetLayer.attributes &&
+    typeof targetLayer.attributes === 'object' &&
+    !Array.isArray(targetLayer.attributes)
+      ? { ...(targetLayer.attributes as Record<string, unknown>) }
+      : {}
+  if (layer.braceLocation) {
+    attributes.coordinates = layer.braceLocation
+  } else {
+    delete attributes.coordinates
+  }
+  if (layer.bracketAxisRules) {
+    attributes.axisRules = layer.bracketAxisRules
+  } else {
+    delete attributes.axisRules
+  }
+  if (Object.keys(attributes).length > 0) {
+    targetLayer.attributes = attributes
+  } else {
+    delete targetLayer.attributes
+  }
 
   if (formatVersion >= 3) {
     targetLayer.shapes = serializeLayerShapesG3(layer)

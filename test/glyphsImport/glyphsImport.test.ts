@@ -43,8 +43,10 @@ paths = (
 glyphname = Aacute;
 unicode = 193;
 layers = (
-{ layerId = "m01"; width = 500; components = ( { name = A; transform = "{1, 0, 0, 1, 50, 0}"; } ); },
-{ layerId = "m02"; width = 600; components = ( { name = A; } ); }
+{ layerId = "m01"; width = 500; components = ( { name = A; transform = "{1, 0, 0, 1, 50, 0}"; automaticAlignment = 0; } ); },
+{ layerId = "m02"; width = 600; components = ( { name = A; } ); },
+{ layerId = "brace.500"; associatedMasterId = "m01"; width = 540; attributes = { coordinates = { Weight = 150; }; }; paths = ( { closed = 0; nodes = ( "0 0 LINE", "100 0 LINE" ); } ); },
+{ layerId = "bracket.150-200"; associatedMasterId = "m01"; width = 550; attributes = { axisRules = { Weight = { min = 150; max = 200; }; }; }; paths = ( { closed = 0; nodes = ( "0 10 LINE", "100 10 LINE" ); } ); }
 );
 }
 );
@@ -133,6 +135,23 @@ describe('buildFontDataFromGlyphsDocument (Glyphs 2)', () => {
       scaleY: 1,
       x: 50,
       y: 0,
+      autoAlign: false,
+    })
+  })
+
+  it('parses brace and bracket layer attributes into canonical layer metadata', () => {
+    const brace = getGlyphLayer(fontData.glyphs.Aacute, 'brace.500')
+    const bracket = getGlyphLayer(fontData.glyphs.Aacute, 'bracket.150-200')
+
+    expect(brace).toMatchObject({
+      type: 'brace',
+      associatedMasterId: 'm01',
+      braceLocation: { Weight: 150 },
+    })
+    expect(bracket).toMatchObject({
+      type: 'bracket',
+      associatedMasterId: 'm01',
+      bracketAxisRules: { Weight: { min: 150, max: 200 } },
     })
   })
 })
