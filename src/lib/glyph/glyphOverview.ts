@@ -525,3 +525,31 @@ export const buildGlyphPreviewData = (
   }
   return preview
 }
+
+/**
+ * Convert a GlyphPreviewData viewBox (SVG Y-down space) to a font-coordinate
+ * Rect (Y-up space) suitable for CanvasController.fitRect.
+ *
+ * SVG uses: svg_y = flipY - font_y
+ * So:       font_y = flipY - svg_y
+ *
+ * viewBox "x y w h" → { xMin: x, xMax: x+w, yMin: flipY-(y+h), yMax: flipY-y }
+ */
+export function buildGlyphPreviewFontRect(preview: GlyphPreviewData): {
+  xMin: number
+  xMax: number
+  yMin: number
+  yMax: number
+} {
+  const parts = preview.viewBox.split(' ')
+  const x = parseFloat(parts[0])
+  const y = parseFloat(parts[1])
+  const w = parseFloat(parts[2])
+  const h = parseFloat(parts[3])
+  return {
+    xMin: x,
+    xMax: x + w,
+    yMin: preview.flipY - (y + h),
+    yMax: preview.flipY - y,
+  }
+}

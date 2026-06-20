@@ -1,9 +1,16 @@
 import { Grid, GridItem } from '@chakra-ui/react'
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import type { ListRange } from 'react-virtuoso'
 import { useStore, type GlyphData } from 'src/store'
 import { getGlyphUnicodeChar } from 'src/lib/glyph/glyphUnicode'
 import { isGlyphGeometryLoaded } from 'src/lib/glyph/glyphGeometryState'
+import {
+  buildGlyphPreviewData,
+  buildGlyphPreviewFontRect,
+} from 'src/lib/glyph/glyphOverview'
+import { setPendingEditorViewportRect } from 'src/features/editor/pendingEditorViewport'
+import { consumePendingOverviewTransitionGlyphId } from 'src/features/fontOverview/pendingOverviewTransitionGlyphId'
 import { loadProjectGlyphGeometryClosure } from 'src/lib/project/projectRepository'
 import { AddGlyphModal } from 'src/features/fontOverview/components/AddGlyphModal'
 import { OverviewContent } from 'src/features/fontOverview/components/OverviewContent'
@@ -24,6 +31,15 @@ export function FontOverviewScreen() {
   useHistoryShortcuts()
 
   const [showOnlyEmptyGlyphs, setShowOnlyEmptyGlyphs] = useState(false)
+  const [transitioningGlyphId, setTransitioningGlyphId] = useState<
+    string | null
+  >(() => consumePendingOverviewTransitionGlyphId())
+  const mountedWithBackTransition = useRef(transitioningGlyphId !== null)
+  useEffect(() => {
+    if (!mountedWithBackTransition.current) return
+    const timerId = setTimeout(() => setTransitioningGlyphId(null), 500)
+    return () => clearTimeout(timerId)
+  }, [])  
   const currentSearchQuery = useStore((state) => state.currentSearchQuery)
   const setSearchQuery = useStore((state) => state.setSearchQuery)
   const filteredGlyphList = useStore((state) => state.filteredGlyphList)
@@ -36,6 +52,7 @@ export function FontOverviewScreen() {
   const selectedSectionId = useStore((state) => state.overviewSectionId)
   const setOverviewSectionId = useStore((state) => state.setOverviewSectionId)
   const hydrateGlyphGeometry = useStore((state) => state.hydrateGlyphGeometry)
+  const activeMasterId = useStore((state) => state.activeMasterId)
   const loadingGlyphGeometryPromisesRef = useRef(
     new Map<string, Promise<GlyphData[]>>()
   )
@@ -245,7 +262,35 @@ export function FontOverviewScreen() {
         activeGlyphIndex + 1,
         activeGlyphIndex
       )
-      setWorkspaceView('editor')
+
+      // Store the preview's font-space Rect so the canvas uses the same
+      // viewport region on first render, aligning the glyph with the SVG preview.
+      const targetGlyph = useStore.getState().fontData?.glyphs[glyphId]
+      const unitsPerEm = useStore.getState().fontData?.unitsPerEm ?? 1000
+      if (targetGlyph) {
+        const preview = buildGlyphPreviewData(
+          targetGlyph,
+          glyphMap,
+          unitsPerEm,
+          activeMasterId
+        )
+        setPendingEditorViewportRect(buildGlyphPreviewFontRect(preview))
+      }
+
+      if (!('startViewTransition' in document)) {
+        setWorkspaceView('editor')
+        return
+      }
+
+      flushSync(() => setTransitioningGlyphId(glyphId))
+      ;(
+        document as Document & { startViewTransition: (cb: () => void) => void }
+      ).startViewTransition(() => {
+        flushSync(() => {
+          setTransitioningGlyphId(null)
+          setWorkspaceView('editor')
+        })
+      })
     },
     [
       activeSection.glyphs,
@@ -293,6 +338,7 @@ export function FontOverviewScreen() {
             restoreSnapshot={overviewGridState}
             selectedGlyphIds={selectedGlyphIdSet}
             topGlyphId={overviewTopGlyphId}
+            transitioningGlyphId={transitioningGlyphId}
             visibleSections={visibleSections}
             onEnterEditor={handleEnterEditor}
             onOpenAddGlyphModal={openAddGlyphModal}

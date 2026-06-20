@@ -36,6 +36,7 @@ interface OverviewContentProps {
   restoreSnapshot: GridStateSnapshot | null
   selectedGlyphIds: Set<string>
   topGlyphId: string | null
+  transitioningGlyphId?: string | null
   visibleSections: OverviewSection[]
   onEnterEditor: (glyphId: string) => void
   onOpenAddGlyphModal: () => void
@@ -51,6 +52,7 @@ export function OverviewContent({
   restoreSnapshot,
   selectedGlyphIds,
   topGlyphId,
+  transitioningGlyphId,
   visibleSections,
   onEnterEditor,
   onOpenAddGlyphModal,
@@ -232,6 +234,7 @@ export function OverviewContent({
                       glyph={glyph}
                       glyphMap={glyphMap}
                       isSelected={selectedGlyphIds.has(glyph.id)}
+                      isTransitioning={transitioningGlyphId === glyph.id}
                       onEnterEditor={onEnterEditor}
                       onSelectGlyph={onSelectGlyph}
                     />

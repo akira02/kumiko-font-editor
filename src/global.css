@@ -5,3 +5,22 @@
   src: url('/fonts/PUAExt-Regular.woff2') format('woff2');
   font-display: swap;
 }
+
+/* View Transition: root cross-fade */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 250ms;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* View Transition: glyph card → canvas shared element morph */
+::view-transition-group(glyph-preview) {
+  animation-duration: 380ms;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+::view-transition-old(glyph-preview),
+::view-transition-new(glyph-preview) {
+  animation-duration: 380ms;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}

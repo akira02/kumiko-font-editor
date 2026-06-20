@@ -1,7 +1,9 @@
 import { Box } from '@chakra-ui/react'
-import { useMemo } from 'react'
+import { useMemo, useCallback } from 'react'
+import { flushSync } from 'react-dom'
 import { useStore } from 'src/store'
 import { LeftPanelContent } from 'src/features/editor/leftPanel/components/LeftPanelContent'
+import { setPendingOverviewTransitionGlyphId } from 'src/features/fontOverview/pendingOverviewTransitionGlyphId'
 
 export function LeftPanel() {
   const fontData = useStore((state) => state.fontData)
@@ -21,6 +23,21 @@ export function LeftPanel() {
     ? (glyphMap[selectedGlyphId] ?? null)
     : null
 
+  const handleBack = useCallback(() => {
+    if (selectedGlyphId) {
+      setPendingOverviewTransitionGlyphId(selectedGlyphId)
+    }
+    if (!('startViewTransition' in document)) {
+      setWorkspaceView('overview')
+      return
+    }
+    ;(
+      document as Document & { startViewTransition: (cb: () => void) => void }
+    ).startViewTransition(() => {
+      flushSync(() => setWorkspaceView('overview'))
+    })
+  }, [selectedGlyphId, setWorkspaceView])
+
   return (
     <Box
       p={4}
@@ -37,7 +54,7 @@ export function LeftPanel() {
         glyphs={glyphs}
         selectedGlyph={selectedGlyph}
         onAddGlyphToEditor={addGlyphToEditor}
-        onBack={() => setWorkspaceView('overview')}
+        onBack={handleBack}
       />
     </Box>
   )

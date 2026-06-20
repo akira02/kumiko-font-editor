@@ -1,4 +1,4 @@
-import { Grid, GridItem, useBreakpointValue } from '@chakra-ui/react'
+import { Box, Grid, GridItem, useBreakpointValue } from '@chakra-ui/react'
 import { CanvasWorkspace } from 'src/features/editor/canvas/CanvasWorkspace'
 import { GlyphInsightProvider } from 'src/features/editor/insight/GlyphInsightProvider'
 import { LeftPanel } from 'src/features/editor/leftPanel/LeftPanel'
@@ -36,6 +36,18 @@ export function EditorLayout() {
           <EditorRightPanel />
         </GridItem>
       </Grid>
+      {/* View transition landing zone — fixed at viewport center so the glyph card always flies to the middle */}
+      <Box
+        position="fixed"
+        top="0px"
+        left="50%"
+        transform="translateX(-50%)"
+        w="110vh"
+        h="110vh"
+        pointerEvents="none"
+        aria-hidden="true"
+        style={{ viewTransitionName: 'glyph-preview' }}
+      />
     </GlyphInsightProvider>
   )
 }

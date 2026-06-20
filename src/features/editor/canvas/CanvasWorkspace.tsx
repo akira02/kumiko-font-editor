@@ -43,6 +43,7 @@ import {
 } from 'src/lib/referenceFont/referenceFontStore'
 import { loadReferenceFontRecord } from 'src/lib/referenceFont/referenceFontPersistence'
 import type { PathData } from 'src/store'
+import { consumePendingEditorViewportRect } from 'src/features/editor/pendingEditorViewport'
 
 const buildPath2DFromPaths = (paths: PathData[]) =>
   new Path2D(
@@ -702,7 +703,8 @@ export function CanvasWorkspace() {
     }
 
     didCenterInitialGlyphRef.current = true
-    controller.fitRect(viewBox)
+    const pendingRect = consumePendingEditorViewportRect()
+    controller.fitRect(pendingRect ?? viewBox)
   }, [canvasSize.height, canvasSize.width, fontData, positionedGlyph])
 
   useEffect(() => {

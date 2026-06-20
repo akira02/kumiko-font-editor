@@ -69,6 +69,7 @@ interface GlyphCardProps {
   glyph: GlyphData
   glyphMap: Record<string, GlyphData>
   isSelected: boolean
+  isTransitioning?: boolean
   onEnterEditor: (glyphId: string) => void
   onSelectGlyph: (glyphId: string, event: MouseEvent) => void
 }
@@ -77,6 +78,7 @@ export const GlyphCard = memo(function GlyphCard({
   glyph,
   glyphMap,
   isSelected,
+  isTransitioning,
   onEnterEditor,
   onSelectGlyph,
 }: GlyphCardProps) {
@@ -105,9 +107,7 @@ export const GlyphCard = memo(function GlyphCard({
     <Box
       p={1}
       h="140px"
-      sx={{
-        contain: 'layout paint style',
-      }}
+      sx={{ contain: 'layout paint style' }}
       borderRadius="sm"
       bg={isSelected ? 'field.yellow.300' : 'field.panel'}
       boxShadow="none"
@@ -119,7 +119,15 @@ export const GlyphCard = memo(function GlyphCard({
     >
       <Stack spacing={1} h="100%">
         <Flex align="center" justify="center" h="104px" borderRadius="sm">
-          <Box w="100%" h="100%">
+          <Box
+            w="100%"
+            h="100%"
+            style={
+              isTransitioning
+                ? { viewTransitionName: 'glyph-preview' }
+                : undefined
+            }
+          >
             <GlyphPreview glyph={glyph} glyphMap={glyphMap} />
           </Box>
         </Flex>

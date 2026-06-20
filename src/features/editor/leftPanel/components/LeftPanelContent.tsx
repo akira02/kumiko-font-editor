@@ -1,5 +1,6 @@
 import { Divider, HStack, Stack, Text, VStack } from '@chakra-ui/react'
-import { useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
+import type { ListRange } from 'react-virtuoso'
 import {
   getFontVerticalBox,
   mapGlyphwikiBoxToFontUnits,
@@ -65,37 +66,48 @@ export function LeftPanelContent({
     )
   }, [fontData, selectedGlyph, targetPartBox])
 
+  const loadGeometry = useCallback(
+    (glyphIds: string[]) => {
+      if (!projectId) return
+      const currentGlyphs = useStore.getState().fontData?.glyphs ?? {}
+      const missing = glyphIds
+        .filter((id) => {
+          const g = currentGlyphs[id]
+          return g && !isGlyphGeometryLoaded(g)
+        })
+        .filter((id) => !loadingRef.current.has(id))
+      if (missing.length === 0) return
+      const loadedGlyphIds = Object.values(currentGlyphs)
+        .filter(isGlyphGeometryLoaded)
+        .map((g) => g.id)
+      const loadPromise = loadProjectGlyphGeometryClosure(projectId, missing, {
+        loadedGlyphIds,
+      }).finally(() => {
+        for (const id of missing) loadingRef.current.delete(id)
+      })
+      for (const id of missing) loadingRef.current.set(id, loadPromise)
+      void loadPromise.then((loaded) => {
+        if (useStore.getState().projectId === projectId) {
+          hydrateGlyphGeometry(loaded)
+        }
+      })
+    },
+    [projectId, hydrateGlyphGeometry]
+  )
+
+  const handleStripRangeChange = useCallback(
+    (range: ListRange) => {
+      const ids = resultGlyphs
+        .slice(range.startIndex, range.endIndex + 1)
+        .map((g) => g.id)
+      loadGeometry(ids)
+    },
+    [resultGlyphs, loadGeometry]
+  )
+
   useEffect(() => {
-    if (!projectId) {
-      return
-    }
-    const missing = resultGlyphs
-      .filter((glyph) => !isGlyphGeometryLoaded(glyph))
-      .map((glyph) => glyph.id)
-      .filter((id) => !loadingRef.current.has(id))
-    if (missing.length === 0) {
-      return
-    }
-    const currentState = useStore.getState()
-    const loadedGlyphIds = Object.values(currentState.fontData?.glyphs ?? {})
-      .filter(isGlyphGeometryLoaded)
-      .map((g) => g.id)
-    const loadPromise = loadProjectGlyphGeometryClosure(projectId, missing, {
-      loadedGlyphIds,
-    }).finally(() => {
-      for (const id of missing) {
-        loadingRef.current.delete(id)
-      }
-    })
-    for (const id of missing) {
-      loadingRef.current.set(id, loadPromise)
-    }
-    void loadPromise.then((loaded) => {
-      if (useStore.getState().projectId === projectId) {
-        hydrateGlyphGeometry(loaded)
-      }
-    })
-  }, [hydrateGlyphGeometry, projectId, resultGlyphs])
+    if (previewGlyph) loadGeometry([previewGlyph.id])
+  }, [previewGlyph, loadGeometry])
 
   return (
     <>
@@ -132,6 +144,7 @@ export function LeftPanelContent({
           previewGlyphId={previewGlyph?.id ?? null}
           resultGlyphs={resultGlyphs}
           onPreviewGlyphChange={setPreviewGlyphId}
+          onRangeChange={handleStripRangeChange}
         />
 
         <GlyphPreviewCard
