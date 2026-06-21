@@ -32,14 +32,10 @@ import type { ToolId } from 'src/features/editor/canvas/workspace/types'
 import { useCanvasClipboard } from 'src/features/editor/canvas/hooks/useCanvasClipboard'
 import { useCanvasKeyboardShortcuts } from 'src/features/editor/canvas/hooks/useCanvasKeyboardShortcuts'
 import { VarPackedPath } from 'src/font/VarPackedPath'
-import {
-  buildReferenceCharPath,
-  clearReferenceFont,
-  loadReferenceFontFromBytes,
-} from 'src/lib/referenceFont/referenceFontStore'
-import { loadReferenceFontRecord } from 'src/lib/referenceFont/referenceFontPersistence'
+import { buildReferenceCharPath } from 'src/lib/referenceFont/referenceFontStore'
 import type { PathData } from 'src/store'
 import { consumePendingEditorViewportRect } from 'src/features/editor/pendingEditorViewport'
+import { useReferenceFontRestoration } from 'src/features/editor/canvas/workspace/hooks/useReferenceFontRestoration'
 
 const buildPath2DFromPaths = (paths: PathData[]) =>
   new Path2D(
@@ -424,45 +420,12 @@ export function CanvasWorkspace() {
     controller.requestUpdate()
   }, [structureGuide])
 
-  // Restore (or clear) the per-project reference font when the project changes.
-  useEffect(() => {
-    let cancelled = false
-    const restore = async () => {
-      const record = projectId
-        ? await loadReferenceFontRecord(projectId)
-        : undefined
-      if (cancelled) {
-        return
-      }
-      if (record) {
-        try {
-          const name = loadReferenceFontFromBytes(
-            record.fontBytes,
-            record.fontName
-          )
-          setReferenceFontName(name)
-          setReferenceFontVisible(true)
-          setReferenceFontChar(null)
-          return
-        } catch {
-          // fall through to the cleared state below
-        }
-      }
-      clearReferenceFont()
-      setReferenceFontName(null)
-      setReferenceFontVisible(false)
-      setReferenceFontChar(null)
-    }
-    void restore()
-    return () => {
-      cancelled = true
-    }
-  }, [
+  useReferenceFontRestoration({
     projectId,
     setReferenceFontChar,
     setReferenceFontName,
     setReferenceFontVisible,
-  ])
+  })
 
   useEffect(() => {
     const sceneController = sceneControllerRef.current
