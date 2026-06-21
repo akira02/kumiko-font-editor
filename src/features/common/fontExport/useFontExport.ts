@@ -15,15 +15,12 @@ import {
   needsOpenTypeFeatureCompilationForBinaryExport,
   validateFeatures,
 } from 'src/lib/openTypeFeatures'
+import { getProjectArchiveSourceFormat } from 'src/lib/project/projectArchive'
+import { getGlyphsExportWarnings } from 'src/lib/fontFormats/glyphsExport'
 import {
-  getProjectArchiveMetadata,
-  getProjectArchiveSourceFormat,
-} from 'src/lib/project/projectArchive'
-import {
-  getGlyphsExportWarnings,
-  serializeGlyphsFileToBlob,
-} from 'src/lib/fontFormats/glyphsExport'
-import { createGlyphsPackageDataFromFontData } from 'src/lib/fontFormats/glyphsPackage'
+  createCanonicalGlyphsPackageData,
+  serializeCanonicalGlyphsProjectToBlob,
+} from 'src/lib/fontFormats/canonicalGlyphsExport'
 import { flushPendingDraft } from 'src/lib/project/flushPendingDraft'
 import { createProjectUiStateSnapshot } from 'src/lib/project/projectUiState'
 import { loadProjectDraft } from 'src/lib/project/projectRepository'
@@ -58,6 +55,7 @@ interface ExportAsset {
   fileName: string
   label: string
   totalGlyphs: number | null
+  warnings?: Array<{ code: string }>
 }
 
 export function useFontExport() {
@@ -164,15 +162,9 @@ export function useFontExport() {
         ? await loadProjectDraft(projectId)
         : null
       const exportFontData = fullDraft?.fontData ?? fontData
-      const exportProjectMetadata =
-        fullDraft?.projectMetadata ?? getProjectArchiveMetadata()
       const selectedGlyphs3Formats = selectedFormats.filter(
         (format) => format === 'glyphs3' || format === 'glyphspackage'
       )
-      const fullGlyphsExportWarnings =
-        selectedGlyphs3Formats.length > 0
-          ? getGlyphsExportWarnings(exportFontData, 3)
-          : []
       const selectedBinaryFormats = selectedFormats.filter(
         (format) =>
           format !== 'zip' &&
@@ -200,29 +192,24 @@ export function useFontExport() {
       const buildExportAsset = async (
         format: FontExportFormat
       ): Promise<ExportAsset> => {
-        // Glyphs export always emits from Kumiko's canonical in-memory model.
+        // Glyphs export streams from Kumiko's canonical records.
         if (format === 'glyphs2' || format === 'glyphs3') {
-          const blob = serializeGlyphsFileToBlob(
-            exportFontData,
-            exportProjectMetadata,
-            null,
-            format === 'glyphs3' ? 3 : 2
-          )
+          const result = await serializeCanonicalGlyphsProjectToBlob({
+            projectId,
+            formatVersion: format === 'glyphs3' ? 3 : 2,
+          })
           return {
-            blob,
+            blob: result.blob,
             fileName: `${baseFileName}-glyphs${format === 'glyphs3' ? '3' : '2'}.glyphs`,
             label: format === 'glyphs3' ? 'Glyphs 3' : 'Glyphs 2',
-            totalGlyphs: Object.keys(exportFontData.glyphs).length,
+            totalGlyphs: result.totalGlyphs,
+            warnings: result.warnings,
           }
         }
 
         if (format === 'glyphspackage') {
-          const packageData = createGlyphsPackageDataFromFontData({
-            fontData: exportFontData,
-            projectMetadata: exportProjectMetadata,
-            packageName:
-              fullDraft?.projectGlyphsPackage?.packageName ??
-              `${baseFileName}.glyphspackage`,
+          const packageData = await createCanonicalGlyphsPackageData({
+            projectId,
           })
           const files: Record<string, Uint8Array> = {}
           const encoder = new TextEncoder()
@@ -234,7 +221,8 @@ export function useFontExport() {
             blob: makeZipBlob(files),
             fileName: `${baseFileName}.glyphspackage.zip`,
             label: 'Glyphs Package',
-            totalGlyphs: Object.keys(exportFontData.glyphs).length,
+            totalGlyphs: packageData.totalGlyphs,
+            warnings: packageData.warnings,
           }
         }
 
@@ -311,10 +299,22 @@ export function useFontExport() {
         triggerBlobDownload(makeZipBlob(files), `${baseFileName}-exports.zip`)
       }
 
-      if (fullGlyphsExportWarnings.length > 0) {
+      const glyphs3WarningCount =
+        selectedGlyphs3Formats.length > 0
+          ? assets.reduce(
+              (count, asset) =>
+                count +
+                (asset.warnings?.filter(
+                  (warning) =>
+                    warning.code === 'glyphs3-shear-transform-unverified'
+                ).length ?? 0),
+              0
+            )
+          : 0
+      if (glyphs3WarningCount > 0) {
         toast({
           title: 'Glyphs export warning',
-          description: `匯出的 Glyphs 3 資料包含 ${fullGlyphsExportWarnings.length} 個 sheared component，已用 matrix transform 保留；請在 Glyphs 重新開啟確認。`,
+          description: `匯出的 Glyphs 3 資料包含 ${glyphs3WarningCount} 個 sheared component，已用 matrix transform 保留；請在 Glyphs 重新開啟確認。`,
           status: 'warning',
           duration: 5200,
           isClosable: true,

@@ -3,11 +3,15 @@ import {
   type GlyphsDocument,
 } from 'src/lib/fontFormats/glyphsDocument'
 import {
+  createBaseGlyphsDocument,
   createGlyphsDocumentFromFontData,
+  createGlyphsRecordFromFontDataGlyph,
+  getGlyphExportWarnings,
+  type GlyphsExportWarning,
   serializeOpenStepValue,
 } from 'src/lib/fontFormats/glyphsExport'
 import { parseOpenStep } from 'src/lib/fontFormats/openstepParser'
-import type { FontData } from 'src/store'
+import type { FontData, GlyphData } from 'src/store'
 
 export interface GlyphsPackageData {
   packageName: string
@@ -15,6 +19,11 @@ export interface GlyphsPackageData {
 
 export interface GeneratedGlyphsPackageData extends GlyphsPackageData {
   files: Record<string, string>
+}
+
+export interface GlyphsPackageBatchResult extends GeneratedGlyphsPackageData {
+  totalGlyphs: number
+  warnings: GlyphsExportWarning[]
 }
 
 interface ParsedGlyphFileEntry {
@@ -219,6 +228,59 @@ export const createGlyphsPackageDataFromFontData = (input: {
   return {
     packageName: ensureGlyphsPackageName(input.packageName),
     files,
+  }
+}
+
+export const createGlyphsPackageDataFromGlyphBatches = async (input: {
+  baseFontData: FontData
+  projectMetadata: Record<string, unknown> | null
+  glyphBatches: AsyncIterable<GlyphData[]>
+  packageName?: string | null
+}): Promise<GlyphsPackageBatchResult> => {
+  const document = createBaseGlyphsDocument(
+    input.baseFontData,
+    input.projectMetadata
+  )
+  document['.formatVersion'] = 3
+
+  const fontInfoDocument = { ...document }
+  delete fontInfoDocument.glyphs
+
+  const files: Record<string, string> = {
+    'fontinfo.plist': `${serializeOpenStepValue(fontInfoDocument)}\n`,
+  }
+  const usedPaths = new Set<string>()
+  const orderedGlyphNames: string[] = []
+  const warnings: GlyphsExportWarning[] = []
+  let totalGlyphs = 0
+
+  for await (const glyphBatch of input.glyphBatches) {
+    for (const glyph of glyphBatch) {
+      const glyphRecord = createGlyphsRecordFromFontDataGlyph(
+        undefined,
+        glyph,
+        3
+      )
+      const glyphName =
+        typeof glyphRecord.glyphname === 'string' &&
+        glyphRecord.glyphname.length > 0
+          ? glyphRecord.glyphname
+          : 'untitled'
+      const relativePath = getUniqueGlyphPath(glyphName, usedPaths)
+      files[relativePath] = `${serializeOpenStepValue(glyphRecord)}\n`
+      orderedGlyphNames.push(glyphName)
+      warnings.push(...getGlyphExportWarnings(glyph, 3))
+      totalGlyphs += 1
+    }
+  }
+
+  files['order.plist'] = `${serializeOpenStepValue(orderedGlyphNames)}\n`
+
+  return {
+    packageName: ensureGlyphsPackageName(input.packageName),
+    files,
+    totalGlyphs,
+    warnings,
   }
 }
 

@@ -1,10 +1,17 @@
+import 'fake-indexeddb/auto'
+
 import { describe, expect, it } from 'vitest'
+import {
+  createCanonicalGlyphsPackageData,
+  serializeCanonicalGlyphsProjectToBlob,
+} from 'src/lib/fontFormats/canonicalGlyphsExport'
 import {
   getGlyphsExportWarnings,
   serializeGlyphsFileToBlob,
 } from 'src/lib/fontFormats/glyphsExport'
 import { createGlyphsPackageDataFromFontData } from 'src/lib/fontFormats/glyphsPackage'
 import type { GlyphsDocument } from 'src/lib/fontFormats/glyphsDocument'
+import { saveProjectDraft } from 'src/lib/project/projectRepository'
 import type { FontData, GlyphData } from 'src/store'
 
 const glyph = (id: string, name: string, unicode: string | null): GlyphData =>
@@ -17,6 +24,48 @@ const glyph = (id: string, name: string, unicode: string | null): GlyphData =>
     components: [],
     componentRefs: [],
   }) as unknown as GlyphData
+
+const layeredGlyph = (id: string, unicode: string | null): GlyphData => ({
+  id,
+  name: id,
+  unicodes: unicode ? [unicode] : [],
+  activeLayerId: 'M1',
+  layerOrder: ['M1'],
+  layers: {
+    M1: {
+      id: 'M1',
+      name: 'Regular',
+      type: 'master',
+      associatedMasterId: 'M1',
+      paths: [
+        {
+          id: `${id}-path`,
+          closed: true,
+          nodes: [
+            {
+              id: `${id}-n1`,
+              x: 0,
+              y: 0,
+              kind: 'oncurve',
+              segmentType: 'line',
+            },
+            {
+              id: `${id}-n2`,
+              x: 100,
+              y: 0,
+              kind: 'oncurve',
+              segmentType: 'line',
+            },
+          ],
+        },
+      ],
+      componentRefs: [],
+      anchors: [],
+      guidelines: [],
+      metrics: { width: 500, lsb: 0, rsb: 400 },
+    },
+  },
+})
 
 describe('serializeGlyphsFileToBlob glyph matching', () => {
   it('keeps a second glyph that shares a unicode with another', async () => {
@@ -566,5 +615,85 @@ describe('serializeGlyphsFileToBlob glyph matching', () => {
     expect(packageData.files['glyphs/A.glyph']).toContain('shapes')
     expect(packageData.files['glyphs/A.glyph']).toContain('(0,0,l)')
     expect(packageData.files['order.plist']).toContain('A')
+  })
+
+  it('exports Glyphs directly from canonical project records', async () => {
+    await saveProjectDraft({
+      id: 'canonical-glyphs-export',
+      title: 'Canonical Glyphs Export',
+      lastModified: 20,
+      createdAt: 10,
+      updatedAt: 20,
+      fontData: {
+        unitsPerEm: 1000,
+        glyphOrder: ['B', 'A'],
+        glyphs: {
+          A: layeredGlyph('A', '0041'),
+          B: layeredGlyph('B', '0042'),
+        },
+      },
+      projectMetadata: {
+        familyName: 'Canonical Glyphs Export',
+        fontMasters: [{ id: 'M1', name: 'Regular' }],
+      },
+      projectSourceFormat: 'glyphs',
+    })
+
+    const result = await serializeCanonicalGlyphsProjectToBlob({
+      projectId: 'canonical-glyphs-export',
+      formatVersion: 3,
+      batchSize: 1,
+    })
+    const text = await result.blob.text()
+
+    expect(result.totalGlyphs).toBe(2)
+    expect(result.warnings).toEqual([])
+    expect(text).toContain('familyName = "Canonical Glyphs Export"')
+    expect(text).toContain('.formatVersion = 3')
+    expect(text.indexOf('glyphname = B')).toBeLessThan(
+      text.indexOf('glyphname = A')
+    )
+    expect(text).toContain('(0,0,l)')
+  })
+
+  it('exports Glyphs package files directly from canonical project records', async () => {
+    await saveProjectDraft({
+      id: 'canonical-glyphspackage-export',
+      title: 'Canonical Glyphs Package',
+      lastModified: 20,
+      createdAt: 10,
+      updatedAt: 20,
+      fontData: {
+        unitsPerEm: 1000,
+        glyphOrder: ['B', 'A'],
+        glyphs: {
+          A: layeredGlyph('A', '0041'),
+          B: layeredGlyph('B', '0042'),
+        },
+      },
+      projectMetadata: {
+        familyName: 'Canonical Glyphs Package',
+        fontMasters: [{ id: 'M1', name: 'Regular' }],
+      },
+      projectGlyphsPackage: { packageName: 'CanonicalPackage.glyphspackage' },
+      projectSourceFormat: 'glyphspackage',
+    })
+
+    const packageData = await createCanonicalGlyphsPackageData({
+      projectId: 'canonical-glyphspackage-export',
+      batchSize: 1,
+    })
+
+    expect(packageData.packageName).toBe('CanonicalPackage.glyphspackage')
+    expect(packageData.totalGlyphs).toBe(2)
+    expect(packageData.warnings).toEqual([])
+    expect(packageData.files['fontinfo.plist']).toContain(
+      'familyName = "Canonical Glyphs Package"'
+    )
+    expect(packageData.files['glyphs/B.glyph']).toContain('glyphname = B')
+    expect(packageData.files['glyphs/A.glyph']).toContain('glyphname = A')
+    expect(packageData.files['order.plist'].indexOf('B')).toBeLessThan(
+      packageData.files['order.plist'].indexOf('A')
+    )
   })
 })

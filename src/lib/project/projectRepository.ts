@@ -24,8 +24,8 @@ import type {
   KumikoProjectSummary,
 } from 'src/lib/project/projectTypes'
 
-const PROJECT_METADATA_UI_KEY = 'projectMetadata'
-const GLYPHS_PACKAGE_UI_KEY = 'glyphsPackage'
+export const PROJECT_METADATA_UI_KEY = 'projectMetadata'
+export const GLYPHS_PACKAGE_UI_KEY = 'glyphsPackage'
 export const PROJECT_UI_STATE_KEY = 'projectUiState'
 const PROJECT_DRAFT_GLYPH_BATCH_SIZE = 256
 

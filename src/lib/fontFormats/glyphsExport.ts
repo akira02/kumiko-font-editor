@@ -301,31 +301,38 @@ export const detectGlyphsFormatVersion = (
 ): GlyphsFormatVersion =>
   document && Number(document['.formatVersion']) >= 3 ? 3 : 2
 
-export const getGlyphsExportWarnings = (
-  fontData: FontData,
+export const getGlyphExportWarnings = (
+  glyph: GlyphData,
   formatVersion: GlyphsFormatVersion
 ): GlyphsExportWarning[] => {
   if (formatVersion < 3) {
     return []
   }
-  return Object.values(fontData.glyphs).flatMap((glyph) =>
-    Object.values(glyph.layers ?? {}).flatMap((layer) =>
-      layer.componentRefs
-        .filter((component) => {
-          const matrix = getComponentMatrix(component)
-          return matrix.b !== 0 || matrix.c !== 0
-        })
-        .map((component) => ({
-          code: 'glyphs3-shear-transform-unverified' as const,
-          glyphId: glyph.id,
-          layerId: layer.id,
-          componentId: component.id,
-          message:
-            'Glyphs 3 export uses a matrix transform to preserve component shear; verify save/reopen behavior in Glyphs for this file.',
-        }))
-    )
+
+  return Object.values(glyph.layers ?? {}).flatMap((layer) =>
+    layer.componentRefs
+      .filter((component) => {
+        const matrix = getComponentMatrix(component)
+        return matrix.b !== 0 || matrix.c !== 0
+      })
+      .map((component) => ({
+        code: 'glyphs3-shear-transform-unverified' as const,
+        glyphId: glyph.id,
+        layerId: layer.id,
+        componentId: component.id,
+        message:
+          'Glyphs 3 export uses a matrix transform to preserve component shear; verify save/reopen behavior in Glyphs for this file.',
+      }))
   )
 }
+
+export const getGlyphsExportWarnings = (
+  fontData: FontData,
+  formatVersion: GlyphsFormatVersion
+): GlyphsExportWarning[] =>
+  Object.values(fontData.glyphs).flatMap((glyph) =>
+    getGlyphExportWarnings(glyph, formatVersion)
+  )
 
 const getG3OnCurveCode = (node: PathNode) => {
   const segmentType = getNodeSegmentType(node)
@@ -865,4 +872,76 @@ export const serializeGlyphsFileToBlob = (
   chunks.push('}')
   chunks.push('\n')
   return new Blob(chunks, { type: 'text/plain;charset=utf-8' })
+}
+
+export interface GlyphsBatchSerializeResult {
+  blob: Blob
+  totalGlyphs: number
+  warnings: GlyphsExportWarning[]
+}
+
+export const serializeGlyphsFileFromGlyphBatchesToBlob = async (input: {
+  baseFontData: FontData
+  projectMetadata: Record<string, unknown> | null
+  glyphBatches: AsyncIterable<GlyphData[]>
+  formatVersionOverride?: GlyphsFormatVersion
+}): Promise<GlyphsBatchSerializeResult> => {
+  const baseDocument = createBaseGlyphsDocument(
+    input.baseFontData,
+    input.projectMetadata
+  ) as Record<string, unknown>
+  if (input.formatVersionOverride === 3) {
+    baseDocument['.formatVersion'] = 3
+  } else if (input.formatVersionOverride === 2) {
+    delete baseDocument['.formatVersion']
+  }
+
+  const formatVersion =
+    input.formatVersionOverride ?? detectGlyphsFormatVersion(baseDocument)
+  const entries = Object.entries(baseDocument).filter(
+    ([, entryValue]) => entryValue !== undefined
+  )
+  const chunks: string[] = ['{\n']
+  const warnings: GlyphsExportWarning[] = []
+  let totalGlyphs = 0
+
+  for (const [key, entryValue] of entries) {
+    chunks.push('  ', key, ' = ')
+    if (key === 'glyphs') {
+      chunks.push('(\n')
+      let wroteAnyGlyph = false
+      for await (const glyphBatch of input.glyphBatches) {
+        for (const glyph of glyphBatch) {
+          chunks.push('    ')
+          serializeOpenStepValueToChunks(
+            createGlyphsRecordFromFontDataGlyph(
+              undefined,
+              glyph,
+              formatVersion
+            ),
+            chunks,
+            2
+          )
+          chunks.push(',\n')
+          warnings.push(...getGlyphExportWarnings(glyph, formatVersion))
+          totalGlyphs += 1
+          wroteAnyGlyph = true
+        }
+      }
+      if (wroteAnyGlyph && chunks[chunks.length - 1] === ',\n') {
+        chunks[chunks.length - 1] = '\n'
+      }
+      chunks.push('  )')
+    } else {
+      serializeOpenStepValueToChunks(entryValue, chunks, 1)
+    }
+    chunks.push(';\n')
+  }
+
+  chunks.push('}\n')
+  return {
+    blob: new Blob(chunks, { type: 'text/plain;charset=utf-8' }),
+    totalGlyphs,
+    warnings,
+  }
 }

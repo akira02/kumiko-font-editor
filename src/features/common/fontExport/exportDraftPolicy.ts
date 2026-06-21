@@ -10,5 +10,9 @@ export const shouldLoadFullDraftForExport = (
   sourceFormat: ProjectSourceFormat | null | undefined
 ) =>
   formats.some(
-    (format) => format !== 'zip' || !canUseCanonicalUfoZipExport(sourceFormat)
+    (format) =>
+      format !== 'glyphs2' &&
+      format !== 'glyphs3' &&
+      format !== 'glyphspackage' &&
+      (format !== 'zip' || !canUseCanonicalUfoZipExport(sourceFormat))
   )
