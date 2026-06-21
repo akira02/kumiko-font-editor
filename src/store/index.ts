@@ -73,6 +73,7 @@ export type {
   PathNode,
   PathNodeKind,
   PathSegmentType,
+  PersistenceQueueState,
   PersistenceStatus,
   SelectedNodeRef,
   SelectedSegmentState,

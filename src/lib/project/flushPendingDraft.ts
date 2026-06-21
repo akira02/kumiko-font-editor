@@ -7,7 +7,7 @@ import type { GlyphEditTimes } from 'src/lib/glyph/glyphEditTimes'
 import type { FontData, PersistenceStatus } from 'src/store'
 import type { KumikoProjectUiState } from 'src/lib/project/projectTypes'
 
-interface FlushPendingDraftInput {
+export interface FlushPendingDraftInput {
   projectId: string
   projectTitle: string
   fontData: FontData

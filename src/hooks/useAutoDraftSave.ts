@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useFlushCurrentDraft } from 'src/hooks/useFlushCurrentDraft'
+import { buildCurrentDraftFlushInput } from 'src/lib/project/currentDraftFlush'
 import { flushPendingDraft } from 'src/lib/project/flushPendingDraft'
-import { createProjectUiStateSnapshot } from 'src/lib/project/projectUiState'
 import { useStore } from 'src/store'
 
 export const AUTO_DRAFT_SAVE_DELAY_MS = 10_000
@@ -50,28 +50,25 @@ export function useAutoDraftSave() {
     }
 
     autosaveTimerRef.current = window.setTimeout(() => {
-      void flushPendingDraft({
-        projectId,
-        projectTitle,
-        fontData,
-        projectQueued: persistenceQueue.projectQueued,
-        uiStateQueued: persistenceQueue.uiStateQueued,
-        projectUiState: createProjectUiStateSnapshot({
-          selectedGlyphId,
-          selectedLayerId,
+      void flushPendingDraft(
+        buildCurrentDraftFlushInput({
           activeMasterId,
+          deletedGlyphIds,
+          dirtyGlyphIds,
+          fontData,
+          glyphEditTimes,
+          markDraftSaved,
+          overviewGridState,
           overviewSectionId,
           overviewTopGlyphId,
-          overviewGridState,
-        }),
-        dirtyGlyphIds,
-        deletedGlyphIds,
-        persistenceRevision: persistenceQueue.revision,
-        glyphEditTimes,
-        selectedLayerId,
-        setPersistenceStatus,
-        markDraftSaved,
-      }).catch((error) => {
+          persistenceQueue,
+          projectId,
+          projectTitle,
+          selectedGlyphId,
+          selectedLayerId,
+          setPersistenceStatus,
+        })
+      ).catch((error) => {
         setPersistenceStatus('error', getErrorMessage(error))
         console.warn('Auto draft save failed.', error)
       })
@@ -95,9 +92,7 @@ export function useAutoDraftSave() {
     overviewSectionId,
     overviewTopGlyphId,
     persistenceStatus,
-    persistenceQueue.projectQueued,
-    persistenceQueue.revision,
-    persistenceQueue.uiStateQueued,
+    persistenceQueue,
     projectId,
     projectTitle,
     selectedGlyphId,

@@ -1,6 +1,6 @@
 import { useCallback } from 'react'
+import { buildCurrentDraftFlushInput } from 'src/lib/project/currentDraftFlush'
 import { flushPendingDraft } from 'src/lib/project/flushPendingDraft'
-import { createProjectUiStateSnapshot } from 'src/lib/project/projectUiState'
 import { useStore, type FontData, type PersistenceStatus } from 'src/store'
 
 interface FlushCurrentDraftOptions {
@@ -64,27 +64,24 @@ export const useFlushCurrentDraft = (
       return false
     }
 
-    return flushPendingDraft({
-      projectId: currentDraft.projectId,
-      projectTitle: currentDraft.projectTitle,
-      fontData: currentDraft.fontData,
-      projectQueued: persistenceQueue.projectQueued,
-      uiStateQueued: persistenceQueue.uiStateQueued,
-      projectUiState: createProjectUiStateSnapshot({
-        selectedGlyphId,
-        selectedLayerId,
+    return flushPendingDraft(
+      buildCurrentDraftFlushInput({
         activeMasterId,
+        deletedGlyphIds,
+        dirtyGlyphIds,
+        fontData: currentDraft.fontData,
+        glyphEditTimes,
+        markDraftSaved,
+        overviewGridState,
         overviewSectionId,
         overviewTopGlyphId,
-        overviewGridState,
-      }),
-      dirtyGlyphIds,
-      deletedGlyphIds,
-      persistenceRevision: persistenceQueue.revision,
-      glyphEditTimes,
-      selectedLayerId,
-      setPersistenceStatus,
-      markDraftSaved,
-    })
+        persistenceQueue,
+        projectId: currentDraft.projectId,
+        projectTitle: currentDraft.projectTitle,
+        selectedGlyphId,
+        selectedLayerId,
+        setPersistenceStatus,
+      })
+    )
   }, [allowErrorRetry, markDraftSaved, setPersistenceStatus])
 }
