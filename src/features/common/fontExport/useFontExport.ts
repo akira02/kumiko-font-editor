@@ -1,6 +1,6 @@
 import { useToast } from '@chakra-ui/react'
 import { zipSync } from 'fflate'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { exportFontAsBinary } from 'src/lib/fontFormats/adapters/binary'
 import {
   exportFontDataAsUfoZip,
@@ -84,22 +84,27 @@ export function useFontExport() {
   const markDraftSaved = useStore((state) => state.markDraftSaved)
   const markLocalSaved = useStore((state) => state.markLocalSaved)
   const setPersistenceStatus = useStore((state) => state.setPersistenceStatus)
-  const compilerRuntimeStatus = createCompilerRuntimeStatus()
-  const openTypeExportWarnings = fontData?.openTypeFeatures
-    ? deriveOpenTypeExportWarnings(fontData.openTypeFeatures, {
-        compilerRuntimeStatus,
-        diagnostics: validateFeatures(fontData.openTypeFeatures, fontData),
-        hasGeneratedFeatureEdits: hasManagedFeatureEdits(
-          fontData.openTypeFeatures
-        ),
-      })
-    : []
+  const compilerRuntimeStatus = useMemo(() => createCompilerRuntimeStatus(), [])
+  const openTypeExportWarnings = useMemo(
+    () =>
+      fontData?.openTypeFeatures
+        ? deriveOpenTypeExportWarnings(fontData.openTypeFeatures, {
+            compilerRuntimeStatus,
+            diagnostics: validateFeatures(fontData.openTypeFeatures, fontData),
+            hasGeneratedFeatureEdits: hasManagedFeatureEdits(
+              fontData.openTypeFeatures
+            ),
+          })
+        : [],
+    [compilerRuntimeStatus, fontData]
+  )
   const hasBlockingOpenTypeWarnings = hasBlockingExportWarnings(
     openTypeExportWarnings
   )
-  const glyphsExportWarnings = fontData
-    ? getGlyphsExportWarnings(fontData, 3)
-    : []
+  const glyphsExportWarnings = useMemo(
+    () => (fontData ? getGlyphsExportWarnings(fontData, 3) : []),
+    [fontData]
+  )
 
   const canExport = Boolean(
     fontData &&
