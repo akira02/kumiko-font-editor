@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { useStore } from 'src/store'
+import { partializeTemporalState } from 'src/store/temporalSnapshot'
 import type { FontData, GlyphData, GlyphLayerData } from 'src/store'
 
 const makeLayer = (id: string, width = 1000): GlyphLayerData => ({
@@ -48,6 +49,27 @@ const getFirstNode = (glyphId: string) => {
   return node!
 }
 
+const loadSingleGlyphProject = () => {
+  const fontData: FontData = {
+    glyphOrder: ['A'],
+    glyphs: {
+      A: makeGlyph('A'),
+    },
+  }
+  useStore.getState().loadProjectState('project-a', 'Project A', fontData)
+  useStore.getState().setSelectedGlyphId('A')
+  useStore.temporal.getState().clear()
+}
+
+const expectNoUndoCheckpoint = (name: string, action: () => void) => {
+  loadSingleGlyphProject()
+
+  action()
+
+  expect(useStore.temporal.getState().pastStates, name).toHaveLength(0)
+  useStore.getState().closeProjectState()
+}
+
 describe('temporal snapshots', () => {
   afterEach(() => {
     useStore.getState().closeProjectState()
@@ -92,6 +114,137 @@ describe('temporal snapshots', () => {
     }
 
     expect(latestSnapshot.fontData?.glyphs.B.layers).toBeDefined()
+  })
+
+  it('tracks only font data in temporal snapshots', () => {
+    loadSingleGlyphProject()
+
+    expect(Object.keys(partializeTemporalState(useStore.getState()))).toEqual([
+      'fontData',
+    ])
+  })
+
+  it('guards UI-only actions from undo history', () => {
+    const uiOnlyActions: Array<[string, () => void]> = [
+      ['setSearchQuery', () => useStore.getState().setSearchQuery('latin')],
+      [
+        'refreshFilteredGlyphList',
+        () => useStore.getState().refreshFilteredGlyphList(),
+      ],
+      ['setSelectedGlyphId', () => useStore.getState().setSelectedGlyphId('A')],
+      [
+        'setReferenceFontName',
+        () => useStore.getState().setReferenceFontName('Ref'),
+      ],
+      [
+        'setReferenceFontVisible',
+        () => useStore.getState().setReferenceFontVisible(true),
+      ],
+      [
+        'setReferenceFontChar',
+        () => useStore.getState().setReferenceFontChar('A'),
+      ],
+      [
+        'toggleBackdropLayer',
+        () => useStore.getState().toggleBackdropLayer('public.default'),
+      ],
+      [
+        'toggleActiveLayerHidden',
+        () => useStore.getState().toggleActiveLayerHidden(),
+      ],
+      ['addGlyphToEditor', () => useStore.getState().addGlyphToEditor('A')],
+      [
+        'insertGlyphIntoEditor',
+        () => useStore.getState().insertGlyphIntoEditor('A'),
+      ],
+      [
+        'removeGlyphFromEditor',
+        () => {
+          useStore.getState().addGlyphToEditor('A')
+          useStore.temporal.getState().clear()
+          useStore.getState().removeGlyphFromEditor('A')
+        },
+      ],
+      [
+        'setEditorTextCursorIndex',
+        () => useStore.getState().setEditorTextCursorIndex(0),
+      ],
+      [
+        'setEditorActiveGlyphIndex',
+        () => useStore.getState().setEditorActiveGlyphIndex(0),
+      ],
+      [
+        'setEditorTextState',
+        () => useStore.getState().setEditorTextState('A', ['A'], 1, 0),
+      ],
+      [
+        'setWorkspaceView',
+        () => useStore.getState().setWorkspaceView('editor'),
+      ],
+      [
+        'setOverviewGrouping',
+        () => useStore.getState().setOverviewGrouping('script'),
+      ],
+      [
+        'setOverviewSectionId',
+        () => useStore.getState().setOverviewSectionId('blank'),
+      ],
+      [
+        'setOverviewGridState',
+        () => useStore.getState().setOverviewGridState({ top: 10 }),
+      ],
+      [
+        'setOverviewTopGlyphId',
+        () => useStore.getState().setOverviewTopGlyphId('A'),
+      ],
+      [
+        'setSelectedNodeIds',
+        () => useStore.getState().setSelectedNodeIds(['public.default-node']),
+      ],
+      [
+        'setSelectedSegment',
+        () =>
+          useStore.getState().setSelectedSegment({
+            pathId: 'public.default-path',
+            startNodeId: 'public.default-node',
+            endNodeId: 'public.default-node',
+            type: 'line',
+          }),
+      ],
+      ['updateViewport', () => useStore.getState().updateViewport(1, 12, 34)],
+      [
+        'setPreviewGlyphMetrics',
+        () =>
+          useStore
+            .getState()
+            .setPreviewGlyphMetrics('A', { width: 1000, lsb: 0, rsb: 0 }),
+      ],
+      [
+        'clearPreviewGlyphMetrics',
+        () => {
+          useStore
+            .getState()
+            .setPreviewGlyphMetrics('A', { width: 1000, lsb: 0, rsb: 0 })
+          useStore.temporal.getState().clear()
+          useStore.getState().clearPreviewGlyphMetrics('A')
+        },
+      ],
+      [
+        'setComponentGhostPaths',
+        () => useStore.getState().setComponentGhostPaths([]),
+      ],
+      [
+        'setComponentTargetRect',
+        () =>
+          useStore
+            .getState()
+            .setComponentTargetRect({ xMin: 0, yMin: 0, xMax: 10, yMax: 10 }),
+      ],
+    ]
+
+    for (const [name, action] of uiOnlyActions) {
+      expectNoUndoCheckpoint(name, action)
+    }
   })
 
   it('does not store UI-only updates as undo checkpoints', () => {
