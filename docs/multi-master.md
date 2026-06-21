@@ -154,7 +154,7 @@ master 名稱無固定字串（Glyphs 的 `customName`、designspace 的 source 
 
 ### M4 — 匯出與 Master / sparse layer 管理（已完成）
 
-- 匯出 `exportMultiMasterUfoZip`：每 source 一個 `.ufo` + `serializeDesignspace` 產生的 `.designspace`，一包 zip。
+- 匯出走 canonical project records：`buildKumikoUfoExportManifest` 依 source 產生 `.ufo`，並用 `serializeDesignspace` 產生 `.designspace`，zip worker 分批寫出 GLIF。
 - sparse layer 建立：layer 面板列出缺漏的 master，`createGlyphMasterLayer` 自作用中 layer 複製建立。
 - master 新增 / 刪除 / 改名：沿用 `FontSourcesTab`；`updateFontSettings` 在 source 刪除/改名時同步清理/更新每字 layer 與 active 參照。
 

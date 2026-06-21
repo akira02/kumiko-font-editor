@@ -1,3 +1,5 @@
+import 'fake-indexeddb/auto'
+
 import { describe, expect, it } from 'vitest'
 import { Window } from 'happy-dom'
 import { strFromU8, unzipSync } from 'fflate'
@@ -11,12 +13,12 @@ import {
   resolveSourceRefs,
   resolveDefaultSourceRef,
 } from 'src/lib/fontFormats/ufoFormat'
-import { exportMultiMasterUfoZip } from 'src/lib/fontFormats/fontUfoZipExport'
 import { getGlyphLayer } from 'src/store/glyphLayer'
 import type {
   UfoGlyphRecord,
   UfoMetadataRecord,
 } from 'src/lib/fontFormats/ufoTypes'
+import { exportCanonicalFontDataAsUfoZip } from './canonicalUfoExportTestUtils'
 
 const testWindow = new Window()
 globalThis.DOMParser ??= testWindow.DOMParser as typeof globalThis.DOMParser
@@ -271,7 +273,7 @@ describe('serializeDesignspace round-trip', () => {
   })
 })
 
-describe('exportMultiMasterUfoZip', () => {
+describe('canonical multi-master UFO export', () => {
   const fontData = () =>
     buildMultiMasterFontData(
       [metadata('sources/Light.ufo'), metadata('sources/Bold.ufo')],
@@ -283,10 +285,11 @@ describe('exportMultiMasterUfoZip', () => {
     )
 
   it('writes a designspace plus one ufo per source', async () => {
-    const blob = exportMultiMasterUfoZip({
+    const blob = await exportCanonicalFontDataAsUfoZip({
       fontData: fontData(),
-      projectId: 'p',
+      projectId: 'canonical-multi-master-basic',
       projectTitle: 'Fam',
+      projectSourceFormat: 'glyphs',
     })
     const files = unzipSync(new Uint8Array(await blob.arrayBuffer()))
     const paths = Object.keys(files)
@@ -381,10 +384,11 @@ describe('exportMultiMasterUfoZip', () => {
       'bracket',
     ]
 
-    const blob = exportMultiMasterUfoZip({
+    const blob = await exportCanonicalFontDataAsUfoZip({
       fontData: data,
-      projectId: 'p',
+      projectId: 'canonical-multi-master-special-layers',
       projectTitle: 'Fam',
+      projectSourceFormat: 'glyphs',
     })
     const files = unzipSync(new Uint8Array(await blob.arrayBuffer()))
     const designspaceText = strFromU8(files['Fam.designspace'])
@@ -401,7 +405,7 @@ describe('exportMultiMasterUfoZip', () => {
     })
     expect(
       Object.keys(files).some((path) =>
-        path.endsWith('glyphs/A.bracket.bracket.glif')
+        /^.+\.ufo\/glyphs\/.+bracket\.bracket\.glif$/.test(path)
       )
     ).toBe(true)
     expect(
@@ -412,10 +416,11 @@ describe('exportMultiMasterUfoZip', () => {
   })
 
   it("each source ufo carries that source's outline", async () => {
-    const blob = exportMultiMasterUfoZip({
+    const blob = await exportCanonicalFontDataAsUfoZip({
       fontData: fontData(),
-      projectId: 'p',
+      projectId: 'canonical-multi-master-outlines',
       projectTitle: 'Fam',
+      projectSourceFormat: 'glyphs',
     })
     const files = unzipSync(new Uint8Array(await blob.arrayBuffer()))
     expect(strFromU8(files['Light.ufo/glyphs/A.glif'])).toContain('x="10"')

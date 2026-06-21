@@ -7,7 +7,6 @@ import { unzipSync, strFromU8 } from 'fflate'
 import { Window } from 'happy-dom'
 import { describe, expect, it } from 'vitest'
 
-import { exportFontDataAsUfoZip } from 'src/lib/fontFormats/fontUfoZipExport'
 import {
   importUfoWorkspaceEntries,
   glyphRecordToLayerContent,
@@ -20,6 +19,7 @@ import {
 import type { UfoGlyphRecord } from 'src/lib/fontFormats/ufoTypes'
 import type { FontData, GlyphData } from 'src/store'
 import { getGlyphLayer } from 'src/store/glyphLayer'
+import { exportCanonicalFontDataAsUfoZip } from './canonicalUfoExportTestUtils'
 const layerOf = (g: GlyphData) => getGlyphLayer(g, null)!
 
 const testWindow = new Window()
@@ -71,11 +71,12 @@ describe('UFO import → export → reimport round-trip', () => {
     const entries = await readUfoEntries()
     const first = await importWorkspace(entries, UFO_NAME)
 
-    const blob = exportFontDataAsUfoZip({
+    const blob = await exportCanonicalFontDataAsUfoZip({
       fontData: first.fontData,
-      projectId: first.project.projectId,
+      projectId: 'canonical-ufo-roundtrip-full',
       projectTitle: 'OpenSourceFont',
-      selectedLayerId: null,
+      projectSourceData: first.projectSourceData,
+      projectSourceFormat: first.projectSourceFormat,
     })
     const zipBytes = new Uint8Array(await blob.arrayBuffer())
     const reentries = zipToEntries(zipBytes)
@@ -113,11 +114,12 @@ describe('UFO import → export → reimport round-trip', () => {
   it('keeps kerning and feature sources in the exported UFO', async () => {
     const entries = await readUfoEntries()
     const first = await importWorkspace(entries, UFO_NAME)
-    const blob = exportFontDataAsUfoZip({
+    const blob = await exportCanonicalFontDataAsUfoZip({
       fontData: first.fontData,
-      projectId: first.project.projectId,
+      projectId: 'canonical-ufo-roundtrip-metadata',
       projectTitle: 'OpenSourceFont',
-      selectedLayerId: null,
+      projectSourceData: first.projectSourceData,
+      projectSourceFormat: first.projectSourceFormat,
     })
     const files = unzipSync(new Uint8Array(await blob.arrayBuffer()))
     const paths = Object.keys(files)
@@ -216,11 +218,12 @@ describe('UFO import → export → reimport round-trip', () => {
       y: 20,
     })
 
-    const blob = exportFontDataAsUfoZip({
+    const blob = await exportCanonicalFontDataAsUfoZip({
       fontData: imported.fontData,
-      projectId: imported.project.projectId,
+      projectId: 'canonical-ufo-roundtrip-background',
       projectTitle: 'OpenSourceFont',
-      selectedLayerId: null,
+      projectSourceData: imported.projectSourceData,
+      projectSourceFormat: imported.projectSourceFormat,
     })
     const files = unzipSync(new Uint8Array(await blob.arrayBuffer()))
     expect(
