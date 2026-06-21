@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  defaultGlyphPackages,
+  loadDefaultGlyphPackages,
   type DefaultGlyphPackage,
+  type GlyphPackageGroup,
 } from 'src/features/fontOverview/data/defaultGlyphPackages'
 import {
   buildGlyphLookupMap,
@@ -18,9 +19,12 @@ export interface GlyphPackageSelection {
 }
 
 interface UseGlyphPackageSelectionOptions {
+  activeGroupId: GlyphPackageGroup
   glyphMap: Record<string, GlyphData>
   onSelectionChange: (selection: GlyphPackageSelection) => void
 }
+
+const EMPTY_GLYPH_PACKAGES: DefaultGlyphPackage[] = []
 
 const getPackageGlyphNames = (packages: DefaultGlyphPackage[]) => {
   const glyphNames = new Set<string>()
@@ -48,53 +52,99 @@ const addPackageDependencies = (
 
 const removePackageDependents = (
   nextSelectedIds: Set<string>,
-  removedPackageId: string
+  removedPackageId: string,
+  loadedPackages: DefaultGlyphPackage[]
 ) => {
   nextSelectedIds.delete(removedPackageId)
-  for (const glyphPackage of defaultGlyphPackages) {
+  for (const glyphPackage of loadedPackages) {
     if (
       nextSelectedIds.has(glyphPackage.id) &&
       glyphPackage.dependsOn.includes(removedPackageId)
     ) {
-      removePackageDependents(nextSelectedIds, glyphPackage.id)
+      removePackageDependents(nextSelectedIds, glyphPackage.id, loadedPackages)
     }
   }
 }
 
 export function useGlyphPackageSelection({
+  activeGroupId,
   glyphMap,
   onSelectionChange,
 }: UseGlyphPackageSelectionOptions) {
   const [selectedPackageIds, setSelectedPackageIds] = useState<Set<string>>(
     () => new Set(['zh-basic'])
   )
+  const [packagesByGroup, setPackagesByGroup] = useState<
+    Partial<Record<GlyphPackageGroup, DefaultGlyphPackage[]>>
+  >({})
+  const [errorsByGroup, setErrorsByGroup] = useState<
+    Partial<Record<GlyphPackageGroup, string>>
+  >({})
+
+  useEffect(() => {
+    if (packagesByGroup[activeGroupId] || errorsByGroup[activeGroupId]) {
+      return
+    }
+
+    let cancelled = false
+
+    loadDefaultGlyphPackages(activeGroupId).then(
+      (packages) => {
+        if (cancelled) {
+          return
+        }
+        setPackagesByGroup((current) => ({
+          ...current,
+          [activeGroupId]: packages,
+        }))
+      },
+      (error: Error) => {
+        if (cancelled) {
+          return
+        }
+        setErrorsByGroup((current) => ({
+          ...current,
+          [activeGroupId]: error.message,
+        }))
+      }
+    )
+
+    return () => {
+      cancelled = true
+    }
+  }, [activeGroupId, errorsByGroup, packagesByGroup])
+
+  const activeGroupPackages =
+    packagesByGroup[activeGroupId] ?? EMPTY_GLYPH_PACKAGES
+  const activeGroupError = errorsByGroup[activeGroupId] ?? null
+  const loadedPackages = useMemo(
+    () => Object.values(packagesByGroup).flat(),
+    [packagesByGroup]
+  )
   const packageById = useMemo(
     () =>
       new Map(
-        defaultGlyphPackages.map((glyphPackage) => [
-          glyphPackage.id,
-          glyphPackage,
-        ])
+        loadedPackages.map((glyphPackage) => [glyphPackage.id, glyphPackage])
       ),
-    []
+    [loadedPackages]
   )
   const glyphLookup = useMemo(() => buildGlyphLookupMap(glyphMap), [glyphMap])
   const coverageByPackageId = useMemo(
     () =>
       new Map(
-        defaultGlyphPackages.map((glyphPackage) => [
+        activeGroupPackages.map((glyphPackage) => [
           glyphPackage.id,
           computeCharsetCoverage(glyphPackage, glyphLookup),
         ])
       ),
-    [glyphLookup]
+    [activeGroupPackages, glyphLookup]
   )
   const selectedPackages = useMemo(
     () =>
-      defaultGlyphPackages.filter((glyphPackage) =>
+      loadedPackages.filter((glyphPackage) =>
         selectedPackageIds.has(glyphPackage.id)
       ),
-    [selectedPackageIds]
+    [loadedPackages, selectedPackageIds]
   )
   const selectedGlyphNames = useMemo(
     () => getPackageGlyphNames(selectedPackages),
@@ -135,18 +185,26 @@ export function useGlyphPackageSelection({
       setSelectedPackageIds((current) => {
         const nextSelectedIds = new Set(current)
         if (nextSelectedIds.has(glyphPackage.id)) {
-          removePackageDependents(nextSelectedIds, glyphPackage.id)
+          removePackageDependents(
+            nextSelectedIds,
+            glyphPackage.id,
+            loadedPackages
+          )
         } else {
           addPackageDependencies(nextSelectedIds, glyphPackage, packageById)
         }
         return nextSelectedIds
       })
     },
-    [packageById]
+    [loadedPackages, packageById]
   )
 
   return {
+    activeGroupError,
+    activeGroupPackages,
     coverageByPackageId,
+    isLoadingActiveGroup:
+      !packagesByGroup[activeGroupId] && activeGroupError === null,
     selectedPackageIds,
     togglePackage,
   }

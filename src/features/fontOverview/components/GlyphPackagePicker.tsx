@@ -14,9 +14,10 @@ import {
   WrapItem,
 } from '@chakra-ui/react'
 import { Plus } from 'iconoir-react'
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import {
-  defaultGlyphPackages,
+  defaultGlyphPackageGroups,
+  firstDefaultGlyphPackageGroupId,
   type DefaultGlyphPackage,
   type GlyphPackageGroup,
 } from 'src/features/fontOverview/data/defaultGlyphPackages'
@@ -35,18 +36,9 @@ interface GlyphPackagePickerProps {
   onSelectionChange: (selection: GlyphPackageSelection) => void
 }
 
-const packageGroups: Array<{ id: GlyphPackageGroup; label: string }> = [
-  { id: 'zh-jf7000', label: '繁體中文' },
-  { id: 'latin', label: '拉丁字母' },
-  { id: 'japanese', label: '日文' },
-  { id: 'symbols', label: '符號' },
-]
-
 const groupLabelById = new Map(
-  packageGroups.map((group) => [group.id, group.label])
+  defaultGlyphPackageGroups.map((group) => [group.id, group.label])
 )
-
-const firstPackageGroupId = packageGroups[0]?.id ?? 'zh-jf7000'
 
 const getPackagesBySection = (packages: DefaultGlyphPackage[]) => {
   const sections = new Map<string, DefaultGlyphPackage[]>()
@@ -161,7 +153,7 @@ function PackageGroupSidebar({
 }: PackageGroupSidebarProps) {
   return (
     <Stack spacing={2}>
-      {packageGroups.map((group) => {
+      {defaultGlyphPackageGroups.map((group) => {
         const isActive = activeGroupId === group.id
         return (
           <Button
@@ -394,22 +386,22 @@ export function GlyphPackagePicker({
   glyphMap,
   onSelectionChange,
 }: GlyphPackagePickerProps) {
-  const [activeGroupId, setActiveGroupId] =
-    useState<GlyphPackageGroup>(firstPackageGroupId)
-
-  const { coverageByPackageId, selectedPackageIds, togglePackage } =
-    useGlyphPackageSelection({
-      glyphMap,
-      onSelectionChange,
-    })
-
-  const activeGroupPackages = useMemo(
-    () =>
-      defaultGlyphPackages.filter(
-        (glyphPackage) => glyphPackage.group === activeGroupId
-      ),
-    [activeGroupId]
+  const [activeGroupId, setActiveGroupId] = useState<GlyphPackageGroup>(
+    firstDefaultGlyphPackageGroupId
   )
+
+  const {
+    activeGroupError,
+    activeGroupPackages,
+    coverageByPackageId,
+    isLoadingActiveGroup,
+    selectedPackageIds,
+    togglePackage,
+  } = useGlyphPackageSelection({
+    activeGroupId,
+    glyphMap,
+    onSelectionChange,
+  })
 
   return (
     <Grid
@@ -441,12 +433,22 @@ export function GlyphPackagePicker({
             display="flex"
             flexDirection="column"
           >
-            <PackageCardsArea
-              packages={activeGroupPackages}
-              coverageByPackageId={coverageByPackageId}
-              selectedPackageIds={selectedPackageIds}
-              onTogglePackage={togglePackage}
-            />
+            {activeGroupError ? (
+              <Text color="red.500" fontSize="sm">
+                {activeGroupError}
+              </Text>
+            ) : isLoadingActiveGroup && activeGroupPackages.length === 0 ? (
+              <Text color="field.muted" fontSize="sm">
+                字集載入中...
+              </Text>
+            ) : (
+              <PackageCardsArea
+                packages={activeGroupPackages}
+                coverageByPackageId={coverageByPackageId}
+                selectedPackageIds={selectedPackageIds}
+                onTogglePackage={togglePackage}
+              />
+            )}
           </Box>
           <PackageGroupSource groupId={activeGroupId} />
         </Stack>
