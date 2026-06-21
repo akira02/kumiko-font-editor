@@ -22,8 +22,8 @@ import {
   markGitHubCommitSynced,
   prepareGitHubCommit,
 } from 'src/lib/github/githubPr'
+import { buildCurrentDraftFlushInput } from 'src/lib/project/currentDraftFlush'
 import { flushPendingDraft } from 'src/lib/project/flushPendingDraft'
-import { createProjectUiStateSnapshot } from 'src/lib/project/projectUiState'
 import { useStore, type FontData } from 'src/store'
 import type { GlyphEditTimes } from 'src/lib/glyph/glyphEditTimes'
 import {
@@ -315,28 +315,25 @@ export const useGitHubCommitFlow = ({
 
     try {
       setIsPreparingGitHubCommit(true)
-      await flushPendingDraft({
-        projectId,
-        projectTitle,
-        fontData,
-        projectQueued: persistenceQueue.projectQueued,
-        uiStateQueued: persistenceQueue.uiStateQueued,
-        projectUiState: createProjectUiStateSnapshot({
-          selectedGlyphId,
-          selectedLayerId,
+      await flushPendingDraft(
+        buildCurrentDraftFlushInput({
           activeMasterId,
+          deletedGlyphIds: localDeletedGlyphIds,
+          dirtyGlyphIds: localDirtyGlyphIds,
+          fontData,
+          glyphEditTimes,
+          markDraftSaved,
+          overviewGridState,
           overviewSectionId,
           overviewTopGlyphId,
-          overviewGridState,
-        }),
-        dirtyGlyphIds: localDirtyGlyphIds,
-        deletedGlyphIds: localDeletedGlyphIds,
-        persistenceRevision: persistenceQueue.revision,
-        glyphEditTimes,
-        selectedLayerId,
-        setPersistenceStatus,
-        markDraftSaved,
-      })
+          persistenceQueue,
+          projectId,
+          projectTitle,
+          selectedGlyphId,
+          selectedLayerId,
+          setPersistenceStatus,
+        })
+      )
       const preparedCommit = await prepareGitHubCommit({
         projectId,
         projectTitle,
@@ -466,28 +463,25 @@ export const useGitHubCommitFlow = ({
     }
 
     try {
-      await flushPendingDraft({
-        projectId,
-        projectTitle,
-        fontData,
-        projectQueued: persistenceQueue.projectQueued,
-        uiStateQueued: persistenceQueue.uiStateQueued,
-        projectUiState: createProjectUiStateSnapshot({
-          selectedGlyphId,
-          selectedLayerId: activeLayerId,
+      await flushPendingDraft(
+        buildCurrentDraftFlushInput({
           activeMasterId,
+          deletedGlyphIds: localDeletedGlyphIds,
+          dirtyGlyphIds: localDirtyGlyphIds,
+          fontData,
+          glyphEditTimes,
+          markDraftSaved,
+          overviewGridState,
           overviewSectionId,
           overviewTopGlyphId,
-          overviewGridState,
-        }),
-        dirtyGlyphIds: localDirtyGlyphIds,
-        deletedGlyphIds: localDeletedGlyphIds,
-        persistenceRevision: persistenceQueue.revision,
-        glyphEditTimes,
-        selectedLayerId: activeLayerId,
-        setPersistenceStatus,
-        markDraftSaved,
-      })
+          persistenceQueue,
+          projectId,
+          projectTitle,
+          selectedGlyphId,
+          selectedLayerId: activeLayerId,
+          setPersistenceStatus,
+        })
+      )
 
       const preparedCommit = await prepareGitHubCommit({
         projectId,
