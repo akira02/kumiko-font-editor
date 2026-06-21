@@ -83,7 +83,6 @@ export function OverviewContent({
         : -1,
     [activeSection.glyphs, topGlyphId]
   )
-
   useEffect(
     () => () => {
       if (restoreFrameRef.current !== null) {

@@ -7,20 +7,57 @@
 }
 
 /* View Transition: root cross-fade */
+::view-transition-group(root) {
+  z-index: 0;
+}
+
 ::view-transition-old(root),
 ::view-transition-new(root) {
-  animation-duration: 250ms;
+  animation-duration: 260ms;
   animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* View Transition: glyph card → canvas shared element morph */
+@keyframes glyph-preview-vt-old {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes glyph-preview-vt-new {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
 ::view-transition-group(glyph-preview) {
   animation-duration: 380ms;
   animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 10;
 }
 
 ::view-transition-old(glyph-preview),
 ::view-transition-new(glyph-preview) {
   animation-duration: 380ms;
   animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  height: 100%;
+  object-fit: contain;
+  overflow: clip;
+  width: 100%;
+}
+
+::view-transition-old(glyph-preview) {
+  animation-name: glyph-preview-vt-old;
+}
+
+::view-transition-new(glyph-preview) {
+  animation-name: glyph-preview-vt-new;
 }

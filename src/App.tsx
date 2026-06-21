@@ -1,4 +1,5 @@
 import { lazy, Suspense } from 'react'
+import { OverviewReturnHeroOverlay } from 'src/features/fontOverview/OverviewReturnHeroOverlay'
 import { useAutoDraftSave } from 'src/hooks/useAutoDraftSave'
 import { useProjectBroadcastSync } from 'src/hooks/useProjectBroadcastSync'
 import { useStore } from 'src/store'
@@ -34,16 +35,22 @@ function App() {
 
   if (workspaceView === 'overview') {
     return (
-      <Suspense fallback={null}>
-        <FontOverviewScreen />
-      </Suspense>
+      <>
+        <Suspense fallback={null}>
+          <FontOverviewScreen />
+        </Suspense>
+        <OverviewReturnHeroOverlay />
+      </>
     )
   }
 
   return (
-    <Suspense fallback={null}>
-      <EditorLayout />
-    </Suspense>
+    <>
+      <Suspense fallback={null}>
+        <EditorLayout />
+      </Suspense>
+      <OverviewReturnHeroOverlay />
+    </>
   )
 }
 

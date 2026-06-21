@@ -847,6 +847,7 @@ export function CanvasWorkspace() {
     <Box position="relative" w="100%" h="100%" bg="white" overflow="hidden">
       <canvas
         ref={canvasRef}
+        data-editor-canvas="true"
         style={{
           width: '100%',
           height: '100%',

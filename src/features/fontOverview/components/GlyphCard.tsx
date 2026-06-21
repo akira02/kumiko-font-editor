@@ -6,12 +6,14 @@ import {
 } from 'src/lib/glyph/glyphOverview'
 import { useStore, type GlyphData } from 'src/store'
 
-const GlyphPreview = memo(function GlyphPreview({
+export const GlyphPreview = memo(function GlyphPreview({
   glyph,
   glyphMap,
+  inheritFallbackColor = false,
 }: {
   glyph: GlyphData
   glyphMap: Record<string, GlyphData>
+  inheritFallbackColor?: boolean
 }) {
   const unitsPerEm = useStore((state) => state.fontData?.unitsPerEm)
   const activeMasterId = useStore((state) => state.activeMasterId)
@@ -31,7 +33,7 @@ const GlyphPreview = memo(function GlyphPreview({
           textAlign="center"
           fontSize={displayCharacter.length > 1 ? 'sm' : '6xl'}
           fontWeight="900"
-          color="field.haze"
+          color={inheritFallbackColor ? 'currentColor' : 'field.haze'}
           lineHeight={1}
           userSelect="none"
         >
@@ -120,6 +122,7 @@ export const GlyphCard = memo(function GlyphCard({
       <Stack spacing={1} h="100%">
         <Flex align="center" justify="center" h="104px" borderRadius="sm">
           <Box
+            data-overview-glyph-preview-id={glyph.id}
             w="100%"
             h="100%"
             style={

@@ -3,7 +3,8 @@ import { useMemo, useCallback } from 'react'
 import { flushSync } from 'react-dom'
 import { useStore } from 'src/store'
 import { LeftPanelContent } from 'src/features/editor/leftPanel/components/LeftPanelContent'
-import { setPendingOverviewTransitionGlyphId } from 'src/features/fontOverview/pendingOverviewTransitionGlyphId'
+import { getEditorGlyphHeroSourceRect } from 'src/features/fontOverview/overviewReturnHeroGeometry'
+import { startOverviewReturnHeroOverlay } from 'src/features/fontOverview/overviewReturnHeroOverlayStore'
 
 export function LeftPanel() {
   const fontData = useStore((state) => state.fontData)
@@ -24,18 +25,33 @@ export function LeftPanel() {
     : null
 
   const handleBack = useCallback(() => {
-    if (selectedGlyphId) {
-      setPendingOverviewTransitionGlyphId(selectedGlyphId)
+    const transitionGlyphId = selectedGlyphId
+    const hasStartViewTransition = 'startViewTransition' in document
+    const sourceRect = getEditorGlyphHeroSourceRect()
+
+    const armReturnOverlay = () => {
+      if (!transitionGlyphId) {
+        return
+      }
+
+      startOverviewReturnHeroOverlay(transitionGlyphId, sourceRect)
     }
-    if (!('startViewTransition' in document)) {
-      setWorkspaceView('overview')
+
+    if (!hasStartViewTransition) {
+      flushSync(() => {
+        setWorkspaceView('overview')
+      })
+      window.requestAnimationFrame(() => {
+        armReturnOverlay()
+      })
       return
     }
-    ;(
-      document as Document & { startViewTransition: (cb: () => void) => void }
-    ).startViewTransition(() => {
+
+    const transition = document.startViewTransition(() => {
       flushSync(() => setWorkspaceView('overview'))
     })
+
+    void transition.ready.then(armReturnOverlay).catch(armReturnOverlay)
   }, [selectedGlyphId, setWorkspaceView])
 
   return (

@@ -1,5 +1,5 @@
 import { Grid, GridItem } from '@chakra-ui/react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import type { ListRange } from 'react-virtuoso'
 import { useStore, type GlyphData } from 'src/store'
@@ -9,8 +9,8 @@ import {
   buildGlyphPreviewData,
   buildGlyphPreviewFontRect,
 } from 'src/lib/glyph/glyphOverview'
+import { setEditorViewTransitionLandingGlyphId } from 'src/features/editor/editorViewTransitionLandingStore'
 import { setPendingEditorViewportRect } from 'src/features/editor/pendingEditorViewport'
-import { consumePendingOverviewTransitionGlyphId } from 'src/features/fontOverview/pendingOverviewTransitionGlyphId'
 import { loadProjectGlyphGeometryClosure } from 'src/lib/project/projectRepository'
 import { AddGlyphModal } from 'src/features/fontOverview/components/AddGlyphModal'
 import { OverviewContent } from 'src/features/fontOverview/components/OverviewContent'
@@ -33,13 +33,7 @@ export function FontOverviewScreen() {
   const [showOnlyEmptyGlyphs, setShowOnlyEmptyGlyphs] = useState(false)
   const [transitioningGlyphId, setTransitioningGlyphId] = useState<
     string | null
-  >(() => consumePendingOverviewTransitionGlyphId())
-  const mountedWithBackTransition = useRef(transitioningGlyphId !== null)
-  useEffect(() => {
-    if (!mountedWithBackTransition.current) return
-    const timerId = setTimeout(() => setTransitioningGlyphId(null), 500)
-    return () => clearTimeout(timerId)
-  }, [])
+  >(null)
   const currentSearchQuery = useStore((state) => state.currentSearchQuery)
   const setSearchQuery = useStore((state) => state.setSearchQuery)
   const filteredGlyphList = useStore((state) => state.filteredGlyphList)
@@ -282,14 +276,20 @@ export function FontOverviewScreen() {
         return
       }
 
-      flushSync(() => setTransitioningGlyphId(glyphId))
-      ;(
+      flushSync(() => {
+        setEditorViewTransitionLandingGlyphId(glyphId)
+        setTransitioningGlyphId(glyphId)
+      })
+      const transition = (
         document as Document & { startViewTransition: (cb: () => void) => void }
       ).startViewTransition(() => {
         flushSync(() => {
           setTransitioningGlyphId(null)
           setWorkspaceView('editor')
         })
+      })
+      void transition.ready.finally(() => {
+        setEditorViewTransitionLandingGlyphId(null)
       })
     },
     [
