@@ -578,6 +578,7 @@ describe('projectRepository canonical storage', () => {
     ])
     expect(metadataDraft?.fontData?.glyphs.B.layers).toBeUndefined()
     expect(metadataDraft?.fontData?.glyphs.B.componentGlyphIds).toEqual(['A'])
+    expect(metadataDraft?.fontData?.glyphs.B.hasDrawableContent).toBe(true)
     expect(metadataDraft?.fontData?.glyphs.B.unicodes).toEqual(['0042'])
     expect(
       fullGlyph?.layers?.['public.default']?.componentRefs[0].glyphId

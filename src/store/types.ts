@@ -184,6 +184,7 @@ export interface GlyphData {
   layers?: Record<string, GlyphLayerData>
   layerOrder?: string[]
   componentGlyphIds?: string[]
+  hasDrawableContent?: boolean
   unicodes?: string[]
   export?: boolean
   category?: string | null

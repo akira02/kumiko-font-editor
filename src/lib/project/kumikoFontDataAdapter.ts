@@ -184,6 +184,13 @@ const deriveComponentGlyphIds = (
   return [...ids].sort((left, right) => left.localeCompare(right))
 }
 
+const deriveHasDrawableContent = (
+  layers: Record<string, KumikoGlyphLayerRecord>
+) =>
+  Object.values(layers).some(
+    (layer) => layer.paths.length > 0 || layer.componentRefs.length > 0
+  )
+
 const toKumikoComponentRefRecord = (
   componentRef: GlyphComponentRef
 ): KumikoGlyphComponentRefRecord => {
@@ -390,6 +397,7 @@ export const glyphDataToKumikoGlyphRecord = (input: {
   const syncDirty = input.syncDirty ?? false
   const unicodes = getGlyphUnicodes(input.glyph)
   const componentGlyphIds = deriveComponentGlyphIds(layers)
+  const hasDrawableContent = deriveHasDrawableContent(layers)
   validateInterpolableLayerOutlineKind(
     input.glyph,
     layers,
@@ -419,6 +427,7 @@ export const glyphDataToKumikoGlyphRecord = (input: {
     layerOrder: input.glyph.layerOrder ?? Object.keys(layers),
     layers,
     componentGlyphIds,
+    hasDrawableContent,
     unicodeKeys: unicodes.map((unicode) =>
       storageIndexKey(input.projectId, unicode)
     ),
@@ -514,6 +523,7 @@ export const kumikoGlyphRecordToGlyphData = (
     rightMetricsKey: record.rightMetricsKey,
     widthMetricsKey: record.widthMetricsKey,
     componentGlyphIds: record.componentGlyphIds,
+    hasDrawableContent: record.hasDrawableContent,
     customData: record.customData,
     sourceData: record.sourceData as GlyphSourceData | undefined,
   }
@@ -528,6 +538,7 @@ export const kumikoGlyphRecordToGlyphMetadata = (
   activeLayerId: null,
   layerOrder: record.layerOrder,
   componentGlyphIds: record.componentGlyphIds,
+  hasDrawableContent: record.hasDrawableContent,
   unicodes: normalizeUnicodeValues(record.unicodes),
   production: record.production,
   export: record.export,

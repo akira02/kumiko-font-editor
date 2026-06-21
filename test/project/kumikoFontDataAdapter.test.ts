@@ -127,6 +127,7 @@ describe('kumikoFontDataAdapter', () => {
       exportDirty: 1,
       syncDirty: 1,
       componentGlyphIds: ['base'],
+      hasDrawableContent: true,
       unicodeKeys: [`project-1${'\0'}0041`],
       componentRefKeys: [`project-1${'\0'}base`],
       layerOrder: ['M1', 'backup-1'],

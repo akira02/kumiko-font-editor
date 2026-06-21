@@ -1,4 +1,5 @@
 import { activeLayer, type GlyphData } from 'src/store'
+import { isGlyphGeometryLoaded } from 'src/lib/glyph/glyphGeometryState'
 import { getPrimaryGlyphUnicode } from 'src/lib/glyph/glyphUnicode'
 
 const knownBlankGlyphNames = new Set([
@@ -46,6 +47,13 @@ export const isKnownBlankGlyph = (glyph: GlyphData) => {
 }
 
 export const hasDrawableGlyphContent = (glyph: GlyphData) => {
+  if (!isGlyphGeometryLoaded(glyph)) {
+    if (glyph.hasDrawableContent !== undefined) {
+      return glyph.hasDrawableContent
+    }
+    return true
+  }
+
   const layer = activeLayer(glyph)
   return layer.paths.length > 0 || layer.componentRefs.length > 0
 }

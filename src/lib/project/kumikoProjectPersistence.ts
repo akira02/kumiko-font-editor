@@ -396,6 +396,7 @@ export const listKumikoGlyphMetadataForProject = async (projectId: string) => {
         widthMetricsKey: record.widthMetricsKey,
         layerOrder: record.layerOrder,
         componentGlyphIds: record.componentGlyphIds,
+        hasDrawableContent: record.hasDrawableContent,
         customData: record.customData,
         sourceData: record.sourceData,
       })

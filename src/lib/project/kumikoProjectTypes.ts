@@ -180,6 +180,7 @@ export interface KumikoGlyphRecord {
   layerOrder: string[]
   layers: Record<string, KumikoGlyphLayerRecord>
   componentGlyphIds: string[]
+  hasDrawableContent: boolean
   unicodeKeys: string[]
   componentRefKeys: string[]
   customData?: Record<string, unknown>
@@ -216,6 +217,7 @@ export type KumikoGlyphMetadataRecord = Pick<
   | 'widthMetricsKey'
   | 'layerOrder'
   | 'componentGlyphIds'
+  | 'hasDrawableContent'
   | 'customData'
   | 'sourceData'
 >

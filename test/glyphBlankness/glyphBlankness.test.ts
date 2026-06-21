@@ -74,4 +74,33 @@ describe('glyph blankness', () => {
     expect(isEmptyGlyphToEdit(makeGlyph({ id: 'A', drawn: false }))).toBe(true)
     expect(isEmptyGlyphToEdit(makeGlyph({ id: 'A', drawn: true }))).toBe(false)
   })
+
+  it('uses metadata drawable state for unloaded glyphs', () => {
+    expect(
+      isEmptyGlyphToEdit({
+        id: 'A',
+        name: 'A',
+        unicodes: ['0041'],
+        layerOrder: ['public.default'],
+        hasDrawableContent: true,
+      })
+    ).toBe(false)
+    expect(
+      isEmptyGlyphToEdit({
+        id: 'B',
+        name: 'B',
+        unicodes: ['0042'],
+        layerOrder: ['public.default'],
+        hasDrawableContent: false,
+      })
+    ).toBe(true)
+    expect(
+      isEmptyGlyphToEdit({
+        id: 'C',
+        name: 'C',
+        unicodes: ['0043'],
+        layerOrder: ['public.default'],
+      })
+    ).toBe(false)
+  })
 })
