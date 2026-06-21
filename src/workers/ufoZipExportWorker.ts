@@ -77,6 +77,20 @@ const writeOpfsFile = async (
   accessHandle.close()
 }
 
+const writeOpfsPath = async (
+  root: FileSystemDirectoryHandle,
+  relativePath: string,
+  content: string
+) => {
+  const segments = relativePath.split('/').filter(Boolean)
+  const fileName = segments.pop()
+  if (!fileName) {
+    return
+  }
+  const dir = await ensureOpfsDir(root, ...segments)
+  await writeOpfsFile(dir, fileName, content)
+}
+
 /** Remove an OPFS directory recursively. */
 const removeOpfsDir = async (
   parent: FileSystemDirectoryHandle,
@@ -130,6 +144,14 @@ self.onmessage = async (event: MessageEvent<ZipExportRequest>) => {
 
     const exportManifest = await buildKumikoUfoExportManifest(projectId)
     const stagingRoot = await ensureOpfsDir(opfsRoot, OPFS_STAGING_DIR)
+
+    if (exportManifest.designspace) {
+      await writeOpfsPath(
+        stagingRoot,
+        exportManifest.designspace.relativePath,
+        exportManifest.designspace.text
+      )
+    }
 
     // --- Phase 1: write all UFO files into OPFS staging ---
     const totalGlyphs = exportManifest.totalGlyphs

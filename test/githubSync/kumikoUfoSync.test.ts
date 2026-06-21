@@ -155,6 +155,138 @@ const makeFontData = (width = 500): FontData => ({
   },
 })
 
+const makeMultiSourceFontData = (): FontData => ({
+  axes: {
+    axes: [
+      {
+        name: 'Weight',
+        label: 'Weight',
+        tag: 'wght',
+        minValue: 0,
+        defaultValue: 0,
+        maxValue: 100,
+      },
+    ],
+    mappings: [],
+  },
+  sources: {
+    Light: { id: 'Light', name: 'Light', location: { Weight: 0 } },
+    Bold: { id: 'Bold', name: 'Bold', location: { Weight: 100 } },
+  },
+  glyphOrder: ['A'],
+  glyphs: {
+    A: {
+      id: 'A',
+      name: 'A',
+      unicodes: ['0041'],
+      activeLayerId: 'Light',
+      layerOrder: ['Light', 'Bold'],
+      layers: {
+        Light: {
+          id: 'Light',
+          name: 'Light',
+          type: 'master',
+          associatedMasterId: 'Light',
+          paths: [
+            {
+              id: 'light-path',
+              closed: false,
+              nodes: [
+                {
+                  id: 'light-node',
+                  kind: 'oncurve',
+                  segmentType: 'line',
+                  x: 10,
+                  y: 0,
+                },
+              ],
+            },
+          ],
+          componentRefs: [],
+          anchors: [],
+          guidelines: [],
+          metrics: { width: 500, lsb: 10, rsb: 490 },
+        },
+        Bold: {
+          id: 'Bold',
+          name: 'Bold',
+          type: 'master',
+          associatedMasterId: 'Bold',
+          paths: [
+            {
+              id: 'bold-path',
+              closed: false,
+              nodes: [
+                {
+                  id: 'bold-node',
+                  kind: 'oncurve',
+                  segmentType: 'line',
+                  x: 80,
+                  y: 0,
+                },
+              ],
+            },
+          ],
+          componentRefs: [],
+          anchors: [],
+          guidelines: [],
+          metrics: { width: 700, lsb: 80, rsb: 620 },
+        },
+      },
+    },
+  },
+})
+
+const designspaceSourceData = {
+  ufo: {
+    designspace: {
+      axes: [
+        {
+          name: 'Weight',
+          tag: 'wght',
+          minimum: 0,
+          default: 0,
+          maximum: 100,
+        },
+      ],
+      sources: [
+        { filename: 'Light.ufo', name: 'Light', location: { Weight: 0 } },
+        { filename: 'Bold.ufo', name: 'Bold', location: { Weight: 100 } },
+      ],
+    },
+    designspacePath: 'Family.designspace',
+    lastSync: null,
+    ufos: [
+      {
+        ufoId: 'Light.ufo',
+        relativePath: 'Light.ufo',
+        defaultLayerId: 'public.default',
+        layers: [{ layerId: 'public.default', glyphDir: 'glyphs' }],
+        contents: { A: 'A.glif' },
+        glyphOrder: ['A'],
+        metainfo: {},
+        fontinfoExtra: {},
+        libExtra: {},
+        groupsExtra: {},
+        kerningExtra: {},
+      },
+      {
+        ufoId: 'Bold.ufo',
+        relativePath: 'Bold.ufo',
+        defaultLayerId: 'public.default',
+        layers: [{ layerId: 'public.default', glyphDir: 'glyphs' }],
+        contents: { A: 'A.glif' },
+        glyphOrder: ['A'],
+        metainfo: {},
+        fontinfoExtra: {},
+        libExtra: {},
+        groupsExtra: {},
+        kerningExtra: {},
+      },
+    ],
+  },
+} satisfies Parameters<typeof saveProjectDraft>[0]['projectSourceData']
+
 const saveCanonicalGitHubProject = async (projectId: string) => {
   await saveProjectDraft({
     id: projectId,
@@ -434,5 +566,78 @@ describe('Kumiko GitHub UFO sync', () => {
       x: 12,
       y: 34,
     })
+  })
+
+  it('builds generic canonical designspace manifests without UFO source metadata', async () => {
+    await saveProjectDraft({
+      id: 'generic-canonical-designspace-export',
+      title: 'Family',
+      lastModified: 2,
+      createdAt: 1,
+      updatedAt: 2,
+      sourceName: 'Family.glyphs',
+      sourceType: 'local',
+      githubSource: null,
+      fontData: makeMultiSourceFontData(),
+      projectMetadata: null,
+      projectSourceData: null,
+      projectSourceFormat: 'glyphs',
+      projectRoundTripFormat: null,
+      projectGlyphsPackage: null,
+    })
+
+    const manifest = await buildKumikoUfoExportManifest(
+      'generic-canonical-designspace-export'
+    )
+    const boldManifest = manifest.ufos.find(
+      (ufo) => ufo.metadata.ufoId === 'Bold'
+    )
+    const boldBatch = await loadKumikoUfoExportGlyphBatch({
+      project: manifest.project,
+      activeUfoId: boldManifest?.metadata.ufoId ?? '',
+      contents: boldManifest?.contents ?? {},
+      glyphIds: boldManifest?.glyphIds ?? [],
+    })
+
+    expect(manifest.designspace?.relativePath).toBe('Family.designspace')
+    expect(manifest.designspace?.text).toContain('filename="Bold.ufo"')
+    expect(boldManifest?.metadata.relativePath).toBe('Bold.ufo')
+    expect(boldBatch[0]?.contours[0]?.points[0]?.x).toBe(80)
+  })
+
+  it('maps source-backed designspace UFOs to their canonical source layers', async () => {
+    await saveProjectDraft({
+      id: 'source-backed-designspace-export',
+      title: 'Family',
+      lastModified: 2,
+      createdAt: 1,
+      updatedAt: 2,
+      sourceName: 'Family.designspace',
+      sourceType: 'local',
+      githubSource: null,
+      fontData: makeMultiSourceFontData(),
+      projectMetadata: null,
+      projectSourceData: designspaceSourceData,
+      projectSourceFormat: 'designspace',
+      projectRoundTripFormat: 'ufo',
+      projectGlyphsPackage: null,
+    })
+
+    const manifest = await buildKumikoUfoExportManifest(
+      'source-backed-designspace-export'
+    )
+    const boldManifest = manifest.ufos.find(
+      (ufo) => ufo.metadata.ufoId === 'Bold.ufo'
+    )
+    const boldBatch = await loadKumikoUfoExportGlyphBatch({
+      project: manifest.project,
+      activeUfoId: boldManifest?.metadata.ufoId ?? '',
+      contents: boldManifest?.contents ?? {},
+      glyphIds: boldManifest?.glyphIds ?? [],
+    })
+
+    expect(manifest.designspace?.relativePath).toBe('Family.designspace')
+    expect(boldBatch[0]?.contours[0]?.points[0]?.x).toBe(80)
+    expect(boldBatch[0]?.advance.width).toBe(700)
   })
 })

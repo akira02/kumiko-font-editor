@@ -2,10 +2,6 @@ import { useToast } from '@chakra-ui/react'
 import { zipSync } from 'fflate'
 import { useMemo, useState } from 'react'
 import { exportFontAsBinary } from 'src/lib/fontFormats/adapters/binary'
-import {
-  exportFontDataAsUfoZip,
-  exportMultiMasterUfoZip,
-} from 'src/lib/fontFormats/fontUfoZipExport'
 import { exportUfoAsZipBlob } from 'src/lib/fontFormats/ufoZipExportClient'
 import {
   createCompilerRuntimeStatus,
@@ -157,15 +153,12 @@ export function useFontExport() {
       })
 
       const sourceFormat = getProjectArchiveSourceFormat()
-      const usesCanonicalUfoZipExport =
+      const usesSourceBackedUfoZipExport =
         canUseCanonicalUfoZipExport(sourceFormat)
       const shouldMarkProjectExportClean = selectedFormats.some(
-        (format) => format !== 'zip' || !usesCanonicalUfoZipExport
+        (format) => format !== 'zip' || !usesSourceBackedUfoZipExport
       )
-      const needsFullDraft = shouldLoadFullDraftForExport(
-        selectedFormats,
-        sourceFormat
-      )
+      const needsFullDraft = shouldLoadFullDraftForExport(selectedFormats)
       const fullDraft = needsFullDraft
         ? await loadProjectDraft(projectId)
         : null
@@ -243,10 +236,10 @@ export function useFontExport() {
           }
         }
 
-        if (format === 'zip' && usesCanonicalUfoZipExport) {
+        if (format === 'zip') {
           const result = await exportUfoAsZipBlob({
             projectId,
-            markClean: true,
+            markClean: usesSourceBackedUfoZipExport,
             onProgress: setUfoExportProgress,
           })
           return {
@@ -261,33 +254,7 @@ export function useFontExport() {
           }
         }
 
-        // Multi-master: export a .designspace + one .ufo per source, straight
-        // from fontData (which holds every master layer).
-        if (Object.keys(exportFontData.sources ?? {}).length > 1) {
-          return {
-            blob: exportMultiMasterUfoZip({
-              fontData: exportFontData,
-              projectId,
-              projectTitle: baseFileName,
-            }),
-            fileName: `${baseFileName}.designspace.zip`,
-            label: 'Designspace + UFO',
-            totalGlyphs: Object.keys(exportFontData.glyphs).length,
-          }
-        }
-
-        const blob = exportFontDataAsUfoZip({
-          fontData: exportFontData,
-          projectId,
-          projectTitle: baseFileName,
-          selectedLayerId,
-        })
-        return {
-          blob,
-          fileName: `${baseFileName}.ufo.zip`,
-          label: 'UFO ZIP',
-          totalGlyphs: Object.keys(exportFontData.glyphs).length,
-        }
+        throw new Error(`Unsupported export format: ${format}`)
       }
 
       const assets: ExportAsset[] = []

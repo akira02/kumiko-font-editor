@@ -5,14 +5,11 @@ export const canUseCanonicalUfoZipExport = (
   sourceFormat: ProjectSourceFormat | null | undefined
 ) => sourceFormat === 'ufo' || sourceFormat === 'designspace'
 
-export const shouldLoadFullDraftForExport = (
-  formats: FontExportFormat[],
-  sourceFormat: ProjectSourceFormat | null | undefined
-) =>
+export const shouldLoadFullDraftForExport = (formats: FontExportFormat[]) =>
   formats.some(
     (format) =>
       format !== 'glyphs2' &&
       format !== 'glyphs3' &&
       format !== 'glyphspackage' &&
-      (format !== 'zip' || !canUseCanonicalUfoZipExport(sourceFormat))
+      format !== 'zip'
   )
