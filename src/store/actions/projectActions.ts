@@ -16,7 +16,10 @@ import type { KumikoProjectUiState } from 'src/lib/project/projectTypes'
 import type { GlyphEditTimes } from 'src/lib/glyph/glyphEditTimes'
 import { getProjectGlyphEditTimes } from 'src/lib/glyph/glyphEditTimes'
 import { isGlyphGeometryLoaded } from 'src/lib/glyph/glyphGeometryState'
-import { syncEditorTextFromGlyphIds } from 'src/store/editorLine'
+import {
+  clampEditorCursorIndex,
+  syncEditorTextFromGlyphIds,
+} from 'src/store/editorLine'
 import { syncFilteredGlyphList } from 'src/store/glyphSearch'
 import { evictGlyphGeometry } from 'src/store/glyphGeometryEviction'
 import {
@@ -221,6 +224,72 @@ export const buildProjectActions = (
             state.selectedLayerId
           ]
         ) {
+          setGlyphActiveLayer(
+            state.fontData.glyphs[state.selectedGlyphId],
+            state.selectedLayerId
+          )
+        }
+        syncFilteredGlyphList(state)
+      })
+    }),
+
+  hydrateExternalGlyphDeletions: (glyphIds: string[]) =>
+    withTemporalPaused(() => {
+      set((state) => {
+        if (!state.fontData || glyphIds.length === 0) {
+          return
+        }
+
+        const deletedGlyphIds = new Set(
+          glyphIds.filter((glyphId) => Boolean(state.fontData?.glyphs[glyphId]))
+        )
+        if (deletedGlyphIds.size === 0) {
+          return
+        }
+
+        for (const glyphId of deletedGlyphIds) {
+          delete state.fontData.glyphs[glyphId]
+          delete state.glyphGeometryAccess[glyphId]
+        }
+        state.fontData.glyphOrder = (
+          state.fontData.glyphOrder ?? Object.keys(state.fontData.glyphs)
+        ).filter((glyphId) => !deletedGlyphIds.has(glyphId))
+        state.editorGlyphIds = state.editorGlyphIds.filter(
+          (glyphId) => !deletedGlyphIds.has(glyphId)
+        )
+        syncEditorTextFromGlyphIds(state)
+        state.editorTextCursorIndex = clampEditorCursorIndex(
+          state,
+          state.editorTextCursorIndex
+        )
+        if (
+          state.previewGlyphMetrics &&
+          deletedGlyphIds.has(state.previewGlyphMetrics.glyphId)
+        ) {
+          state.previewGlyphMetrics = null
+        }
+        if (
+          state.selectedGlyphId &&
+          deletedGlyphIds.has(state.selectedGlyphId)
+        ) {
+          const fallbackGlyphId =
+            state.editorGlyphIds[
+              Math.max(0, state.editorTextCursorIndex - 1)
+            ] ??
+            state.editorGlyphIds[0] ??
+            Object.keys(state.fontData.glyphs)[0] ??
+            null
+          state.selectedGlyphId = fallbackGlyphId
+          state.editorActiveGlyphIndex = state.editorGlyphIds.indexOf(
+            fallbackGlyphId ?? ''
+          )
+          if (state.editorActiveGlyphIndex < 0) {
+            state.editorActiveGlyphIndex = 0
+          }
+          state.selectedNodeIds = []
+          state.selectedSegment = null
+        }
+        if (state.selectedGlyphId) {
           setGlyphActiveLayer(
             state.fontData.glyphs[state.selectedGlyphId],
             state.selectedLayerId

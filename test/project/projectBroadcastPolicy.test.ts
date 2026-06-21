@@ -101,6 +101,12 @@ describe('project broadcast policy', () => {
         { isDirty: true, localDirtyGlyphIds: ['A'] },
         makeMessage({ deletedGlyphIds: ['B'] })
       )
+    ).toBe(true)
+    expect(
+      canMergeProjectBroadcastWhileDirty(
+        { isDirty: true, localDirtyGlyphIds: ['A'] },
+        makeMessage({ deletedGlyphIds: ['A'] })
+      )
     ).toBe(false)
   })
 })

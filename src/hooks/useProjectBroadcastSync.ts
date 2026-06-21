@@ -67,15 +67,24 @@ export function useProjectBroadcastSync() {
         }
         if (canMergeProjectBroadcastWhileDirty(state, message)) {
           void (async () => {
-            const glyphs = await loadProjectGlyphGeometryClosure(
-              message.projectId,
-              message.glyphIds
-            )
-            useStore.getState().hydrateGlyphGeometry(glyphs)
+            if (message.glyphIds.length > 0) {
+              const glyphs = await loadProjectGlyphGeometryClosure(
+                message.projectId,
+                message.glyphIds
+              )
+              useStore.getState().hydrateGlyphGeometry(glyphs)
+            }
+            if (message.deletedGlyphIds.length > 0) {
+              useStore
+                .getState()
+                .hydrateExternalGlyphDeletions(message.deletedGlyphIds)
+            }
             toast({
               title: 'Project updated',
               description:
-                'Independent glyph changes from another window were loaded.',
+                message.deletedGlyphIds.length > 0
+                  ? 'Independent glyph changes and deletions from another window were loaded.'
+                  : 'Independent glyph changes from another window were loaded.',
               status: 'info',
               duration: 2400,
               isClosable: true,

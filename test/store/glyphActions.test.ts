@@ -63,6 +63,32 @@ describe('glyph actions', () => {
     expect(useStore.getState().fontData?.glyphs.B).toBeUndefined()
   })
 
+  it('hydrates external glyph deletions without marking local dirty state', () => {
+    const fontData: FontData = {
+      glyphOrder: ['A', 'B', 'C'],
+      glyphs: {
+        A: makeGlyph('A', '0041'),
+        B: makeGlyph('B', '0042'),
+        C: makeGlyph('C', '0043'),
+      },
+    }
+    useStore.getState().loadProjectState('project-a', 'Project A', fontData)
+    useStore.getState().setEditorTextState('ABC', ['A', 'B', 'C'], 2, 1)
+    useStore.getState().setSelectedGlyphId('B')
+    useStore.getState().markDraftSaved()
+
+    useStore.getState().hydrateExternalGlyphDeletions(['B'])
+
+    const state = useStore.getState()
+    expect(state.fontData?.glyphOrder).toEqual(['A', 'C'])
+    expect(state.fontData?.glyphs.B).toBeUndefined()
+    expect(state.editorGlyphIds).toEqual(['A', 'C'])
+    expect(state.selectedGlyphId).not.toBe('B')
+    expect(state.dirtyGlyphIds).toEqual([])
+    expect(state.deletedGlyphIds).toEqual([])
+    expect(state.isDirty).toBe(false)
+  })
+
   it('moves a deleted glyph from dirty to deleted tracking', () => {
     const fontData: FontData = {
       glyphOrder: ['A'],

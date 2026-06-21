@@ -36,8 +36,7 @@ export const canMergeProjectBroadcastWhileDirty = (
 ) =>
   state.isDirty &&
   !message.projectChanged &&
-  message.deletedGlyphIds.length === 0 &&
-  message.glyphIds.length > 0 &&
+  (message.glyphIds.length > 0 || message.deletedGlyphIds.length > 0) &&
   getProjectBroadcastLocalGlyphOverlap(state, message).length === 0
 
 export const shouldBlockProjectBroadcastReload = (

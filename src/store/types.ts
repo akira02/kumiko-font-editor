@@ -587,6 +587,7 @@ export interface GlobalState {
     glyphs: GlyphData[],
     options?: { maxLoadedGlyphs?: number }
   ) => void
+  hydrateExternalGlyphDeletions: (glyphIds: string[]) => void
   hydratePersistedLocalChanges: (
     dirtyGlyphIds: string[],
     deletedGlyphIds: string[],

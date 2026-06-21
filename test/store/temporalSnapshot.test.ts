@@ -230,6 +230,10 @@ describe('temporal snapshots', () => {
         },
       ],
       [
+        'hydrateExternalGlyphDeletions',
+        () => useStore.getState().hydrateExternalGlyphDeletions(['A']),
+      ],
+      [
         'setComponentGhostPaths',
         () => useStore.getState().setComponentGhostPaths([]),
       ],
