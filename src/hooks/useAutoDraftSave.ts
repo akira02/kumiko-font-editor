@@ -3,7 +3,7 @@ import { flushPendingDraft } from 'src/lib/project/flushPendingDraft'
 import { createProjectUiStateSnapshot } from 'src/lib/project/projectUiState'
 import { useStore } from 'src/store'
 
-const AUTO_DRAFT_SAVE_DELAY_MS = 60_000
+export const AUTO_DRAFT_SAVE_DELAY_MS = 10_000
 
 const getErrorMessage = (error: unknown) =>
   error instanceof Error ? error.message : 'Auto draft save failed.'
