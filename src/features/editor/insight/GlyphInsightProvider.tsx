@@ -3,10 +3,10 @@ import { useStore } from 'src/store'
 import {
   getStructureBodyBox,
   isHanGlyph,
-} from 'src/features/common/qualityCheck/utils/hanClassification'
-import { buildGlyphGeometrySample } from 'src/features/common/qualityCheck/utils/glyphSampling'
-import { evaluateSampleAgainstRadar } from 'src/features/common/qualityCheck/utils/qualityRadar'
-import { resolveFontGlyphs } from 'src/features/common/qualityCheck/utils/resolvedGlyph'
+} from 'src/lib/qualityCheck/hanClassification'
+import { buildGlyphGeometrySample } from 'src/lib/qualityCheck/glyphSampling'
+import { evaluateSampleAgainstRadar } from 'src/lib/qualityCheck/qualityRadar'
+import { resolveFontGlyphs } from 'src/lib/qualityCheck/resolvedGlyph'
 import { useQualityAnalysis } from 'src/features/common/qualityCheck/hooks/useQualityAnalysis'
 import {
   GlyphInsightContext,

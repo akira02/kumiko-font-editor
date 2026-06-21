@@ -4,7 +4,7 @@ import {
   buildGrayProofText,
   buildGrayStats,
   buildProofRun,
-} from 'src/features/common/qualityCheck/utils/qualityProof'
+} from 'src/lib/qualityCheck/qualityProof'
 import type { FontData, GlyphData, PathData } from 'src/store/types'
 import { normalizeGlyphToLayers } from 'src/store'
 

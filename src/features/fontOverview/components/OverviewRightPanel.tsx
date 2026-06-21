@@ -13,8 +13,8 @@ import {
   FontQualityCheckModal,
   SelectedGlyphQualityCheckModal,
 } from 'src/features/common/qualityCheck/QualityCheckModal'
-import type { QualityCheckMode } from 'src/features/common/qualityCheck/utils/qualityCheckMode'
-import type { QualityScope } from 'src/features/common/qualityCheck/utils/qualityLint'
+import type { QualityCheckMode } from 'src/features/common/qualityCheck/types'
+import type { QualityScope } from 'src/lib/qualityCheck/qualityLint'
 import { useStore } from 'src/store'
 import { useTranslation } from 'react-i18next'
 

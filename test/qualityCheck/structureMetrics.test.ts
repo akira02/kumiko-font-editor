@@ -3,15 +3,15 @@ import {
   computeInkArea,
   flattenContour,
   getPolygonsBounds,
-} from 'src/features/common/qualityCheck/utils/polygonGeometry'
-import { flattenResolvedGlyph } from 'src/features/common/qualityCheck/utils/glyphInk'
+} from 'src/lib/qualityCheck/polygonGeometry'
+import { flattenResolvedGlyph } from 'src/lib/qualityCheck/glyphInk'
 import {
   getStructureBodyBox,
   isHanGlyph,
-} from 'src/features/common/qualityCheck/utils/hanClassification'
-import { resolveFontGlyphs } from 'src/features/common/qualityCheck/utils/resolvedGlyph'
-import { buildGlyphGeometrySample } from 'src/features/common/qualityCheck/utils/glyphSampling'
-import { analyzeFontPopulation } from 'src/features/common/qualityCheck/hooks/useQualityAnalysis'
+} from 'src/lib/qualityCheck/hanClassification'
+import { resolveFontGlyphs } from 'src/lib/qualityCheck/resolvedGlyph'
+import { buildGlyphGeometrySample } from 'src/lib/qualityCheck/glyphSampling'
+import { analyzeFontPopulation } from 'src/lib/qualityCheck/populationAnalysis'
 import type { FontData, GlyphData, PathData } from 'src/store/types'
 import { normalizeGlyphToLayers } from 'src/store'
 

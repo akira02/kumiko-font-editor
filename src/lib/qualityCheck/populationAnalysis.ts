@@ -1,13 +1,15 @@
-import type { ResolvedFont } from 'src/features/common/qualityCheck/utils/resolvedGlyph'
-import { buildFontGeometrySamples } from 'src/features/common/qualityCheck/utils/glyphSampling'
+import type { FontData } from 'src/store'
+import type { ResolvedFont } from 'src/lib/qualityCheck/resolvedGlyph'
+import { resolveFontGlyphs } from 'src/lib/qualityCheck/resolvedGlyph'
+import { buildFontGeometrySamples } from 'src/lib/qualityCheck/glyphSampling'
 import {
   buildStructureBaseline,
   type StructureBaseline,
-} from 'src/features/common/qualityCheck/utils/structureMetrics'
+} from 'src/lib/qualityCheck/structureMetrics'
 import {
   computeRadarFromSamples,
   type RadarAnalysis,
-} from 'src/features/common/qualityCheck/utils/qualityRadar'
+} from 'src/lib/qualityCheck/qualityRadar'
 
 /**
  * 母體分析：整套字體唯一的重計算點。一次 flatten 取樣後，
@@ -32,4 +34,21 @@ export const runPopulationAnalysis = (
       semanticEnclosureChars
     ),
   }
+}
+
+/**
+ * Synchronously derive population analysis from live FontData. Useful for small
+ * fonts, tests, and fallback paths where the worker is not involved.
+ */
+export const analyzeFontPopulation = (
+  fontData: FontData | null | undefined,
+  semanticEnclosureChars?: ReadonlySet<string>
+): PopulationAnalysis => {
+  if (!fontData) {
+    return { baseline: null, radar: null }
+  }
+  return runPopulationAnalysis(
+    resolveFontGlyphs(fontData),
+    semanticEnclosureChars
+  )
 }

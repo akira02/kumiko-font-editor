@@ -11,7 +11,7 @@ import {
 import type {
   QualityIssue,
   QualityIssueSeverity,
-} from 'src/features/common/qualityCheck/utils/qualityLint'
+} from 'src/lib/qualityCheck/qualityLint'
 
 const severityMeta: Record<
   QualityIssueSeverity,

@@ -7,7 +7,7 @@ import {
   type PathNode,
   isOffCurveNode,
 } from 'src/store'
-import { isHanGlyph } from 'src/features/common/qualityCheck/utils/hanClassification'
+import { isHanGlyph } from 'src/lib/qualityCheck/hanClassification'
 import { getPrimaryGlyphUnicode } from 'src/lib/glyph/glyphUnicode'
 
 export type QualityScope = 'changed' | 'current' | 'selected' | 'font'

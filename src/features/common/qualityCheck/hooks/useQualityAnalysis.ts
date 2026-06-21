@@ -1,26 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { FontData } from 'src/store'
-import { resolveFontGlyphs } from 'src/features/common/qualityCheck/utils/resolvedGlyph'
-import {
-  runPopulationAnalysis,
-  type PopulationAnalysis,
-} from 'src/features/common/qualityCheck/utils/populationAnalysis'
-
-/**
- * 主執行緒便利函數：同步從 FontData 算出母體分析（小字體、測試、Worker 不可用時的後援）。
- */
-export const analyzeFontPopulation = (
-  fontData: FontData | null | undefined,
-  semanticEnclosureChars?: ReadonlySet<string>
-): PopulationAnalysis => {
-  if (!fontData) {
-    return { baseline: null, radar: null }
-  }
-  return runPopulationAnalysis(
-    resolveFontGlyphs(fontData),
-    semanticEnclosureChars
-  )
-}
+import { resolveFontGlyphs } from 'src/lib/qualityCheck/resolvedGlyph'
+import type { PopulationAnalysis } from 'src/lib/qualityCheck/populationAnalysis'
 
 interface AnalysisSuccessMessage {
   type: 'analysis-success'

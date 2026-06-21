@@ -2,24 +2,24 @@ import {
   computeInkFromPolygons,
   flattenResolvedGlyph,
   type GlyphInkMetrics,
-} from 'src/features/common/qualityCheck/utils/glyphInk'
+} from 'src/lib/qualityCheck/glyphInk'
 import {
   getPolygonsBounds,
   type GeometryBounds,
-} from 'src/features/common/qualityCheck/utils/polygonGeometry'
+} from 'src/lib/qualityCheck/polygonGeometry'
 import {
   buildSidesFromPolygons,
   type StructureSides,
-} from 'src/features/common/qualityCheck/utils/structureMetrics'
+} from 'src/lib/qualityCheck/structureMetrics'
 import {
   getGlyphCharacter,
   isHanGlyph,
   type StructureBodyBox,
-} from 'src/features/common/qualityCheck/utils/hanClassification'
+} from 'src/lib/qualityCheck/hanClassification'
 import type {
   ResolvedFont,
   ResolvedGlyph,
-} from 'src/features/common/qualityCheck/utils/resolvedGlyph'
+} from 'src/lib/qualityCheck/resolvedGlyph'
 
 /**
  * 母體統計分析的單一特徵來源：每個字形「攤平一次」即同時得到

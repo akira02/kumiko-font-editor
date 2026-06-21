@@ -2,11 +2,11 @@ import {
   RADAR_OUTLIER_Z,
   formatRadarValue,
   type RadarReason,
-} from 'src/features/common/qualityCheck/utils/qualityRadar'
+} from 'src/lib/qualityCheck/qualityRadar'
 import {
   sideLabels,
   type StructureSide,
-} from 'src/features/common/qualityCheck/utils/structureMetrics'
+} from 'src/lib/qualityCheck/structureMetrics'
 
 /**
  * 把工程向的 RadarReason（z-score、中位數）翻譯成素人能讀的白話建議：

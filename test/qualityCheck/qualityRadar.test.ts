@@ -3,14 +3,14 @@ import {
   computeInkArea,
   computeInkMoments,
   flattenContour,
-} from 'src/features/common/qualityCheck/utils/polygonGeometry'
+} from 'src/lib/qualityCheck/polygonGeometry'
 import {
   buildRobustStat,
   computeRadarFromSamples,
   radarZScore,
-} from 'src/features/common/qualityCheck/utils/qualityRadar'
-import { analyzeFontPopulation } from 'src/features/common/qualityCheck/hooks/useQualityAnalysis'
-import type { GlyphGeometrySample } from 'src/features/common/qualityCheck/utils/glyphSampling'
+} from 'src/lib/qualityCheck/qualityRadar'
+import { analyzeFontPopulation } from 'src/lib/qualityCheck/populationAnalysis'
+import type { GlyphGeometrySample } from 'src/lib/qualityCheck/glyphSampling'
 import type { FontData, GlyphData, PathData } from 'src/store'
 import { normalizeGlyphToLayers } from 'src/store'
 

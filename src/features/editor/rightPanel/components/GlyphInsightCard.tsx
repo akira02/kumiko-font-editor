@@ -12,7 +12,7 @@ import { useMemo } from 'react'
 import {
   buildRadarAdvice,
   type RadarAdvice,
-} from 'src/features/common/qualityCheck/utils/radarAdvice'
+} from 'src/lib/qualityCheck/radarAdvice'
 import { useGlyphInsight } from 'src/features/editor/insight/glyphInsight'
 
 const MAX_VISIBLE_ADVICES = 4

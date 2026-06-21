@@ -1,9 +1,6 @@
 import { Box, Text } from '@chakra-ui/react'
 import { useMemo } from 'react'
-import type {
-  ProofGlyph,
-  ProofRun,
-} from 'src/features/common/qualityCheck/utils/qualityProof'
+import type { ProofGlyph, ProofRun } from 'src/lib/qualityCheck/qualityProof'
 
 const PROOF_ASCENDER = 900
 const PROOF_DESCENDER = -260

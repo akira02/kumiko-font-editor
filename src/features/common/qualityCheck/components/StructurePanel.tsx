@@ -12,27 +12,27 @@ import {
 } from '@chakra-ui/react'
 import { useMemo } from 'react'
 import type { FontData, GlyphData } from 'src/store'
-import type { QualityScope } from 'src/features/common/qualityCheck/utils/qualityLint'
+import type { QualityScope } from 'src/lib/qualityCheck/qualityLint'
 import {
   sideLabels,
   strokeTypeLabels,
   type SideDistribution,
   type StructureBaseline,
   type StructureSide,
-} from 'src/features/common/qualityCheck/utils/structureMetrics'
-import { isHanGlyph } from 'src/features/common/qualityCheck/utils/hanClassification'
-import { resolveFontGlyphs } from 'src/features/common/qualityCheck/utils/resolvedGlyph'
+} from 'src/lib/qualityCheck/structureMetrics'
+import { isHanGlyph } from 'src/lib/qualityCheck/hanClassification'
+import { resolveFontGlyphs } from 'src/lib/qualityCheck/resolvedGlyph'
 import {
   buildGlyphGeometrySample,
   type GlyphGeometrySample,
-} from 'src/features/common/qualityCheck/utils/glyphSampling'
+} from 'src/lib/qualityCheck/glyphSampling'
 import { useQualityAnalysis } from 'src/features/common/qualityCheck/hooks/useQualityAnalysis'
 import {
   formatRadarReason,
   radarDimensionLabels,
   type RadarGlyphEvaluation,
-} from 'src/features/common/qualityCheck/utils/qualityRadar'
-import { buildRadarAdvice } from 'src/features/common/qualityCheck/utils/radarAdvice'
+} from 'src/lib/qualityCheck/qualityRadar'
+import { buildRadarAdvice } from 'src/lib/qualityCheck/radarAdvice'
 
 interface StructurePanelProps {
   fontData: FontData | null

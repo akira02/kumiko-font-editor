@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildEnclosureCharacterSet } from 'src/features/common/qualityCheck/utils/semanticStructure'
+import { buildEnclosureCharacterSet } from 'src/lib/qualityCheck/semanticStructure'
 import {
   parseCompositionLine,
   type GlyphwikiPartPlacement,

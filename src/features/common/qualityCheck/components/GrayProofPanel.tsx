@@ -20,8 +20,8 @@ import {
   buildProofRun,
   getGlyphCharacter,
   grayArticlePresets,
-} from 'src/features/common/qualityCheck/utils/qualityProof'
-import type { QualityScope } from 'src/features/common/qualityCheck/utils/qualityLint'
+} from 'src/lib/qualityCheck/qualityProof'
+import type { QualityScope } from 'src/lib/qualityCheck/qualityLint'
 import { useTranslation } from 'react-i18next'
 
 interface GrayProofPanelProps {

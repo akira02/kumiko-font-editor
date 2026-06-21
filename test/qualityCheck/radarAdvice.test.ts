@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { buildRadarAdvice } from 'src/features/common/qualityCheck/utils/radarAdvice'
-import type { RadarReason } from 'src/features/common/qualityCheck/utils/qualityRadar'
+import { buildRadarAdvice } from 'src/lib/qualityCheck/radarAdvice'
+import type { RadarReason } from 'src/lib/qualityCheck/qualityRadar'
 
 const makeReason = (overrides: Partial<RadarReason>): RadarReason => ({
   key: 'bearing:top:branching',

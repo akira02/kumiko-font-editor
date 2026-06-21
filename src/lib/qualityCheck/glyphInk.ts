@@ -1,4 +1,4 @@
-import type { ResolvedGlyph } from 'src/features/common/qualityCheck/utils/resolvedGlyph'
+import type { ResolvedGlyph } from 'src/lib/qualityCheck/resolvedGlyph'
 import {
   getComponentMatrix,
   type ComponentMatrix,
@@ -9,7 +9,7 @@ import {
   getPolygonsBounds,
   type GeometryBounds,
   type GeometryPoint,
-} from 'src/features/common/qualityCheck/utils/polygonGeometry'
+} from 'src/lib/qualityCheck/polygonGeometry'
 
 /**
  * 字形層級的墨水度量：把已解析字形（含遞迴 component）攤平成多邊形，

@@ -1,9 +1,9 @@
-import type { GlyphGeometrySample } from 'src/features/common/qualityCheck/utils/glyphSampling'
+import type { GlyphGeometrySample } from 'src/lib/qualityCheck/glyphSampling'
 import {
   sideLabels,
   strokeTypeLabels,
   type StructureSide,
-} from 'src/features/common/qualityCheck/utils/structureMetrics'
+} from 'src/lib/qualityCheck/structureMetrics'
 
 /**
  * Font Quality Radar：以同一套字體自身的統計分布為基準的

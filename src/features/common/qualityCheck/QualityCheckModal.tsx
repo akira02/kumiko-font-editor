@@ -26,14 +26,14 @@ import { LintPanel } from 'src/features/common/qualityCheck/components/LintPanel
 import { MixedProofPanel } from 'src/features/common/qualityCheck/components/MixedProofPanel'
 import { GrayProofPanel } from 'src/features/common/qualityCheck/components/GrayProofPanel'
 import { StructurePanel } from 'src/features/common/qualityCheck/components/StructurePanel'
-import type { QualityCheckMode } from 'src/features/common/qualityCheck/utils/qualityCheckMode'
+import type { QualityCheckMode } from 'src/features/common/qualityCheck/types'
 import {
   buildQualityReport,
   type QualityIssue,
   type QualityReport,
   type QualityScope,
-} from 'src/features/common/qualityCheck/utils/qualityLint'
-import { mixedProofPresets } from 'src/features/common/qualityCheck/utils/qualityProof'
+} from 'src/lib/qualityCheck/qualityLint'
+import { mixedProofPresets } from 'src/lib/qualityCheck/qualityProof'
 import { useTranslation } from 'react-i18next'
 
 interface QualityCheckModalProps {

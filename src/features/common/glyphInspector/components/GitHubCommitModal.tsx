@@ -25,7 +25,7 @@ import {
   GitHubSyncSection,
   type GitHubSyncSectionProps,
 } from 'src/features/common/glyphInspector/components/GitHubSyncSection'
-import type { QualitySummary } from 'src/features/common/qualityCheck/utils/qualityLint'
+import type { QualitySummary } from 'src/lib/qualityCheck/qualityLint'
 import { useTranslation } from 'react-i18next'
 
 export interface GitHubCommitModalProps {

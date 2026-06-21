@@ -7,7 +7,7 @@ import {
 import {
   getStructureBodyBox,
   type StructureBodyBox,
-} from 'src/features/common/qualityCheck/utils/hanClassification'
+} from 'src/lib/qualityCheck/hanClassification'
 import { getPrimaryGlyphUnicode } from 'src/lib/glyph/glyphUnicode'
 
 /**
