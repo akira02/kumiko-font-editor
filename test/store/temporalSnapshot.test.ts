@@ -11,7 +11,15 @@ const makeLayer = (id: string, width = 1000): GlyphLayerData => ({
     {
       id: `${id}-path`,
       closed: false,
-      nodes: [],
+      nodes: [
+        {
+          id: `${id}-node`,
+          x: 10,
+          y: 20,
+          kind: 'oncurve',
+          segmentType: 'line',
+        },
+      ],
     },
   ],
   componentRefs: [],
@@ -30,6 +38,15 @@ const makeGlyph = (id: string): GlyphData => ({
     'public.default': makeLayer('public.default'),
   },
 })
+
+const getFirstNode = (glyphId: string) => {
+  const node =
+    useStore.getState().fontData?.glyphs[glyphId].layers?.['public.default']
+      .paths[0].nodes[0]
+
+  expect(node).toBeDefined()
+  return node!
+}
 
 describe('temporal snapshots', () => {
   afterEach(() => {
@@ -75,5 +92,67 @@ describe('temporal snapshots', () => {
     }
 
     expect(latestSnapshot.fontData?.glyphs.B.layers).toBeDefined()
+  })
+
+  it('does not store UI-only updates as undo checkpoints', () => {
+    const fontData: FontData = {
+      glyphOrder: ['A'],
+      glyphs: {
+        A: makeGlyph('A'),
+      },
+    }
+    useStore.getState().loadProjectState('project-a', 'Project A', fontData)
+    useStore.getState().setSelectedGlyphId('A')
+    useStore.temporal.getState().clear()
+
+    useStore.getState().setSelectedNodeIds(['public.default-node'])
+    useStore
+      .getState()
+      .setPreviewGlyphMetrics('A', { width: 1000, lsb: 0, rsb: 0 })
+    useStore.getState().updateViewport(1, 12, 34)
+
+    expect(useStore.temporal.getState().pastStates).toHaveLength(0)
+
+    useStore.getState().updateGlyphMetrics('A', { width: 900 })
+
+    expect(useStore.temporal.getState().pastStates).toHaveLength(1)
+
+    useStore.getState().setSelectedNodeIds([])
+
+    expect(useStore.temporal.getState().pastStates).toHaveLength(1)
+  })
+
+  it('restores a moved node with a single undo after UI-only updates', () => {
+    const fontData: FontData = {
+      glyphOrder: ['A'],
+      glyphs: {
+        A: makeGlyph('A'),
+      },
+    }
+    useStore.getState().loadProjectState('project-a', 'Project A', fontData)
+    useStore.getState().setSelectedGlyphId('A')
+    useStore.temporal.getState().clear()
+
+    useStore.getState().updateNodePositions('A', [
+      {
+        pathId: 'public.default-path',
+        nodeId: 'public.default-node',
+        newPos: { x: 80, y: 90 },
+      },
+    ])
+    useStore.getState().setSelectedNodeIds(['public.default-node'])
+    useStore.getState().setSelectedSegment({
+      pathId: 'public.default-path',
+      startNodeId: 'public.default-node',
+      endNodeId: 'public.default-node',
+      type: 'line',
+    })
+
+    expect(getFirstNode('A')).toMatchObject({ x: 80, y: 90 })
+    expect(useStore.temporal.getState().pastStates).toHaveLength(1)
+
+    useStore.temporal.getState().undo()
+
+    expect(getFirstNode('A')).toMatchObject({ x: 10, y: 20 })
   })
 })

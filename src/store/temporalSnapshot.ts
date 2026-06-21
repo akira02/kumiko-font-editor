@@ -3,6 +3,12 @@ import type { FontData, GlobalState, GlyphData } from 'src/store/types'
 
 type TemporalTrackedState = Pick<GlobalState, 'fontData'>
 
+const temporalSnapshotCache = new WeakMap<
+  FontData,
+  { geometryKey: string; snapshot: FontData }
+>()
+const temporalSnapshotSources = new WeakMap<FontData, FontData>()
+
 const stripGlyphGeometry = (glyph: GlyphData): GlyphData => {
   if (!isGlyphGeometryLoaded(glyph)) {
     return glyph
@@ -36,6 +42,9 @@ const getTemporalGeometryGlyphIds = (state: GlobalState) => {
   return glyphIds
 }
 
+const getTemporalGeometryKey = (glyphIds: Set<string>) =>
+  [...glyphIds].sort().join('\0')
+
 export const createTemporalFontDataSnapshot = (
   fontData: FontData,
   geometryGlyphIds: Set<string>
@@ -54,11 +63,40 @@ export const createTemporalFontDataSnapshot = (
   }
 }
 
+const getTemporalFontDataSnapshot = (
+  fontData: FontData,
+  geometryGlyphIds: Set<string>
+) => {
+  const geometryKey = getTemporalGeometryKey(geometryGlyphIds)
+  const cached = temporalSnapshotCache.get(fontData)
+  if (cached?.geometryKey === geometryKey) {
+    return cached.snapshot
+  }
+
+  const snapshot = createTemporalFontDataSnapshot(fontData, geometryGlyphIds)
+  temporalSnapshotCache.set(fontData, { geometryKey, snapshot })
+  temporalSnapshotSources.set(snapshot, fontData)
+  return snapshot
+}
+
+const getTemporalFontDataSource = (fontData: FontData) =>
+  temporalSnapshotSources.get(fontData) ?? fontData
+
+export const areTemporalTrackedStatesEqual = (
+  pastState: TemporalTrackedState,
+  currentState: TemporalTrackedState
+) =>
+  pastState.fontData === currentState.fontData ||
+  !pastState.fontData ||
+  !currentState.fontData ||
+  getTemporalFontDataSource(pastState.fontData) ===
+    getTemporalFontDataSource(currentState.fontData)
+
 export const partializeTemporalState = (
   state: GlobalState
 ): TemporalTrackedState => ({
   fontData: state.fontData
-    ? createTemporalFontDataSnapshot(
+    ? getTemporalFontDataSnapshot(
         state.fontData,
         getTemporalGeometryGlyphIds(state)
       )

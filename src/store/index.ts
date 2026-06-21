@@ -9,7 +9,10 @@ import { buildGlyphActions } from 'src/store/actions/glyphActions'
 import { buildPathActions } from 'src/store/actions/pathActions'
 import { buildProjectActions } from 'src/store/actions/projectActions'
 import { buildBehaviorActions } from 'src/store/actions/behaviorActions'
-import { partializeTemporalState } from 'src/store/temporalSnapshot'
+import {
+  areTemporalTrackedStatesEqual,
+  partializeTemporalState,
+} from 'src/store/temporalSnapshot'
 
 export {
   getGlyphLayer,
@@ -193,10 +196,7 @@ export const useStore = create<GlobalState>()(
       // as "unchanged" so it is never recorded. Otherwise the null→loaded open
       // transition becomes the bottom of the undo stack, and undoing far enough
       // restores fontData = null, which routes the app back to the Home screen.
-      equality: (pastState, currentState) =>
-        pastState.fontData === currentState.fontData ||
-        !pastState.fontData ||
-        !currentState.fontData,
+      equality: areTemporalTrackedStatesEqual,
       limit: 50,
     }
   )
