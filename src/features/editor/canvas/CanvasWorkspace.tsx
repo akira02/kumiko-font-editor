@@ -27,11 +27,7 @@ import {
   getGlyphFrameAtPoint,
   type LayerGeometryCacheEntry,
 } from 'src/features/editor/canvas/workspace/layout/positionedGlyphs'
-import {
-  buildGlyphIdByCharacter,
-  charIndexToCodeUnitIndex,
-  codeUnitIndexToCharIndex,
-} from 'src/features/editor/canvas/workspace/layout/textInput'
+import { useCanvasTextInput } from 'src/features/editor/canvas/workspace/hooks/useCanvasTextInput'
 import type { ToolId } from 'src/features/editor/canvas/workspace/types'
 import { useCanvasClipboard } from 'src/features/editor/canvas/hooks/useCanvasClipboard'
 import { useCanvasKeyboardShortcuts } from 'src/features/editor/canvas/hooks/useCanvasKeyboardShortcuts'
@@ -82,9 +78,6 @@ export function CanvasWorkspace() {
     []
   )
   const [activeToolId, setActiveToolId] = useState<ToolId>('pointer')
-  const [draftTextInputValue, setDraftTextInputValue] = useState('')
-  const [isComposingText, setIsComposingText] = useState(false)
-  const [compositionText, setCompositionText] = useState('')
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 })
   const [contextMenu, setContextMenu] = useState<{
     x: number
@@ -145,7 +138,6 @@ export function CanvasWorkspace() {
   const futureStatesLength = useTemporalStore(
     (state) => state.futureStates.length
   )
-  const textInputValue = isComposingText ? draftTextInputValue : editorText
 
   const handleUndo = useCallback(() => {
     useStore.temporal.getState().undo()
@@ -201,16 +193,36 @@ export function CanvasWorkspace() {
     ]
   )
 
+  const {
+    compositionOverlayStyle,
+    compositionText,
+    getCursorX,
+    handleTextInputChange,
+    handleTextInputCompositionEnd,
+    handleTextInputCompositionStart,
+    handleTextInputCompositionUpdate,
+    handleTextInputSelect,
+    textInputValue,
+  } = useCanvasTextInput({
+    activeToolId,
+    canvasSize,
+    editorGlyphIds,
+    editorText,
+    editorTextCursorIndex,
+    fontData,
+    inputRef: hiddenTextInputRef,
+    positionedGlyphs,
+    setEditorActiveGlyphIndex,
+    setEditorTextCursorIndex,
+    setEditorTextState,
+    viewport,
+  })
+
   const positionedGlyph = useMemo(
     () =>
       positionedGlyphs[editorActiveGlyphIndex] ??
       positionedGlyphs.find((glyph) => glyph.glyphId === selectedGlyphId),
     [editorActiveGlyphIndex, positionedGlyphs, selectedGlyphId]
-  )
-
-  const glyphIdByCharacter = useMemo(
-    () => buildGlyphIdByCharacter(fontData),
-    [fontData]
   )
 
   const getPreviousPenSelection = useCallback(() => {
@@ -251,109 +263,6 @@ export function CanvasWorkspace() {
       getGlyphFrameAtPoint(point, positionedGlyphs, fontData),
     [fontData, positionedGlyphs]
   )
-
-  const commitTextInputValue = useCallback(
-    (value: string, selectionStart: number | null) => {
-      const beforeCursor = value.slice(0, selectionStart ?? value.length)
-      const supportedChars = Array.from(value).filter((character) =>
-        glyphIdByCharacter.has(character)
-      )
-      const supportedBeforeCursor = Array.from(beforeCursor).filter(
-        (character) => glyphIdByCharacter.has(character)
-      )
-      const glyphIds = supportedChars
-        .map((character) => glyphIdByCharacter.get(character))
-        .filter((glyphId): glyphId is string => Boolean(glyphId))
-      setEditorTextState(
-        supportedChars.join(''),
-        glyphIds,
-        supportedBeforeCursor.length,
-        glyphIds.length > 0
-          ? Math.max(
-              0,
-              Math.min(supportedBeforeCursor.length - 1, glyphIds.length - 1)
-            )
-          : 0
-      )
-      setDraftTextInputValue(supportedChars.join(''))
-    },
-    [glyphIdByCharacter, setEditorTextState]
-  )
-
-  const getCursorX = useCallback(
-    (cursorIndex: number) => {
-      for (const positionedGlyph of positionedGlyphs) {
-        const startIndex = positionedGlyph.sourceStartIndex ?? 0
-        const length = positionedGlyph.sourceLength ?? 1
-        const endIndex = startIndex + length
-        if (cursorIndex === startIndex) {
-          return positionedGlyph.x
-        }
-        if (cursorIndex > startIndex && cursorIndex < endIndex) {
-          return (
-            positionedGlyph.x +
-            positionedGlyph.glyph.xAdvance *
-              ((cursorIndex - startIndex) / length)
-          )
-        }
-        if (cursorIndex === endIndex) {
-          return positionedGlyph.x + positionedGlyph.glyph.xAdvance
-        }
-      }
-
-      const previousGlyph = positionedGlyphs.at(-1)
-      return previousGlyph ? previousGlyph.x + previousGlyph.glyph.xAdvance : 0
-    },
-    [positionedGlyphs]
-  )
-
-  const compositionOverlayStyle = useMemo(() => {
-    if (
-      activeToolId !== 'text' ||
-      !isComposingText ||
-      !compositionText ||
-      canvasSize.width === 0
-    ) {
-      return null
-    }
-
-    return {
-      left:
-        canvasSize.width / 2 +
-        viewport.pan.x +
-        getCursorX(editorTextCursorIndex) * viewport.zoom,
-      top: canvasSize.height / 2 + viewport.pan.y - 28,
-    }
-  }, [
-    activeToolId,
-    canvasSize.height,
-    canvasSize.width,
-    compositionText,
-    editorTextCursorIndex,
-    getCursorX,
-    isComposingText,
-    viewport.pan.x,
-    viewport.pan.y,
-    viewport.zoom,
-  ])
-
-  useEffect(() => {
-    if (activeToolId !== 'text') {
-      return
-    }
-
-    const input = hiddenTextInputRef.current
-    if (!input) {
-      return
-    }
-
-    const selectionOffset = charIndexToCodeUnitIndex(
-      textInputValue,
-      editorTextCursorIndex
-    )
-    input.focus()
-    input.setSelectionRange(selectionOffset, selectionOffset)
-  }, [activeToolId, editorTextCursorIndex, textInputValue])
 
   useEffect(() => {
     if (!canvasRef.current || canvasControllerRef.current) {
@@ -881,47 +790,11 @@ export function CanvasWorkspace() {
         compositionText={compositionText}
         inputRef={hiddenTextInputRef}
         textInputValue={textInputValue}
-        onChange={(event) => {
-          setDraftTextInputValue(event.target.value)
-          if (!isComposingText) {
-            commitTextInputValue(
-              event.target.value,
-              event.target.selectionStart
-            )
-          }
-        }}
-        onCompositionEnd={(event) => {
-          setIsComposingText(false)
-          setCompositionText('')
-          setDraftTextInputValue(event.currentTarget.value)
-          commitTextInputValue(
-            event.currentTarget.value,
-            event.currentTarget.selectionStart
-          )
-        }}
-        onCompositionStart={() => {
-          setDraftTextInputValue(textInputValue)
-          setIsComposingText(true)
-        }}
-        onCompositionUpdate={(event) => {
-          setCompositionText(event.data)
-        }}
-        onSelect={(event) => {
-          if (activeToolId !== 'text') {
-            return
-          }
-          const target = event.target as HTMLTextAreaElement
-          const cursorIndex = codeUnitIndexToCharIndex(
-            target.value,
-            target.selectionStart ?? target.value.length
-          )
-          setEditorTextCursorIndex(cursorIndex)
-          if (editorGlyphIds.length > 0) {
-            setEditorActiveGlyphIndex(
-              Math.max(0, Math.min(cursorIndex - 1, editorGlyphIds.length - 1))
-            )
-          }
-        }}
+        onChange={handleTextInputChange}
+        onCompositionEnd={handleTextInputCompositionEnd}
+        onCompositionStart={handleTextInputCompositionStart}
+        onCompositionUpdate={handleTextInputCompositionUpdate}
+        onSelect={handleTextInputSelect}
       />
 
       <CanvasWorkspaceOverlay
