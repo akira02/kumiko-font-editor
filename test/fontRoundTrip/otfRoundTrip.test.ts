@@ -1,3 +1,5 @@
+import 'fake-indexeddb/auto'
+
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 
@@ -7,6 +9,8 @@ import {
   exportFontAsBinary,
   importBinaryFontFile,
 } from 'src/lib/fontFormats/fontBinaryFormat'
+import { exportCanonicalProjectAsBinary } from 'src/lib/fontFormats/canonicalBinaryExport'
+import { saveProjectDraft } from 'src/lib/project/projectRepository'
 import type { FontData, GlyphData } from 'src/store'
 import { getGlyphLayer } from 'src/store/glyphLayer'
 import { getPrimaryGlyphUnicode } from 'src/lib/glyph/glyphUnicode'
@@ -100,6 +104,38 @@ describe('OTF import → export round-trip', () => {
     expect(JSON.stringify(imported.projectSourceData.binary)).not.toContain(
       'sfntBuffer'
     )
+  })
+
+  it('exports binary output from canonical project records', async () => {
+    const imported = await importBinaryFontFile(await loadFixtureFile())
+    const canonicalProjectId = 'canonical-binary-export'
+    await saveProjectDraft({
+      id: canonicalProjectId,
+      title: 'Canonical Binary Export',
+      lastModified: 2,
+      createdAt: 1,
+      updatedAt: 2,
+      sourceName: 'PublicSans-Regular.otf',
+      sourceType: 'local',
+      githubSource: null,
+      fontData: dropFeatures(imported.fontData),
+      projectMetadata: null,
+      projectSourceData: imported.projectSourceData,
+      projectSourceFormat: 'otf',
+      projectRoundTripFormat: null,
+      projectGlyphsPackage: null,
+    })
+
+    const blob = await exportCanonicalProjectAsBinary({
+      projectId: canonicalProjectId,
+      format: 'otf',
+    })
+    const reimported = await reimport(blob, 'canonical-roundtrip.otf')
+
+    expect(Object.keys(reimported.fontData.glyphs).length).toBe(
+      Object.keys(imported.fontData.glyphs).length
+    )
+    expect(reimported.fontData.glyphOrder).toEqual(imported.fontData.glyphOrder)
   })
 
   it('keeps control-character glyphs but drops their cmap mapping', () => {

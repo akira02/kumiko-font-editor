@@ -1,7 +1,7 @@
 import { useToast } from '@chakra-ui/react'
 import { zipSync } from 'fflate'
 import { useMemo, useState } from 'react'
-import { exportFontAsBinary } from 'src/lib/fontFormats/adapters/binary'
+import { exportCanonicalProjectAsBinary } from 'src/lib/fontFormats/canonicalBinaryExport'
 import { exportUfoAsZipBlob } from 'src/lib/fontFormats/ufoZipExportClient'
 import {
   createCompilerRuntimeStatus,
@@ -20,11 +20,7 @@ import {
 import { flushPendingDraft } from 'src/lib/project/flushPendingDraft'
 import { markKumikoProjectExportClean } from 'src/lib/project/kumikoProjectPersistence'
 import { createProjectUiStateSnapshot } from 'src/lib/project/projectUiState'
-import { loadProjectDraft } from 'src/lib/project/projectRepository'
-import {
-  canUseCanonicalUfoZipExport,
-  shouldLoadFullDraftForExport,
-} from 'src/features/common/fontExport/exportDraftPolicy'
+import { canUseCanonicalUfoZipExport } from 'src/features/common/fontExport/exportDraftPolicy'
 import { useStore } from 'src/store'
 import type { FontExportFormat } from 'src/features/common/fontExport/ExportFontModal'
 
@@ -158,11 +154,6 @@ export function useFontExport() {
       const shouldMarkProjectExportClean = selectedFormats.some(
         (format) => format !== 'zip' || !usesSourceBackedUfoZipExport
       )
-      const needsFullDraft = shouldLoadFullDraftForExport(selectedFormats)
-      const fullDraft = needsFullDraft
-        ? await loadProjectDraft(projectId)
-        : null
-      const exportFontData = fullDraft?.fontData ?? fontData
       const selectedGlyphs3Formats = selectedFormats.filter(
         (format) => format === 'glyphs3' || format === 'glyphspackage'
       )
@@ -174,13 +165,13 @@ export function useFontExport() {
           format !== 'glyphspackage'
       )
       if (
-        exportFontData.openTypeFeatures &&
+        fontData.openTypeFeatures &&
         selectedBinaryFormats.length > 0 &&
         needsOpenTypeFeatureCompilationForBinaryExport(
-          exportFontData.openTypeFeatures,
+          fontData.openTypeFeatures,
           {
             hasGeneratedFeatureEdits: hasManagedFeatureEdits(
-              exportFontData.openTypeFeatures
+              fontData.openTypeFeatures
             ),
           }
         ) &&
@@ -229,7 +220,7 @@ export function useFontExport() {
 
         if (format !== 'zip') {
           return {
-            blob: await exportFontAsBinary(exportFontData, format),
+            blob: await exportCanonicalProjectAsBinary({ projectId, format }),
             fileName: `${baseFileName}.${format}`,
             label: format.toUpperCase(),
             totalGlyphs: null,

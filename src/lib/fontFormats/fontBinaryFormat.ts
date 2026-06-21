@@ -460,9 +460,27 @@ const isControlCodePoint = (codePoint: number) =>
 export const exportFontAsBinary = (
   fontData: FontData,
   format: BinaryFontExportFormat
-) => {
-  const glyphList = getBinaryExportGlyphList(fontData)
-  const glyphs = glyphList.map((glyph) => {
+) =>
+  exportGlyphListAsBinary({
+    fontData,
+    glyphs: getBinaryExportGlyphList(fontData),
+    format,
+    preserveSourceFontBuffer: fontData.binarySource?.sfntBuffer.slice(0),
+  })
+
+export const exportGlyphListAsBinary = (input: {
+  fontData: Pick<
+    FontData,
+    | 'fontInfo'
+    | 'unitsPerEm'
+    | 'lineMetricsHorizontalLayout'
+    | 'openTypeFeatures'
+  >
+  glyphs: GlyphData[]
+  format: BinaryFontExportFormat
+  preserveSourceFontBuffer?: ArrayBuffer
+}) => {
+  const glyphs = input.glyphs.map((glyph) => {
     const path = new opentype.Path()
     activeLayer(glyph).paths.forEach((shape) => {
       appendShapeToPath(path, shape)
@@ -490,39 +508,41 @@ export const exportFontAsBinary = (
   })
 
   const font = new opentype.Font({
-    familyName: fontData.fontInfo?.familyName || 'KumikoExport',
+    familyName: input.fontData.fontInfo?.familyName || 'KumikoExport',
     styleName: 'Regular',
-    unitsPerEm: fontData.unitsPerEm ?? 1000,
-    ascender: fontData.lineMetricsHorizontalLayout?.ascender?.value ?? 800,
-    descender: fontData.lineMetricsHorizontalLayout?.descender?.value ?? -200,
+    unitsPerEm: input.fontData.unitsPerEm ?? 1000,
+    ascender:
+      input.fontData.lineMetricsHorizontalLayout?.ascender?.value ?? 800,
+    descender:
+      input.fontData.lineMetricsHorizontalLayout?.descender?.value ?? -200,
     glyphs,
   })
   const sfntBuffer = font.toArrayBuffer()
   const getOutputBuffer = async () => {
     const compiledBuffer = await compileManagedFontFeatures(
       sfntBuffer,
-      fontData.openTypeFeatures,
+      input.fontData.openTypeFeatures,
       {
-        preserveSourceFontBuffer: fontData.binarySource?.sfntBuffer.slice(0),
+        preserveSourceFontBuffer: input.preserveSourceFontBuffer,
       }
     )
 
-    if (format === 'woff') {
+    if (input.format === 'woff') {
       const fonteditorCore = await loadFontEditorCore()
       return fonteditorCore.ttf2woff(compiledBuffer)
     }
-    if (format === 'woff2') {
+    if (input.format === 'woff2') {
       const fonteditorCore = await ensureWoff2Ready()
       return toExactArrayBuffer(fonteditorCore.ttftowoff2(compiledBuffer))
     }
     return compiledBuffer
   }
   const mime =
-    format === 'woff2'
+    input.format === 'woff2'
       ? 'font/woff2'
-      : format === 'woff'
+      : input.format === 'woff'
         ? 'font/woff'
-        : format === 'otf'
+        : input.format === 'otf'
           ? 'font/otf'
           : 'font/ttf'
   return getOutputBuffer().then((buffer) => new Blob([buffer], { type: mime }))
