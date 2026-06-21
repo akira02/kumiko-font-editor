@@ -4,7 +4,10 @@ import {
   type EventStream,
   type ToolEvent,
 } from 'src/features/editor/tools/BaseTool'
-import { asyncEventIterator } from 'src/features/editor/tools/toolPrimitives'
+import {
+  asyncEventIterator,
+  constrainHorizontalVerticalDiagonal,
+} from 'src/features/editor/tools/toolPrimitives'
 import {
   useStore,
   activeLayer,
@@ -64,7 +67,9 @@ export class KnifeTool extends BaseTool {
     for await (const event of asyncEventIterator(eventStream)) {
       event.preventDefault()
       const rawPoint = this.localPoint(event)
-      pointB = event.shiftKey ? constrainHorVerDiag(pointA, rawPoint) : rawPoint
+      pointB = event.shiftKey
+        ? constrainHorizontalVerticalDiagonal(pointA, rawPoint)
+        : rawPoint
       if (!didDrag && BaseTool.shouldInitiateDrag(pointA, pointB)) {
         didDrag = true
       }
@@ -498,25 +503,6 @@ function* iterPathSegments(path: PathData): Generator<PathSegment> {
 
 function isOnCurve(node: PathNode) {
   return isOnCurveNode(node)
-}
-
-function constrainHorVerDiag(
-  origin: { x: number; y: number },
-  point: { x: number; y: number }
-) {
-  const dx = point.x - origin.x
-  const dy = point.y - origin.y
-  if (Math.abs(dx) > Math.abs(dy) * 2) {
-    return { x: point.x, y: origin.y }
-  }
-  if (Math.abs(dy) > Math.abs(dx) * 2) {
-    return { x: origin.x, y: point.y }
-  }
-  const size = Math.max(Math.abs(dx), Math.abs(dy))
-  return {
-    x: origin.x + Math.sign(dx || 1) * size,
-    y: origin.y + Math.sign(dy || 1) * size,
-  }
 }
 
 function lineIntersection(

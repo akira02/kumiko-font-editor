@@ -4,7 +4,10 @@ import {
   type EventStream,
   type ToolEvent,
 } from 'src/features/editor/tools/BaseTool'
-import { asyncEventIterator } from 'src/features/editor/tools/toolPrimitives'
+import {
+  asyncEventIterator,
+  constrainHorizontalVerticalDiagonal,
+} from 'src/features/editor/tools/toolPrimitives'
 import { glyphRulerSegments, type Vec } from 'src/font/powerRuler'
 
 // Snap distance (screen px) within which a click jumps to the contour normal.
@@ -55,7 +58,9 @@ export class PowerRulerTool extends BaseTool {
     for await (const event of asyncEventIterator(eventStream)) {
       event.preventDefault()
       const raw = this.localPoint(event)
-      const pointB = event.shiftKey ? constrainHorVerDiag(pointA, raw) : raw
+      const pointB = event.shiftKey
+        ? constrainHorizontalVerticalDiagonal(pointA, raw)
+        : raw
       if (!didDrag && BaseTool.shouldInitiateDrag(pointA, pointB)) {
         didDrag = true
       }
@@ -134,21 +139,5 @@ function nearestOnLine(a: Vec, b: Vec, p: Vec): { point: Vec; tangent: Vec } {
   return {
     point: { x: a.x + dx * clamped, y: a.y + dy * clamped },
     tangent: { x: dx, y: dy },
-  }
-}
-
-function constrainHorVerDiag(origin: Vec, point: Vec): Vec {
-  const dx = point.x - origin.x
-  const dy = point.y - origin.y
-  if (Math.abs(dx) > Math.abs(dy) * 2) {
-    return { x: point.x, y: origin.y }
-  }
-  if (Math.abs(dy) > Math.abs(dx) * 2) {
-    return { x: origin.x, y: point.y }
-  }
-  const size = Math.max(Math.abs(dx), Math.abs(dy))
-  return {
-    x: origin.x + Math.sign(dx || 1) * size,
-    y: origin.y + Math.sign(dy || 1) * size,
   }
 }
