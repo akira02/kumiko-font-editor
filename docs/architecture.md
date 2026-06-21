@@ -54,9 +54,9 @@ key ideas:
   the global store.
 
 The low-level canvas (controller, scene view, rendering layers) lives in
-`src/canvas/` and is deliberately decoupled from React — it does not own React
-UI. Editor interaction tools (pointer, pen, brush, etc.) live separately under
-`src/features/editor/tools/`.
+`src/sceneView/` and is deliberately decoupled from React — it does not own
+React UI. Editor interaction tools (pointer, pen, brush, etc.) live separately
+under `src/features/editor/tools/`.
 
 ## Project structure
 
@@ -75,7 +75,7 @@ UI. Editor interaction tools (pointer, pen, brush, etc.) live separately under
 - `src/lib/`: data processing and integration logic shared by multiple features, such as UFO/Glyphs formats, GitHub API, IndexedDB persistence, and export worker clients.
 - `src/workers/`: Web Worker entry points for heavier background work such as search and large exports.
 - `src/hooks/`: React hooks shared across features.
-- `src/icons/`: shared project icon components.
+- `src/assets/icons/`: shared project icon assets.
 - `src/font/`: glyph path data structures and font-specific helpers.
   - `src/font/fontra-ported/`: pure algorithm modules ported file-by-file from Fontra, such as curve fitting and variable font interpolation. See that folder's README and [fontra-parity.md](fontra-parity.md).
 - `src/assets/`: frontend static assets.
