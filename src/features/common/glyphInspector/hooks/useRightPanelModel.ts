@@ -12,7 +12,7 @@ import {
 import type { PathBooleanOperation } from 'src/lib/pathBooleanOperations'
 import { useGitHubCommitFlow } from 'src/features/common/glyphInspector/hooks/useGitHubCommitFlow'
 import { useProjectSyncDirtyStatus } from 'src/features/common/glyphInspector/hooks/useProjectSyncDirtyStatus'
-import { useFlushCurrentDraft } from 'src/features/common/projectPersistence/useFlushCurrentDraft'
+import { useFlushCurrentDraft } from 'src/hooks/useFlushCurrentDraft'
 import { buildQualityReport } from 'src/features/common/qualityCheck/utils/qualityLint'
 import {
   parseNumberInput,

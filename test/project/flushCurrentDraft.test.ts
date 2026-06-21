@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { canFlushCurrentDraft } from 'src/features/common/projectPersistence/useFlushCurrentDraft'
+import { canFlushCurrentDraft } from 'src/hooks/useFlushCurrentDraft'
 import type { FontData } from 'src/store'
 
 const fontData = { glyphs: {}, glyphOrder: [] } satisfies FontData

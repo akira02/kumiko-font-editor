@@ -25,7 +25,7 @@ import {
   type SpacingBehaviorRow,
 } from 'src/lib/openTypeFeatures'
 import { useStore, type FontData, type GlyphData } from 'src/store'
-import { useFlushCurrentDraft } from 'src/features/common/projectPersistence/useFlushCurrentDraft'
+import { useFlushCurrentDraft } from 'src/hooks/useFlushCurrentDraft'
 import { CombinationBehaviorList } from 'src/features/editor/rightPanel/behaviors/CombinationBehaviorList'
 import { AlternateBehaviorList } from 'src/features/editor/rightPanel/behaviors/AlternateBehaviorList'
 import { SpacingBehaviorList } from 'src/features/editor/rightPanel/behaviors/SpacingBehaviorList'

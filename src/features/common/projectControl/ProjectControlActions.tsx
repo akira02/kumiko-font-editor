@@ -17,7 +17,7 @@ import {
   WarningTriangle,
 } from 'iconoir-react'
 import { AppSettingsModal } from 'src/features/common/projectControl/AppSettingsModal'
-import { useFlushCurrentDraft } from 'src/features/common/projectPersistence/useFlushCurrentDraft'
+import { useFlushCurrentDraft } from 'src/hooks/useFlushCurrentDraft'
 import { useStore } from 'src/store'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'

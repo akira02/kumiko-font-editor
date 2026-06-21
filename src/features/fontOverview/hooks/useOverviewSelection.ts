@@ -2,7 +2,7 @@ import { useCallback, useMemo, useRef, useState, type MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '@chakra-ui/react'
 import { useStore, type GlyphData } from 'src/store'
-import { useFlushCurrentDraft } from 'src/features/common/projectPersistence/useFlushCurrentDraft'
+import { useFlushCurrentDraft } from 'src/hooks/useFlushCurrentDraft'
 
 interface UseOverviewSelectionOptions {
   activeGlyphs: GlyphData[]

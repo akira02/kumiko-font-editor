@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { useFlushCurrentDraft } from 'src/features/common/projectPersistence/useFlushCurrentDraft'
+import { useFlushCurrentDraft } from 'src/hooks/useFlushCurrentDraft'
 import { flushPendingDraft } from 'src/lib/project/flushPendingDraft'
 import { createProjectUiStateSnapshot } from 'src/lib/project/projectUiState'
 import { useStore } from 'src/store'
