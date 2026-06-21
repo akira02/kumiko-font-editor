@@ -5,20 +5,10 @@ import {
   SceneView,
   VisualizationLayer,
   visualizationLayerDefinitions,
-  type Rect,
   type SceneModel,
 } from 'src/sceneView'
 import { SceneController } from 'src/features/editor/tools'
-import { useGlyphInsight } from 'src/features/editor/insight/glyphInsight'
-import { buildStructureGuideModel } from 'src/features/editor/insight/structureGuideModel'
-import { getGlyphUnicodeChar } from 'src/lib/glyph/glyphUnicode'
-import {
-  getNodeSegmentType,
-  isOffCurveNode,
-  useStore,
-  useTemporalStore,
-  getGlyphLayer,
-} from 'src/store'
+import { useStore, useTemporalStore, getGlyphLayer } from 'src/store'
 import { CanvasContextMenu } from 'src/features/editor/canvas/workspace/components/CanvasContextMenu'
 import { CanvasWorkspaceOverlay } from 'src/features/editor/canvas/workspace/components/CanvasWorkspaceOverlay'
 import { HiddenTextInput } from 'src/features/editor/canvas/workspace/components/HiddenTextInput'
@@ -31,35 +21,8 @@ import { useCanvasTextInput } from 'src/features/editor/canvas/workspace/hooks/u
 import type { ToolId } from 'src/features/editor/canvas/workspace/types'
 import { useCanvasClipboard } from 'src/features/editor/canvas/hooks/useCanvasClipboard'
 import { useCanvasKeyboardShortcuts } from 'src/features/editor/canvas/hooks/useCanvasKeyboardShortcuts'
-import { VarPackedPath } from 'src/font/VarPackedPath'
-import { buildReferenceCharPath } from 'src/lib/referenceFont/referenceFontStore'
-import type { PathData } from 'src/store'
-import { consumePendingEditorViewportRect } from 'src/features/editor/pendingEditorViewport'
 import { useReferenceFontRestoration } from 'src/features/editor/canvas/workspace/hooks/useReferenceFontRestoration'
-
-const buildPath2DFromPaths = (paths: PathData[]) =>
-  new Path2D(
-    VarPackedPath.fromUnpackedContours(
-      paths.map((path) => ({
-        isClosed: path.closed,
-        points: path.nodes.map((node, index) => {
-          const nextOnCurve = path.nodes
-            .slice(index + 1)
-            .find((candidate) => !isOffCurveNode(candidate))
-          return {
-            x: node.x,
-            y: node.y,
-            type: isOffCurveNode(node)
-              ? getNodeSegmentType(nextOnCurve) === 'quadratic'
-                ? ('offCurveQuad' as const)
-                : ('offCurveCubic' as const)
-              : ('onCurve' as const),
-            smooth: isOffCurveNode(node) ? false : (node.smooth ?? false),
-          }
-        }),
-      }))
-    ).toSVGPath()
-  )
+import { useCanvasSceneModelSync } from 'src/features/editor/canvas/workspace/hooks/useCanvasSceneModelSync'
 
 export function CanvasWorkspace() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -383,43 +346,6 @@ export function CanvasWorkspace() {
     }
   }, [clearPreviewGlyphMetrics, selectedGlyphId])
 
-  useEffect(() => {
-    const sceneController = sceneControllerRef.current
-    const controller = canvasControllerRef.current
-    if (!sceneController || !controller) {
-      return
-    }
-
-    sceneController.sceneModel.componentGhostPath = componentGhostPaths?.length
-      ? buildPath2DFromPaths(componentGhostPaths)
-      : undefined
-    sceneController.sceneModel.componentTargetBox =
-      componentTargetRect ?? undefined
-    controller.requestUpdate()
-  }, [componentGhostPaths, componentTargetRect])
-
-  const insight = useGlyphInsight()
-  const structureGuide = useMemo(
-    () =>
-      insight.showBands &&
-      insight.sample &&
-      insight.baseline &&
-      insight.sample.glyphId === activeEditorGlyphId
-        ? buildStructureGuideModel(insight.sample, insight.baseline)
-        : undefined,
-    [activeEditorGlyphId, insight.baseline, insight.sample, insight.showBands]
-  )
-
-  useEffect(() => {
-    const sceneController = sceneControllerRef.current
-    const controller = canvasControllerRef.current
-    if (!sceneController || !controller) {
-      return
-    }
-    sceneController.sceneModel.structureGuide = structureGuide
-    controller.requestUpdate()
-  }, [structureGuide])
-
   useReferenceFontRestoration({
     projectId,
     setReferenceFontChar,
@@ -427,157 +353,28 @@ export function CanvasWorkspace() {
     setReferenceFontVisible,
   })
 
-  useEffect(() => {
-    const sceneController = sceneControllerRef.current
-    const controller = canvasControllerRef.current
-    if (!sceneController || !controller) {
-      return
-    }
-
-    const glyph = activeEditorGlyphId
-      ? fontData?.glyphs[activeEditorGlyphId]
-      : null
-    const fallbackChar = getGlyphUnicodeChar(glyph ?? undefined)
-    const char = referenceFontChar || fallbackChar
-    const unitsPerEm = fontData?.unitsPerEm ?? 1000
-    const advanceWidth =
-      getGlyphLayer(glyph ?? undefined, selectedLayerId)?.metrics.width ??
-      unitsPerEm
-
-    sceneController.sceneModel.referencePath =
-      referenceFontVisible && referenceFontName && char
-        ? (buildReferenceCharPath(char, unitsPerEm, advanceWidth) ?? undefined)
-        : undefined
-    controller.requestUpdate()
-  }, [
+  useCanvasSceneModelSync({
     activeEditorGlyphId,
-    fontData,
-    referenceFontChar,
-    referenceFontName,
-    referenceFontVisible,
-    selectedLayerId,
-  ])
-
-  useEffect(() => {
-    const sceneController = sceneControllerRef.current
-    const controller = canvasControllerRef.current
-    if (!sceneController || !controller) {
-      return
-    }
-
-    const glyph = activeEditorGlyphId
-      ? fontData?.glyphs[activeEditorGlyphId]
-      : null
-    const activeLayerId = glyph
-      ? (selectedLayerId ?? glyph.activeLayerId ?? null)
-      : null
-    const paths: Path2D[] = []
-    if (glyph) {
-      for (const layerId of visibleBackdropLayerIds) {
-        if (layerId === activeLayerId) {
-          continue
-        }
-        const layer = getGlyphLayer(glyph, layerId)
-        if (layer?.paths?.length) {
-          paths.push(buildPath2DFromPaths(layer.paths))
-        }
-      }
-    }
-    sceneController.sceneModel.backdropPaths = paths.length ? paths : undefined
-    sceneController.sceneModel.hideActiveLayer = hideActiveLayer
-    controller.requestUpdate()
-  }, [
-    activeEditorGlyphId,
-    fontData,
-    hideActiveLayer,
-    selectedLayerId,
-    visibleBackdropLayerIds,
-  ])
-
-  useEffect(() => {
-    const sceneController = sceneControllerRef.current
-    const controller = canvasControllerRef.current
-    if (!sceneController || !controller) {
-      return
-    }
-
-    sceneController.sceneModel.glyph = positionedGlyph
-    sceneController.sceneModel.glyphs = positionedGlyphs
-    if (activeToolId === 'text') {
-      const metrics = fontData?.lineMetricsHorizontalLayout
-      const yMin = metrics?.descender?.value ?? -220
-      const yMax = metrics?.ascender?.value ?? 900
-      const cursorX = getCursorX(editorTextCursorIndex)
-      sceneController.sceneModel.textCursor = { x: cursorX, yMin, yMax }
-    } else {
-      sceneController.sceneModel.textCursor = undefined
-    }
-    sceneController.sceneModel.lineMetricsHorizontalLayout =
-      fontData?.lineMetricsHorizontalLayout
-    const selectionPointIds = new Set(
-      selectedNodeIds.flatMap((selectedNodeId) => {
-        const pointRefs = positionedGlyph?.pointRefs ?? []
-        const pointIndex = pointRefs.findIndex(
-          (pointRef) =>
-            `${pointRef.pathId}:${pointRef.nodeId}` === selectedNodeId
-        )
-        return pointIndex >= 0 ? [`point/${pointIndex}`] : []
-      })
-    )
-    sceneController.sceneModel.selection = selectionPointIds
-    sceneController.selection = selectionPointIds
-
-    // Never push the store viewport back here: it is a delayed echo of the
-    // controller's own state and rewinds the canvas mid-pan (visible jump).
-    controller.requestUpdate()
-  }, [
     activeToolId,
+    canvasControllerRef,
+    canvasSize,
+    componentGhostPaths,
+    componentTargetRect,
+    didCenterInitialGlyphRef,
     editorTextCursorIndex,
     fontData,
     getCursorX,
+    hideActiveLayer,
     positionedGlyph,
     positionedGlyphs,
+    referenceFontChar,
+    referenceFontName,
+    referenceFontVisible,
+    sceneControllerRef,
+    selectedLayerId,
     selectedNodeIds,
-  ])
-
-  useEffect(() => {
-    const controller = canvasControllerRef.current
-    if (
-      didCenterInitialGlyphRef.current ||
-      !controller ||
-      !positionedGlyph ||
-      canvasSize.width === 0 ||
-      canvasSize.height === 0
-    ) {
-      return
-    }
-
-    const metrics = fontData?.lineMetricsHorizontalLayout
-    const fallbackYMin = metrics?.descender?.value ?? -220
-    const fallbackYMax = metrics?.ascender?.value ?? 900
-    const bounds = positionedGlyph.glyph.path.getControlBounds()
-    const xMin = positionedGlyph.x + Math.min(bounds?.xMin ?? 0, 0)
-    const xMax =
-      positionedGlyph.x +
-      Math.max(
-        bounds?.xMax ?? positionedGlyph.glyph.xAdvance,
-        positionedGlyph.glyph.xAdvance
-      )
-    const yMin = Math.min(bounds?.yMin ?? fallbackYMin, fallbackYMin)
-    const yMax = Math.max(bounds?.yMax ?? fallbackYMax, fallbackYMax)
-    const paddingX = Math.max(80, (xMax - xMin) * 0.18)
-    const paddingY = Math.max(120, (yMax - yMin) * 0.12)
-    const viewBox: Rect = {
-      xMin: xMin - paddingX,
-      yMin: yMin - paddingY,
-      xMax: xMax + paddingX,
-      yMax: yMax + paddingY,
-    }
-
-    didCenterInitialGlyphRef.current = true
-    const pendingRect = consumePendingEditorViewportRect()
-    controller.fitRect(pendingRect ?? viewBox)
-  }, [canvasSize.height, canvasSize.width, fontData, positionedGlyph])
+    visibleBackdropLayerIds,
+  })
 
   useEffect(() => {
     const canvas = canvasRef.current
