@@ -14,7 +14,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "format": "prettier --write .",
-    "lint": "prettier --check . && eslint .",
+    "lint": "prettier --check . && eslint --max-warnings=0 .",
     "preview": "vite preview",
     "data:glyphdata": "node scripts/build-glyphdata.mjs",
     "data:ids": "node scripts/build-ids-data.mjs",
@@ -23,8 +23,8 @@
     "cf:deploy": "pnpm build && npx wrangler pages deploy dist"
   },
   "lint-staged": {
-    "*": "prettier --write --ignore-unknown",
-    "*.{js,jsx,ts,tsx}": "eslint --fix"
+    "*": "prettier --check --ignore-unknown",
+    "*.{js,jsx,ts,tsx}": "eslint --max-warnings=0"
   },
   "dependencies": {
     "@chakra-ui/react": "^2.10.0",

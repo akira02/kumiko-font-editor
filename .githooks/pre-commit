@@ -1,5 +1,5 @@
 #!/bin/sh
 set -eu
 
-echo "Run pnpm lint before committing."
-pnpm lint-staged
+echo "Run staged lint before committing."
+pnpm exec lint-staged
