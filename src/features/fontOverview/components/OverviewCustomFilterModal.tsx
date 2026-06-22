@@ -215,7 +215,7 @@ function PresetFilterList({
   const { t } = useTranslation()
 
   return (
-    <SimpleGrid columns={{ base: 1, md: 2 }} spacing={2}>
+    <SimpleGrid columns={{ base: 1, sm: 2, md: 3 }} spacing={2}>
       {presets.map((preset) => {
         const isActive = activePresetId === preset.id
         const selectedBg = 'field.ink'
@@ -656,7 +656,7 @@ export function OverviewCustomFilterModal({
       isOpen={isOpen}
       onClose={onClose}
       scrollBehavior="inside"
-      size="4xl"
+      size="3xl"
     >
       <ModalOverlay />
       {isOpen ? (
