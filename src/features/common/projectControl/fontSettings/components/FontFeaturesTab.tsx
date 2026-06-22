@@ -2,7 +2,7 @@ import { Box, Grid, GridItem, Stack } from '@chakra-ui/react'
 import { useMemo, useState } from 'react'
 import { FeatureClassesPanel } from 'src/features/common/projectControl/fontSettings/features/components/FeatureClassesPanel'
 import { FeatureDetailPanel } from 'src/features/common/projectControl/fontSettings/features/components/FeatureDetailPanel'
-import { FeaturePreludePanel } from 'src/features/common/projectControl/fontSettings/features/components/FeaturePreludePanel'
+import { FeatureSourcePanel } from 'src/features/common/projectControl/fontSettings/features/components/FeatureSourcePanel'
 import { FeatureSummary } from 'src/features/common/projectControl/fontSettings/features/components/FeatureSummary'
 import {
   FeatureWorkbenchSidebar,
@@ -35,7 +35,7 @@ export function FontFeaturesTab({
   onOpenTypeFeaturesChange,
 }: FontFeaturesTabProps) {
   const [selected, setSelected] = useState<FeatureWorkbenchSelection>({
-    kind: 'prelude',
+    kind: 'source',
   })
   const diagnostics = useMemo(
     () => (fontData ? validateFeatures(openTypeFeatures, fontData) : []),
@@ -83,7 +83,7 @@ export function FontFeaturesTab({
       : null
   const activeSelection =
     selected.kind === 'feature' && !selectedFeature
-      ? ({ kind: 'prelude' } as const)
+      ? ({ kind: 'source' } as const)
       : selected
 
   return (
@@ -130,7 +130,7 @@ export function FontFeaturesTab({
                 onRuleChange={updateRule}
               />
             ) : (
-              <FeaturePreludePanel
+              <FeatureSourcePanel
                 rawFeatureText={openTypeFeatures.rawFeatureText ?? ''}
                 state={openTypeFeatures}
                 onRawFeatureTextChange={updateRawFeatureText}

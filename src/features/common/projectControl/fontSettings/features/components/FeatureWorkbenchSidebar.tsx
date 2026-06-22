@@ -7,7 +7,7 @@ import type {
 import { useTranslation } from 'react-i18next'
 
 export type FeatureWorkbenchSelection =
-  | { kind: 'prelude' }
+  | { kind: 'source' }
   | { kind: 'workflow' }
   | { kind: 'classes' }
   | { kind: 'feature'; featureId: string }
@@ -36,12 +36,12 @@ export function FeatureWorkbenchSidebar({
       pr={{ base: 0, lg: 4 }}
       minW={0}
     >
-      <SidebarSection title={t('projectControl.preludeSection')}>
+      <SidebarSection title={t('projectControl.sourceSection')}>
         <SidebarButton
-          isSelected={selected.kind === 'prelude'}
-          label={t('projectControl.prelude')}
+          isSelected={selected.kind === 'source'}
+          label={t('projectControl.source')}
           detail={`${state.languagesystems.length} language systems`}
-          onClick={() => onSelect({ kind: 'prelude' })}
+          onClick={() => onSelect({ kind: 'source' })}
         />
       </SidebarSection>
 

@@ -68,7 +68,7 @@ describe('UFO feature text selection', () => {
     expect(featureText).toContain('sub f i by f_i;')
   })
 
-  it('emits raw prelude even when no managed feature is active', () => {
+  it('emits raw feature source even when no managed feature is active', () => {
     const state: OpenTypeFeaturesState = {
       ...createEmptyOpenTypeFeaturesState(),
       rawFeatureText: '@Code = [hyphen greater];',

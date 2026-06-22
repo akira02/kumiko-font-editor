@@ -11,25 +11,25 @@ import {
 import type { OpenTypeFeaturesState } from 'src/lib/openTypeFeatures'
 import { useTranslation } from 'react-i18next'
 
-interface FeaturePreludePanelProps {
+interface FeatureSourcePanelProps {
   rawFeatureText: string
   state: OpenTypeFeaturesState
   onRawFeatureTextChange: (value: string) => void
 }
 
-export function FeaturePreludePanel({
+export function FeatureSourcePanel({
   rawFeatureText,
   state,
   onRawFeatureTextChange,
-}: FeaturePreludePanelProps) {
+}: FeatureSourcePanelProps) {
   const { t } = useTranslation()
 
   return (
     <Stack spacing={4}>
       <Stack spacing={2}>
-        <Text fontWeight="semibold">{t('projectControl.prelude')}</Text>
+        <Text fontWeight="semibold">{t('projectControl.source')}</Text>
         <Text fontSize="sm" color="field.muted">
-          {t('projectControl.featurePreludeDataFlow')}
+          {t('projectControl.featureSourceDataFlow')}
         </Text>
       </Stack>
 

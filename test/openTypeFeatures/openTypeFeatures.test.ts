@@ -226,6 +226,18 @@ describe('OpenType auto feature suggestions', () => {
 })
 
 describe('OpenType FEA source maps', () => {
+  it('includes raw .fea source in generated FEA output', () => {
+    const generated = generateFea({
+      ...createEmptyOpenTypeFeaturesState(),
+      rawFeatureText: '@Code = [hyphen greater];',
+    })
+
+    expect(generated.text).toContain('@Code = [hyphen greater];')
+    expect(generated.text.indexOf('@Code = [hyphen greater];')).toBeLessThan(
+      generated.text.indexOf('languagesystem DFLT dflt;')
+    )
+  })
+
   it('emits trace comments and source map entries for generated rules', () => {
     const generated = generateFea(
       makeStateWithRule({
