@@ -23,6 +23,9 @@ import { useCanvasClipboard } from 'src/features/editor/canvas/hooks/useCanvasCl
 import { useCanvasKeyboardShortcuts } from 'src/features/editor/canvas/hooks/useCanvasKeyboardShortcuts'
 import { useReferenceFontRestoration } from 'src/features/editor/canvas/workspace/hooks/useReferenceFontRestoration'
 import { useCanvasSceneModelSync } from 'src/features/editor/canvas/workspace/hooks/useCanvasSceneModelSync'
+import { isGlyphGeometryLoaded } from 'src/lib/glyph/glyphGeometryState'
+import { loadProjectGlyphGeometryClosure } from 'src/lib/project/projectRepository'
+import type { GlyphData } from 'src/store'
 
 export function CanvasWorkspace() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -32,6 +35,7 @@ export function CanvasWorkspace() {
   const temporaryToolRef = useRef<ToolId | null>(null)
   const hiddenTextInputRef = useRef<HTMLTextAreaElement | null>(null)
   const didCenterInitialGlyphRef = useRef(false)
+  const editorGeometryLoadRef = useRef(new Map<string, Promise<GlyphData[]>>())
   const layerGeometryCache = useMemo(
     () => new Map<string, LayerGeometryCacheEntry>(),
     []
@@ -80,11 +84,13 @@ export function CanvasWorkspace() {
   const referenceFontVisible = useStore((state) => state.referenceFontVisible)
   const referenceFontChar = useStore((state) => state.referenceFontChar)
   const projectId = useStore((state) => state.projectId)
+  const hydrateGlyphGeometry = useStore((state) => state.hydrateGlyphGeometry)
   const setReferenceFontName = useStore((state) => state.setReferenceFontName)
   const setReferenceFontVisible = useStore(
     (state) => state.setReferenceFontVisible
   )
   const setReferenceFontChar = useStore((state) => state.setReferenceFontChar)
+  const addGlyphs = useStore((state) => state.addGlyphs)
   const visibleBackdropLayerIds = useStore(
     (state) => state.visibleBackdropLayerIds
   )
@@ -164,6 +170,7 @@ export function CanvasWorkspace() {
     textInputValue,
   } = useCanvasTextInput({
     activeToolId,
+    addGlyphs,
     canvasSize,
     editorGlyphIds,
     editorText,
@@ -352,6 +359,45 @@ export function CanvasWorkspace() {
     setReferenceFontName,
     setReferenceFontVisible,
   })
+
+  useEffect(() => {
+    if (!projectId || editorGlyphIds.length === 0) {
+      return
+    }
+
+    const currentGlyphs = useStore.getState().fontData?.glyphs ?? {}
+    const missingGlyphIds = [...new Set(editorGlyphIds)]
+      .filter((glyphId) => {
+        const glyph = currentGlyphs[glyphId]
+        return glyph && !isGlyphGeometryLoaded(glyph)
+      })
+      .filter((glyphId) => !editorGeometryLoadRef.current.has(glyphId))
+    if (missingGlyphIds.length === 0) {
+      return
+    }
+
+    const loadedGlyphIds = Object.values(currentGlyphs)
+      .filter(isGlyphGeometryLoaded)
+      .map((glyph) => glyph.id)
+    const loadPromise = loadProjectGlyphGeometryClosure(
+      projectId,
+      missingGlyphIds,
+      { loadedGlyphIds }
+    ).finally(() => {
+      for (const glyphId of missingGlyphIds) {
+        editorGeometryLoadRef.current.delete(glyphId)
+      }
+    })
+
+    for (const glyphId of missingGlyphIds) {
+      editorGeometryLoadRef.current.set(glyphId, loadPromise)
+    }
+    void loadPromise.then((loadedGlyphs) => {
+      if (useStore.getState().projectId === projectId) {
+        hydrateGlyphGeometry(loadedGlyphs)
+      }
+    })
+  }, [editorGlyphIds, hydrateGlyphGeometry, projectId])
 
   useCanvasSceneModelSync({
     activeEditorGlyphId,

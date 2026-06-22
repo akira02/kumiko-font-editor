@@ -12,6 +12,7 @@ import type { PositionedGlyph } from 'src/sceneView'
 import type { FontData, ViewportState } from 'src/store'
 import type { ToolId } from 'src/features/editor/canvas/workspace/types'
 import {
+  buildTextInputCommitPlan,
   buildGlyphIdByCharacter,
   charIndexToCodeUnitIndex,
   codeUnitIndexToCharIndex,
@@ -19,6 +20,15 @@ import {
 
 interface CanvasTextInputOptions {
   activeToolId: ToolId
+  addGlyphs: (
+    glyphs: Array<{
+      id: string
+      name: string
+      unicode: string | null
+      production?: string | null
+      width?: number
+    }>
+  ) => string[]
   canvasSize: { width: number; height: number }
   editorGlyphIds: string[]
   editorText: string
@@ -39,6 +49,7 @@ interface CanvasTextInputOptions {
 
 export function useCanvasTextInput({
   activeToolId,
+  addGlyphs,
   canvasSize,
   editorGlyphIds,
   editorText,
@@ -62,30 +73,24 @@ export function useCanvasTextInput({
 
   const commitTextInputValue = useCallback(
     (value: string, selectionStart: number | null) => {
-      const beforeCursor = value.slice(0, selectionStart ?? value.length)
-      const supportedChars = Array.from(value).filter((character) =>
-        glyphIdByCharacter.has(character)
-      )
-      const supportedBeforeCursor = Array.from(beforeCursor).filter(
-        (character) => glyphIdByCharacter.has(character)
-      )
-      const glyphIds = supportedChars
-        .map((character) => glyphIdByCharacter.get(character))
-        .filter((glyphId): glyphId is string => Boolean(glyphId))
+      const commitPlan = buildTextInputCommitPlan({
+        fontData,
+        glyphIdByCharacter,
+        selectionStart,
+        value,
+      })
+      if (commitPlan.glyphsToAdd.length > 0) {
+        addGlyphs(commitPlan.glyphsToAdd)
+      }
       setEditorTextState(
-        supportedChars.join(''),
-        glyphIds,
-        supportedBeforeCursor.length,
-        glyphIds.length > 0
-          ? Math.max(
-              0,
-              Math.min(supportedBeforeCursor.length - 1, glyphIds.length - 1)
-            )
-          : 0
+        commitPlan.text,
+        commitPlan.glyphIds,
+        commitPlan.cursorIndex,
+        commitPlan.activeGlyphIndex
       )
-      setDraftTextInputValue(supportedChars.join(''))
+      setDraftTextInputValue(commitPlan.text)
     },
-    [glyphIdByCharacter, setEditorTextState]
+    [addGlyphs, fontData, glyphIdByCharacter, setEditorTextState]
   )
 
   const getCursorX = useCallback(

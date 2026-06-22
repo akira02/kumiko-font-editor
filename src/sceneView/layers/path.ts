@@ -96,7 +96,7 @@ registerVisualizationLayerDefinition({
 registerVisualizationLayerDefinition({
   identifier: 'main.edit.empty.placeholder',
   name: 'Empty Glyph Placeholder',
-  selectionFunc: glyphSelector('editing'),
+  selectionFunc: glyphSelector('all'),
   zIndex: 499,
   colors: { fillColor: 'rgba(102, 112, 100, 0.2)' },
   draw: (
@@ -107,6 +107,7 @@ registerVisualizationLayerDefinition({
   ) => {
     if (
       isHandTool(model) ||
+      (model.activeToolIdentifier !== 'text' && !positionedGlyph.isEditing) ||
       !positionedGlyph.isEmpty ||
       !positionedGlyph.displayCharacter
     ) {
