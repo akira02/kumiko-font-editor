@@ -650,9 +650,9 @@ function OverviewCustomFilterModalForm({
           gap={4}
           justify="space-between"
           pb={3}
-          pr={20}
           pt={5}
           px={6}
+          pr={14}
         >
           <Text as="h2" flexShrink={0} fontSize="xl" fontWeight="900">
             {activeTabIndex === 0
