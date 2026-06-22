@@ -25,6 +25,10 @@ Use three format-independent stores:
 | `kumiko_glyphs`   | `[projectId, glyphId]` | One canonical glyph record containing all layers for that glyph.                                                              |
 | `kumiko_ui_state` | `[projectId, key]`     | Editor UI state, selected glyph/layer, and non-font user state. The persistence queue is runtime-only and is not stored here. |
 
+Overview custom filters are intentionally excluded from `kumiko_ui_state`.
+They are app-level preferences backed by browser storage, because they describe
+the user's sidebar workflow rather than a specific font project.
+
 Recommended `kumiko_glyphs` indexes:
 
 - `byProject`: `projectId`

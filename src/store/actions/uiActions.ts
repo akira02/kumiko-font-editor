@@ -17,6 +17,7 @@ import {
   customOverviewFilterIdToNodeId,
   normalizeOverviewCustomFilters,
 } from 'src/lib/glyph/glyphOverview'
+import { saveAppOverviewCustomFilters } from 'src/lib/preferences/appPreferences'
 
 type ImmerSet = Parameters<
   StateCreator<GlobalState, [['zustand/immer', never]], []>
@@ -63,11 +64,13 @@ export const buildUiActions = (set: ImmerSet) => ({
         sort: filter.sort ?? 'codePoint',
         source: filter.source ?? 'user',
       }
-      state.overviewCustomFilters.push(
+      const normalizedFilter =
         normalizeOverviewCustomFilters([nextFilter])[0] ?? nextFilter
-      )
+      state.overviewCustomFilters = saveAppOverviewCustomFilters([
+        ...state.overviewCustomFilters,
+        normalizedFilter,
+      ])
       state.overviewSectionId = customOverviewFilterIdToNodeId(filterId)
-      markUiStateDirty(state)
     })
     return filterId
   },
@@ -82,22 +85,25 @@ export const buildUiActions = (set: ImmerSet) => ({
       if (index < 0) {
         return
       }
-      state.overviewCustomFilters[index] =
+      const normalizedFilter =
         normalizeOverviewCustomFilters([filter])[0] ?? filter
-      markUiStateDirty(state)
+      state.overviewCustomFilters = saveAppOverviewCustomFilters(
+        state.overviewCustomFilters.map((currentFilter, currentIndex) =>
+          currentIndex === index ? normalizedFilter : currentFilter
+        )
+      )
     }),
 
   deleteOverviewCustomFilter: (filterId: string) =>
     set((state) => {
-      state.overviewCustomFilters = state.overviewCustomFilters.filter(
-        (filter) => filter.id !== filterId
+      state.overviewCustomFilters = saveAppOverviewCustomFilters(
+        state.overviewCustomFilters.filter((filter) => filter.id !== filterId)
       )
       if (
         state.overviewSectionId === customOverviewFilterIdToNodeId(filterId)
       ) {
         state.overviewSectionId = 'filters'
       }
-      markUiStateDirty(state)
     }),
 
   // Rebuild the overview list against the current fontData. Needed after an

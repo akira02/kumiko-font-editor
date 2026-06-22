@@ -1,5 +1,4 @@
 import type { FontData } from 'src/store'
-import type { OverviewCustomFilter } from 'src/lib/glyph/glyphOverview'
 import type { GlyphsPackageData } from 'src/lib/fontFormats/glyphsPackage'
 import type { KumikoProjectSourceData } from 'src/lib/project/kumikoProjectTypes'
 import type {
@@ -16,7 +15,6 @@ export interface KumikoProjectUiState {
   overviewSectionId?: string | null
   overviewTopGlyphId?: string | null
   overviewGridState?: unknown | null
-  overviewCustomFilters?: OverviewCustomFilter[] | null
 }
 
 export interface GitHubProjectSource {

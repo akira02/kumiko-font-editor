@@ -1,5 +1,4 @@
 import type { KumikoProjectUiState } from 'src/lib/project/projectTypes'
-import { normalizeOverviewCustomFilters } from 'src/lib/glyph/glyphOverview'
 
 export const createProjectUiStateSnapshot = (input: KumikoProjectUiState) => ({
   selectedGlyphId: input.selectedGlyphId ?? null,
@@ -8,7 +7,4 @@ export const createProjectUiStateSnapshot = (input: KumikoProjectUiState) => ({
   overviewSectionId: input.overviewSectionId ?? null,
   overviewTopGlyphId: input.overviewTopGlyphId ?? null,
   overviewGridState: input.overviewGridState ?? null,
-  overviewCustomFilters: normalizeOverviewCustomFilters(
-    input.overviewCustomFilters
-  ),
 })
