@@ -28,11 +28,32 @@ import {
   collectOverviewGeometryGlyphIds,
   OVERVIEW_MAX_RESIDENT_GLYPH_GEOMETRY,
 } from 'src/features/fontOverview/utils/overviewGeometryWindow'
+import {
+  buildOverviewGridZoomLayout,
+  clampOverviewGridSizePx,
+  DEFAULT_OVERVIEW_GRID_SIZE_PX,
+  formatOverviewGridSizeInput,
+  MAX_OVERVIEW_GRID_SIZE_PX,
+  MIN_OVERVIEW_GRID_SIZE_PX,
+  OVERVIEW_GRID_SIZE_STEP_BY_UNIT,
+  overviewGridSizeUnitToPx,
+  overviewGridSizePxToUnit,
+  parseOverviewGridSizeInput,
+  type OverviewGridSizeUnit,
+} from 'src/features/fontOverview/utils/overviewGridZoom'
 
 export function FontOverviewScreen() {
   useHistoryShortcuts()
 
   const [showOnlyEmptyGlyphs, setShowOnlyEmptyGlyphs] = useState(false)
+  const [overviewGridSizePx, setOverviewGridSizePx] = useState(
+    DEFAULT_OVERVIEW_GRID_SIZE_PX
+  )
+  const [overviewGridSizeUnit, setOverviewGridSizeUnit] =
+    useState<OverviewGridSizeUnit>('px')
+  const [overviewGridSizeInput, setOverviewGridSizeInput] = useState(() =>
+    formatOverviewGridSizeInput(DEFAULT_OVERVIEW_GRID_SIZE_PX, 'px')
+  )
   const [transitioningGlyphId, setTransitioningGlyphId] = useState<
     string | null
   >(null)
@@ -96,6 +117,12 @@ export function FontOverviewScreen() {
 
   const selectedGlyph =
     overviewGlyphs.find((glyph) => glyph.id === selectedGlyphId) ?? null
+  const overviewGridZoom = useMemo(
+    () => buildOverviewGridZoomLayout(overviewGridSizePx),
+    [overviewGridSizePx]
+  )
+  const canZoomIn = overviewGridSizePx < MAX_OVERVIEW_GRID_SIZE_PX
+  const canZoomOut = overviewGridSizePx > MIN_OVERVIEW_GRID_SIZE_PX
   const glyphMap = useMemo(() => fontData?.glyphs ?? {}, [fontData?.glyphs])
   const overviewPreviewGlyphIds = useMemo(() => {
     if (overviewPreviewWindow?.sectionId === activeSection.id) {
@@ -272,6 +299,88 @@ export function FontOverviewScreen() {
     }
   }
 
+  const applyOverviewGridSizePx = useCallback(
+    (nextSizePx: number) => {
+      const clampedSizePx = clampOverviewGridSizePx(nextSizePx)
+      resetGridState()
+      setOverviewGridSizePx(clampedSizePx)
+      return clampedSizePx
+    },
+    [resetGridState]
+  )
+
+  const handleOverviewGridSizeInputChange = useCallback(
+    (value: string) => {
+      setOverviewGridSizeInput(value)
+      const parsedInput = parseOverviewGridSizeInput(value)
+      if (parsedInput === null) {
+        return
+      }
+
+      applyOverviewGridSizePx(
+        overviewGridSizeUnitToPx(parsedInput.value, parsedInput.unit)
+      )
+      setOverviewGridSizeUnit(parsedInput.unit)
+    },
+    [applyOverviewGridSizePx]
+  )
+
+  const handleOverviewGridSizeInputBlur = useCallback(() => {
+    const parsedInput = parseOverviewGridSizeInput(overviewGridSizeInput)
+    if (parsedInput === null) {
+      setOverviewGridSizeInput(
+        formatOverviewGridSizeInput(overviewGridSizePx, overviewGridSizeUnit)
+      )
+      return
+    }
+
+    const clampedSizePx = applyOverviewGridSizePx(
+      overviewGridSizeUnitToPx(parsedInput.value, parsedInput.unit)
+    )
+    setOverviewGridSizeUnit(parsedInput.unit)
+    setOverviewGridSizeInput(
+      formatOverviewGridSizeInput(clampedSizePx, parsedInput.unit)
+    )
+  }, [
+    applyOverviewGridSizePx,
+    overviewGridSizeInput,
+    overviewGridSizePx,
+    overviewGridSizeUnit,
+  ])
+
+  const stepOverviewGridSize = useCallback(
+    (direction: 1 | -1) => {
+      const parsedInput = parseOverviewGridSizeInput(overviewGridSizeInput)
+      const stepUnit = parsedInput?.unit ?? overviewGridSizeUnit
+      const currentUnitValue =
+        parsedInput?.value ??
+        overviewGridSizePxToUnit(overviewGridSizePx, stepUnit)
+      const nextUnitValue =
+        currentUnitValue + OVERVIEW_GRID_SIZE_STEP_BY_UNIT[stepUnit] * direction
+      const clampedSizePx = applyOverviewGridSizePx(
+        overviewGridSizeUnitToPx(nextUnitValue, stepUnit)
+      )
+      setOverviewGridSizeUnit(stepUnit)
+      setOverviewGridSizeInput(
+        formatOverviewGridSizeInput(clampedSizePx, stepUnit)
+      )
+    },
+    [
+      applyOverviewGridSizePx,
+      overviewGridSizeInput,
+      overviewGridSizePx,
+      overviewGridSizeUnit,
+    ]
+  )
+
+  const handleOverviewZoomIn = useCallback(() => {
+    stepOverviewGridSize(1)
+  }, [stepOverviewGridSize])
+
+  const handleOverviewZoomOut = useCallback(() => {
+    stepOverviewGridSize(-1)
+  }, [stepOverviewGridSize])
+
   const handleEnterEditor = useCallback(
     async (glyphId: string) => {
       savePendingGridState()
@@ -384,9 +493,17 @@ export function FontOverviewScreen() {
             topGlyphId={overviewTopGlyphId}
             transitioningGlyphId={transitioningGlyphId}
             visibleSections={visibleSections}
+            zoomLayout={overviewGridZoom}
+            zoomSizeInputValue={overviewGridSizeInput}
+            canZoomIn={canZoomIn}
+            canZoomOut={canZoomOut}
             onEnterEditor={handleEnterEditor}
             onOpenAddGlyphModal={openAddGlyphModal}
             onGridStateChange={handleGridStateChange}
+            onZoomSizeInputBlur={handleOverviewGridSizeInputBlur}
+            onZoomSizeInputChange={handleOverviewGridSizeInputChange}
+            onZoomIn={handleOverviewZoomIn}
+            onZoomOut={handleOverviewZoomOut}
             onRangeChange={handleRangeChange}
             onSelectGlyph={handleGlyphSelect}
           />

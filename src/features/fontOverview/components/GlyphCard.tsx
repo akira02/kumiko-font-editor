@@ -11,6 +11,9 @@ interface GlyphCardProps {
   glyph: GlyphData
   glyphMap: Record<string, GlyphData>
   preview: GlyphPreviewData | null
+  cardHeight: number
+  previewHeight: number
+  showGlyphName: boolean
   isSelected: boolean
   isTransitioning?: boolean
   onEnterEditor: (glyphId: string) => void
@@ -21,6 +24,9 @@ export const GlyphCard = memo(function GlyphCard({
   glyph,
   glyphMap,
   preview,
+  cardHeight,
+  previewHeight,
+  showGlyphName,
   isSelected,
   isTransitioning,
   onEnterEditor,
@@ -50,7 +56,8 @@ export const GlyphCard = memo(function GlyphCard({
   return (
     <Box
       p={1}
-      h="140px"
+      h={`${cardHeight}px`}
+      overflow="hidden"
       sx={{ contain: 'layout paint style' }}
       borderRadius="sm"
       bg={isSelected ? 'field.yellow.300' : 'field.panel'}
@@ -61,8 +68,14 @@ export const GlyphCard = memo(function GlyphCard({
       onDoubleClick={handleDoubleClick}
       onMouseDown={handleMouseDown}
     >
-      <Stack spacing={1} h="100%">
-        <Flex align="center" justify="center" h="104px" borderRadius="sm">
+      <Stack spacing={showGlyphName ? 1 : 0} h="100%">
+        <Flex
+          align="center"
+          justify="center"
+          h={`${previewHeight}px`}
+          minH={0}
+          borderRadius="sm"
+        >
           <Box
             data-overview-glyph-preview-id={glyph.id}
             w="100%"
@@ -81,15 +94,17 @@ export const GlyphCard = memo(function GlyphCard({
           </Box>
         </Flex>
 
-        <Text
-          fontSize="xs"
-          color="field.muted"
-          noOfLines={1}
-          textAlign="center"
-          fontFamily="mono"
-        >
-          {glyph.id}
-        </Text>
+        {showGlyphName ? (
+          <Text
+            fontSize="xs"
+            color="field.muted"
+            noOfLines={1}
+            textAlign="center"
+            fontFamily="mono"
+          >
+            {glyph.id}
+          </Text>
+        ) : null}
       </Stack>
     </Box>
   )

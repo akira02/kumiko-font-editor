@@ -8,8 +8,8 @@ export const OverviewGridList = forwardRef<
   return (
     <Grid
       ref={ref}
-      gridTemplateColumns="repeat(auto-fill, minmax(120px, 1fr))"
-      gap={3}
+      gridTemplateColumns="repeat(auto-fill, minmax(var(--overview-card-min-width, 120px), 1fr))"
+      gap="var(--overview-grid-gap, 12px)"
       {...props}
     />
   )
