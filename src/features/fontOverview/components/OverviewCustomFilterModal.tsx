@@ -209,43 +209,61 @@ function PresetFilterList({ onCreatePreset, presets }: PresetFilterListProps) {
   const { t } = useTranslation()
 
   return (
-    <VStack align="stretch" spacing={0}>
+    <VStack align="stretch" overflow="visible" spacing={1}>
       {presets.map((preset) => {
         return (
           <Button
             key={preset.id}
             alignItems="stretch"
             bg="transparent"
-            borderBottom="1px solid"
-            borderColor="field.haze"
-            borderRadius={0}
+            borderRadius="sm"
             color="field.ink"
-            h="auto"
+            h="58px"
             justifyContent="flex-start"
-            minH="58px"
+            overflow="visible"
             px={3}
             py={2}
             position="relative"
             role="group"
             textAlign="left"
-            transition="min-height 180ms ease, background-color 180ms ease"
             variant="ghost"
             whiteSpace="normal"
             _active={{
-              bg: 'field.panelMuted',
+              bg: 'transparent',
               color: 'field.ink',
             }}
             _focusVisible={{
               boxShadow: '0 0 0 2px var(--chakra-colors-field-ink)',
             }}
             _hover={{
-              bg: 'field.panelMuted',
+              bg: 'transparent',
               color: 'field.ink',
-              minH: '82px',
             }}
             onClick={() => onCreatePreset(preset)}
           >
-            <HStack align="center" flex={1} minW={0} spacing={4} w="100%">
+            <Box
+              bg="transparent"
+              borderRadius="sm"
+              inset={0}
+              pointerEvents="none"
+              position="absolute"
+              transform="scaleY(1)"
+              transformOrigin="center"
+              transition="background-color 160ms ease, transform 180ms ease"
+              zIndex={0}
+              _groupHover={{
+                bg: 'field.panelMuted',
+                transform: 'scaleY(1.28)',
+              }}
+            />
+            <HStack
+              align="center"
+              flex={1}
+              minW={0}
+              spacing={4}
+              w="100%"
+              zIndex={1}
+            >
               <Text
                 flexShrink={0}
                 fontSize="md"
@@ -262,11 +280,9 @@ function PresetFilterList({ onCreatePreset, presets }: PresetFilterListProps) {
                 fontSize="xs"
                 fontWeight="normal"
                 lineHeight="1.35"
-                maxH="18px"
                 minW={0}
                 overflow="hidden"
-                transition="max-height 180ms ease"
-                _groupHover={{ maxH: '48px' }}
+                noOfLines={1}
               >
                 {getPresetSummary(preset, t)}
               </Text>
@@ -277,10 +293,10 @@ function PresetFilterList({ onCreatePreset, presets }: PresetFilterListProps) {
                 transition="color 180ms ease, transform 180ms ease"
                 _groupHover={{
                   color: 'field.ink',
-                  transform: 'translateX(3px)',
+                  transform: 'translateX(8px)',
                 }}
               >
-                <ArrowRight width={18} height={18} strokeWidth={2.2} />
+                <ArrowRight width={24} height={24} strokeWidth={2.2} />
               </Box>
             </HStack>
           </Button>
