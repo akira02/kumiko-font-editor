@@ -6,7 +6,9 @@ Kumiko 的字體編輯設計參考了 [fontra](https://github.com/googlefonts/fo
 
 ## 一、檔案層互通（UFO / designspace）
 
-fontra 以 UFO 與 `.designspace` 為主要儲存格式，Kumiko 亦支援 UFO 的讀寫，因此 outline、component、anchor、metrics、kerning 等標準欄位可在兩者間交換，無需任何程式碼層的關聯。
+fontra 以 UFO 與 `.designspace` 為主要儲存格式，Kumiko 亦支援 UFO / designspace 的讀寫，因此 outline、component、anchor、metrics 等標準欄位可在兩者間交換，無需任何程式碼層的關聯。
+
+Kerning 也應走同一條 UFO 互通路線，但目前尚未把 `groups.plist` / `kerning.plist` parser 與 serializer 接到 import/export。Kumiko 已有 canonical `FontData.kerningGroups / kerningPairs` 與 feature suggestion 接縫；完整 UFO kerning round-trip 依 [Kerning Roadmap](kerning.md) 的 K1 補上。
 
 為確保 round-trip 不遺失資料，Kumiko 在讀取 UFO 時保留 fontra 寫入的非標準 `lib` key（例如 `fontra.sourceStatusFieldDefinitions`），並於寫出時原樣帶回，即使這些欄位 Kumiko 本身並未使用。相關邏輯位於 `src/lib/fontFormats/`。
 

@@ -19,15 +19,17 @@
 - `FontData.axes: FontAxes` —— `FontAxis`（`name` / `tag` / `minValue` / `defaultValue` / `maxValue` / `mapping`）與 `CrossAxisMapping`。
 - `FontData.sources: Record<string, FontSource>` —— 每個 source 有 `location: Record<string, number>`（設計空間座標）。
 - `GlyphData.layers: Record<string, GlyphLayerData>`，`GlyphLayerData.associatedMasterId` 連到 source。
+- store 已有 `activeMasterId` / `editLocation`，master 切換時會把 `editLocation` 吸附到該 source 的 location。
+- `.designspace` + 多 `.ufo` 與 `.glyphs` / `.glyphspackage` 匯入已能建立多 master layers，並可用既有 master UI 在離散 source 間切換。
 - 插值演算法已自 fontra 移植至 `src/font/fontra-ported/`：`VariationModel`、`DiscreteVariationModel`、`normalizeLocation` / `normalizeLocationSparse`、`piecewiseLinearMap`、`mapForward` / `mapBackward`、`makeDefaultLocation`、`makeSparseNormalizedLocation`、`supportScalar`。這些與 `fontTools.varLib.models` 行為一致，因此插值結果會與 fontra / fontTools 逐點相符。
 
 ### 缺口
 
 - **沒有 glyph 插值控制器**：目前沒有「給定 glyph 的各 layer + 字體 axes/sources，於任意 location 算出一個 static glyph」的程式。對應 fontra 的 `VariableGlyphController`（`src-js/fontra-core/src/glyph-controller.js`）。
-- **沒有目前編輯位置（location）狀態**：store / sceneModel 沒有「目前在設計空間的哪個位置」。
+- **`editLocation` 尚未變成任意 location 工作流**：目前只隨 master 切換吸附到既有 source，sceneModel / canvas 尚未支援「位於 master 之間」的唯讀 instance。
 - **沒有插值渲染**：sceneView 一律畫 active layer，不會畫插值結果。
 - **沒有相容性檢查**：插值要求各 layer 的輪廓數、點數、點型別一致；目前無檢查。
-- **沒有設計空間導覽 UI**：無軸 slider / source 切換。對應 fontra `panel-designspace-navigation.js`。
+- **沒有完整設計空間導覽 UI**：已有離散 source / master 切換；尚無軸 slider、任意 location preview、source map 視覺化。對應 fontra `panel-designspace-navigation.js`。
 - **離散軸未表達**：`FontAxis` 沒有 `values` 欄位，無法描述離散軸（如 italic 0/1）。`DiscreteVariationModel` 需要此欄位；純連續軸（weight/width）則不受影響。
 
 ## 架構設計
@@ -73,7 +75,7 @@
 
 ### Phase 1 — 唯讀插值預覽
 
-- store 加入目前 location 狀態與設定 action。
+- 擴充 `editLocation` 的設定 action，允許 UI 設到非 master location。
 - 實作 `glyphInterpolation.ts`，於 location 算出 instance。
 - sceneView 在非 master 位置渲染 instance（唯讀），master 位置維持現狀。
 - 最小 UI：每軸一個 slider（先不做 avar）。
@@ -81,7 +83,7 @@
 ### Phase 2 — 在 master 編輯與切換
 
 - 依目前 location 對應/吸附到最近 master，切換 active layer 進行編輯（沿用既有編輯路徑）。
-- source / master 的新增、刪除、命名管理 UI（對應 fontra designspace navigation 的子集）。
+- 離散 source / master 的新增、刪除、命名管理已由多 master 工程提供；本階段補的是 slider location 與 master 編輯模式之間的清楚切換。
 
 ### Phase 3 — 跨 source 連動編輯
 

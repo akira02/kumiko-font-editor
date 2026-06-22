@@ -294,7 +294,7 @@ export function OverviewContent({
         border="1px solid"
         borderColor="field.line"
         borderRadius="sm"
-        boxShadow="6px 6px 0 rgba(8, 11, 13, 0.16)"
+        boxShadow="floating"
       >
         <Tooltip label={t('fontOverview.zoomOut')}>
           <IconButton

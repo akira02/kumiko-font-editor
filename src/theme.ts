@@ -103,6 +103,11 @@ const semanticTokens = {
   },
 }
 
+const shadows = {
+  floating:
+    '0 14px 34px rgba(8, 11, 13, 0.12), 0 4px 12px rgba(8, 11, 13, 0.08)',
+}
+
 const components = {
   Button: {
     baseStyle: {
@@ -238,7 +243,7 @@ const components = {
         borderRadius: '2px',
         bg: 'popover',
         p: 1,
-        boxShadow: '6px 6px 0 rgba(8, 11, 13, 0.18)',
+        boxShadow: 'floating',
       },
       item: {
         borderRadius: '1px',
@@ -302,6 +307,7 @@ const theme = extendTheme({
   config,
   colors,
   semanticTokens,
+  shadows,
   fonts: {
     heading: sansStack,
     body: sansStack,

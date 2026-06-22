@@ -21,7 +21,7 @@ While excellent tools like [Fontra](https://github.com/googlefonts/fontra) exist
 
 ## Features
 
-- **Open from anywhere**: import a local `.ufo` project folder, or load a UFO project straight from a GitHub repository (via a Cloudflare Pages Functions archive proxy).
+- **Open from anywhere**: import local `.ufo`, `.designspace`, `.glyphs`, `.glyphspackage`, or binary font files, or load a UFO project straight from a GitHub repository (via a Cloudflare Pages Functions archive proxy).
 - **GitHub-native workflow**: sign in with GitHub OAuth, check your fork, list branches, push commits, and open a compare page to raise a pull request.
 - **Component-aware glyph editing**: edit paths, nodes, and metrics on the canvas, with an IDS engine for assembling CJK glyphs from reusable components.
 - **Built-in quality checks**: live grayscale preview and statistical design insights surfaced directly in the editor.
@@ -32,7 +32,7 @@ While excellent tools like [Fontra](https://github.com/googlefonts/fontra) exist
 Kumiko's near-term focus is the **collaborative glyph-completion workflow** — contributor experience first, editor completeness second. Highlights:
 
 - Robust GitHub sync (per-glyph conflict resolution; server-side session storage replacing signed cookies).
-- Kerning anchored to the UFO model (`groups.plist` / `kerning.plist`), exported as FEA.
+- Kerning anchored to the UFO model (`groups.plist` / `kerning.plist`), exported as FEA. See [docs/kerning.md](docs/kerning.md) for the current plan.
 - Expanded GitHub write-back for more UFO metadata and non-glyph files.
 - Exploring OpenType features support.
 
