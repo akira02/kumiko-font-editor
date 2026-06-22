@@ -25,7 +25,7 @@ import type {
 } from 'src/lib/glyph/glyphOverview'
 import { OverviewTreeNav } from 'src/features/fontOverview/components/OverviewTreeNav'
 import type { OverviewSearchOptionsState } from 'src/store'
-import { Search, Settings } from 'iconoir-react'
+import { NavArrowDown, Search, Xmark } from 'iconoir-react'
 import { useTranslation } from 'react-i18next'
 
 type SearchFieldGroupId = 'glyphName' | 'unicode' | 'note' | 'component' | 'ids'
@@ -174,23 +174,18 @@ export function OverviewSidebar({
         </HStack>
 
         <InputGroup>
-          <InputLeftElement pointerEvents="none">
-            <Search width={18} height={18} strokeWidth={2.2} />
-          </InputLeftElement>
-          <Input
-            pl={9}
-            pr={11}
-            placeholder={t('fontOverview.searchPlaceholder')}
-            value={currentSearchQuery}
-            onChange={(event) => onSearchQueryChange(event.target.value)}
-          />
-          <InputRightElement>
-            <Menu closeOnSelect={false} placement="bottom-end">
+          <InputLeftElement>
+            <Menu closeOnSelect={false} placement="bottom-start">
               <Tooltip label={t('fontOverview.searchOptions')}>
                 <MenuButton
                   as={IconButton}
                   aria-label={t('fontOverview.searchOptions')}
-                  icon={<Settings width={18} height={18} strokeWidth={2.1} />}
+                  icon={
+                    <VStack spacing={0}>
+                      <Search width={18} height={18} strokeWidth={2.2} />
+                      <NavArrowDown width={10} height={10} strokeWidth={2.4} />
+                    </VStack>
+                  }
                   size="sm"
                   variant="ghost"
                 />
@@ -239,7 +234,27 @@ export function OverviewSidebar({
                 </MenuOptionGroup>
               </MenuList>
             </Menu>
-          </InputRightElement>
+          </InputLeftElement>
+          <Input
+            pl={9}
+            pr={11}
+            placeholder={t('fontOverview.searchPlaceholder')}
+            value={currentSearchQuery}
+            onChange={(event) => onSearchQueryChange(event.target.value)}
+          />
+          {currentSearchQuery ? (
+            <InputRightElement>
+              <Tooltip label={t('fontOverview.clearSearch')}>
+                <IconButton
+                  aria-label={t('fontOverview.clearSearch')}
+                  icon={<Xmark width={18} height={18} strokeWidth={2.2} />}
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => onSearchQueryChange('')}
+                />
+              </Tooltip>
+            </InputRightElement>
+          ) : null}
         </InputGroup>
 
         <Text fontSize="sm" color="field.muted" fontFamily="mono">

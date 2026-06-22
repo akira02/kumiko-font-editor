@@ -237,6 +237,7 @@
     },
     "matchCase": "區分大小寫",
     "regex": "Regex",
+    "clearSearch": "清除搜尋",
     "visibleTotalCount": "顯示 {{visible}} / {{total}} 個字符",
     "customFilter": {
       "createTitle": "新增自定篩選器",

@@ -237,6 +237,7 @@
     },
     "matchCase": "Match case",
     "regex": "Regex",
+    "clearSearch": "Clear search",
     "visibleTotalCount": "Showing {{visible}} / {{total}} glyphs",
     "customFilter": {
       "createTitle": "New custom filter",

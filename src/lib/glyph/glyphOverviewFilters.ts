@@ -211,6 +211,30 @@ const CUSTOM_FILTER_NODE_ID_PREFIX = 'custom-filter:'
 const normalizeSearchText = (value: string, matchCase: boolean) =>
   matchCase ? value : value.toLocaleLowerCase()
 
+const getCharacterSearchAliases = (query: string) => {
+  const characters = Array.from(query)
+  if (characters.length !== 1) {
+    return []
+  }
+
+  const codePoint = characters[0]?.codePointAt(0)
+  if (codePoint === undefined) {
+    return []
+  }
+
+  const unicode = codePoint.toString(16).toUpperCase().padStart(4, '0')
+  return [
+    unicode,
+    `U+${unicode}`,
+    codePoint <= 0xffff ? `uni${unicode}` : `u${unicode}`,
+  ]
+}
+
+const getSearchNeedles = (query: string, matchCase: boolean) =>
+  [query, ...getCharacterSearchAliases(query)].map((value) =>
+    normalizeSearchText(value, matchCase)
+  )
+
 const compact = <T>(values: Array<T | null | undefined | false>): T[] =>
   values.filter((value): value is T => Boolean(value))
 
@@ -390,10 +414,12 @@ export const createOverviewSearchMatcher = (
     }
   }
 
-  const needle = normalizeSearchText(query, matchCase)
+  const needles = getSearchNeedles(query, matchCase)
   return (glyph: GlyphData) =>
     getOverviewSearchTargets(glyph, fields, idsDictionary).some((target) =>
-      normalizeSearchText(target, matchCase).includes(needle)
+      needles.some((needle) =>
+        normalizeSearchText(target, matchCase).includes(needle)
+      )
     )
 }
 

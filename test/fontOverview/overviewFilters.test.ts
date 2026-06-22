@@ -121,6 +121,8 @@ describe('overview search filters', () => {
     makeGlyph({ id: 'thorn', note: 'Icelandic thorn', unicode: '00FE' }),
     makeGlyph({ id: 'A.sc', unicode: null }),
     makeGlyph({ id: '林', unicode: '6797' }),
+    makeGlyph({ id: 'cid1000', unicode: '5343' }),
+    makeGlyph({ id: 'uni5343', unicode: null }),
   ]
 
   it('matches Glyphs-style name, Unicode value, character, and note fields', () => {
@@ -136,6 +138,13 @@ describe('overview search filters', () => {
     expect(
       ids(filterGlyphsByOverviewSearch(glyphs, { query: 'Icelandic' }))
     ).toEqual(['thorn'])
+  })
+
+  it('matches literal characters against Unicode values and Glyphs-style names', () => {
+    expect(ids(filterGlyphsByOverviewSearch(glyphs, { query: '千' }))).toEqual([
+      'cid1000',
+      'uni5343',
+    ])
   })
 
   it('preserves Kumiko component and IDS search extensions', () => {
