@@ -15,6 +15,7 @@ import {
   MenuItemOption,
   MenuList,
   MenuOptionGroup,
+  Portal,
   Text,
   Tooltip,
   VStack,
@@ -222,61 +223,51 @@ export function OverviewSidebar({
                   _hover={{ bg: 'transparent' }}
                 />
               </Tooltip>
-              <MenuList
-                bg="white"
-                bgColor="white"
-                minW="220px"
-                sx={{
-                  '& [role="menuitemcheckbox"]': {
-                    bg: 'white',
-                  },
-                  '& [role="menuitemcheckbox"]:hover': {
-                    bg: 'field.panelMuted',
-                  },
-                }}
-              >
-                <MenuOptionGroup
-                  title={t('fontOverview.searchFieldsTitle')}
-                  type="checkbox"
-                  value={selectedFieldGroups}
-                  onChange={(value) => {
-                    const nextGroups =
-                      normalizeMenuValues<SearchFieldGroupId>(value)
-                    if (!nextGroups.length) {
-                      return
-                    }
-                    onSearchOptionsChange({
-                      fields: searchFieldGroupsToFields(nextGroups),
-                    })
-                  }}
-                >
-                  {SEARCH_FIELD_GROUPS.map((group) => (
-                    <MenuItemOption key={group.id} value={group.id}>
-                      {t(group.labelKey)}
+              <Portal>
+                <MenuList bg="white" minW="220px" zIndex="popover">
+                  <MenuOptionGroup
+                    title={t('fontOverview.searchFieldsTitle')}
+                    type="checkbox"
+                    value={selectedFieldGroups}
+                    onChange={(value) => {
+                      const nextGroups =
+                        normalizeMenuValues<SearchFieldGroupId>(value)
+                      if (!nextGroups.length) {
+                        return
+                      }
+                      onSearchOptionsChange({
+                        fields: searchFieldGroupsToFields(nextGroups),
+                      })
+                    }}
+                  >
+                    {SEARCH_FIELD_GROUPS.map((group) => (
+                      <MenuItemOption key={group.id} value={group.id}>
+                        {t(group.labelKey)}
+                      </MenuItemOption>
+                    ))}
+                  </MenuOptionGroup>
+                  <MenuDivider />
+                  <MenuOptionGroup
+                    title={t('fontOverview.searchOptionsTitle')}
+                    type="checkbox"
+                    value={searchOptionValues}
+                    onChange={(value) => {
+                      const values = new Set(normalizeMenuValues(value))
+                      onSearchOptionsChange({
+                        matchCase: values.has('matchCase'),
+                        regex: values.has('regex'),
+                      })
+                    }}
+                  >
+                    <MenuItemOption value="matchCase">
+                      {t('fontOverview.matchCase')}
                     </MenuItemOption>
-                  ))}
-                </MenuOptionGroup>
-                <MenuDivider />
-                <MenuOptionGroup
-                  title={t('fontOverview.searchOptionsTitle')}
-                  type="checkbox"
-                  value={searchOptionValues}
-                  onChange={(value) => {
-                    const values = new Set(normalizeMenuValues(value))
-                    onSearchOptionsChange({
-                      matchCase: values.has('matchCase'),
-                      regex: values.has('regex'),
-                    })
-                  }}
-                >
-                  <MenuItemOption value="matchCase">
-                    {t('fontOverview.matchCase')}
-                  </MenuItemOption>
-                  <MenuItemOption value="regex">
-                    {t('fontOverview.regex')}
-                  </MenuItemOption>
-                </MenuOptionGroup>
-              </MenuList>
+                    <MenuItemOption value="regex">
+                      {t('fontOverview.regex')}
+                    </MenuItemOption>
+                  </MenuOptionGroup>
+                </MenuList>
+              </Portal>
             </Menu>
           </InputLeftElement>
           <Input
