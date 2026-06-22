@@ -57,6 +57,7 @@ export {
   createRawFeatureTextSourceSection,
   setRawFeatureTextSource,
 } from 'src/lib/openTypeFeatures/featureSourceSections'
+export { classifyRawFeatureTextSource } from 'src/lib/openTypeFeatures/classifyRawFeatureText'
 export { parseLayoutTableInventory } from 'src/lib/openTypeFeatures/layoutTableInventory'
 export { parseGdefTable } from 'src/lib/openTypeFeatures/gdefParser'
 export { readSfntTableDirectory } from 'src/lib/openTypeFeatures/binaryReader'

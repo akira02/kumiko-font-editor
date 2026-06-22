@@ -264,7 +264,20 @@ function collectNestedLookupIds(
   }
 }
 
+const getRawFeatureTextForOutput = (state: OpenTypeFeaturesState) => {
+  if (!state.rawFeatureText) return null
+
+  const isClassifiedIntoModel = (state.sourceSections ?? []).some(
+    (section) =>
+      section.textRef === 'rawFeatureText' &&
+      section.meta?.classifiedIntoModel === true &&
+      section.meta?.preserveRawTextInGeneratedFea === false
+  )
+  return isClassifiedIntoModel ? null : state.rawFeatureText
+}
+
 export const buildFeaDocument = (state: OpenTypeFeaturesState) => {
+  const rawFeatureTextForOutput = getRawFeatureTextForOutput(state)
   const lookupById = new Map(state.lookups.map((lookup) => [lookup.id, lookup]))
   const lookupNameById = new Map(
     state.lookups.map((lookup) => [lookup.id, lookup.name])
@@ -286,8 +299,8 @@ export const buildFeaDocument = (state: OpenTypeFeaturesState) => {
 
   const statements: FeaNode[] = [
     ...headerComments.map((value) => ({ kind: 'Comment' as const, value })),
-    ...(state.rawFeatureText
-      ? [{ kind: 'Raw' as const, value: state.rawFeatureText }]
+    ...(rawFeatureTextForOutput
+      ? [{ kind: 'Raw' as const, value: rawFeatureTextForOutput }]
       : []),
     ...state.languagesystems.map((languageSystem) => ({
       kind: 'LanguageSystem' as const,

@@ -13,6 +13,7 @@ import { updateLookupRule } from 'src/features/common/projectControl/fontSetting
 import {
   applyAutoFeatureSuggestion,
   buildAutoFeatureSuggestions,
+  classifyRawFeatureTextSource,
   generateFea,
   ignoreAutoFeatureSuggestion,
   setRawFeatureTextSource,
@@ -74,9 +75,12 @@ export function FontFeaturesTab({
 
   const updateRawFeatureText = (rawFeatureText: string) => {
     onOpenTypeFeaturesChange(
-      setRawFeatureTextSource(openTypeFeatures, rawFeatureText, {
-        origin: 'manual-input',
-      })
+      classifyRawFeatureTextSource(
+        setRawFeatureTextSource(openTypeFeatures, rawFeatureText, {
+          origin: 'manual-input',
+        }),
+        { origin: 'manual-input' }
+      )
     )
   }
 

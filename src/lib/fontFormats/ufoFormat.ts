@@ -35,6 +35,7 @@ import {
   settingsFromLib,
 } from 'src/lib/fontFormats/fontInfoSettings'
 import { createEmptyOpenTypeFeaturesState } from 'src/lib/openTypeFeatures/defaults'
+import { classifyRawFeatureTextSource } from 'src/lib/openTypeFeatures/classifyRawFeatureText'
 import { setRawFeatureTextSource } from 'src/lib/openTypeFeatures/featureSourceSections'
 import type {
   UfoGithubSource,
@@ -846,13 +847,18 @@ const buildFontDataFromUfoGlyphs = (
     unitsPerEm: getUnitsPerEm(metadata.fontinfo),
     lineMetricsHorizontalLayout: buildLineMetrics(metadata.fontinfo),
     openTypeFeatures: metadata.featuresText
-      ? setRawFeatureTextSource(
-          createEmptyOpenTypeFeaturesState(),
-          metadata.featuresText,
+      ? classifyRawFeatureTextSource(
+          setRawFeatureTextSource(
+            createEmptyOpenTypeFeaturesState(),
+            metadata.featuresText,
+            {
+              origin: 'ufo-import',
+              path: 'features.fea',
+              title: 'UFO features.fea',
+            }
+          ),
           {
             origin: 'ufo-import',
-            path: 'features.fea',
-            title: 'UFO features.fea',
           }
         )
       : createEmptyOpenTypeFeaturesState(),

@@ -248,6 +248,8 @@ export interface GlyphClass {
   meta?: {
     userOverridden?: boolean
     generatedBy?: AutoFeatureGeneratorName
+    sourceSectionId?: string
+    classifiedFromRawFeatureText?: boolean
   }
 }
 

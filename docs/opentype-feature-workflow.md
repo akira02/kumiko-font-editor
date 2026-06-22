@@ -117,7 +117,21 @@ generated .fea / UI / export policy
 
 目前 raw `.fea` 先放在 `openTypeFeatures.rawFeatureText`。
 
-下一步應該讓使用者貼上的 `.fea` 可以被解析成 Kumiko model：
+`classifyRawFeatureTextSource()` 會先做保守型 first-pass classification。它只在整段 raw `.fea` 都能被安全理解時，才把內容提交成 Kumiko feature records，並讓 generated `.fea` 改由 Kumiko model 輸出；遇到不支援的語法時，raw source 會繼續保留並交給 compiler/export 使用。
+
+目前可分類的第一批語法：
+
+- `languagesystem`
+- glyph class 宣告，例如 `@Letters = [A B C];`
+- 簡單 `feature` block
+- feature 內簡單 `script` / `language`
+- feature 內簡單 `lookup SomeLookup;` reference
+- 簡單 `sub a by a.alt;`
+- 簡單 ligature `sub f i by f_i;`
+- 簡單 `pos A -20;`
+- 簡單 pair positioning `pos A V -80;`
+
+後續應該逐步讓使用者貼上的 `.fea` 可以被解析成更完整的 Kumiko model：
 
 - languagesystem
 - feature blocks

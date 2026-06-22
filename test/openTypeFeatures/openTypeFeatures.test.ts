@@ -6,6 +6,7 @@ import {
   getInstalledCompilerDependencyCapabilities,
   getOpenTypeCompilerRuntimeRequirement,
 } from 'src/lib/openTypeFeatures/compilerRuntimeCapabilities'
+import { classifyRawFeatureTextSource } from 'src/lib/openTypeFeatures/classifyRawFeatureText'
 import {
   createCompilerRuntimeStatus,
   makeCompilerErrorResponse,
@@ -246,6 +247,122 @@ describe('OpenType FEA source maps', () => {
         preservationPolicy: 'editable-rebuild',
       },
     ])
+  })
+
+  it('classifies supported raw .fea source into Kumiko feature records', () => {
+    const state = classifyRawFeatureTextSource(
+      setRawFeatureTextSource(
+        createEmptyOpenTypeFeaturesState(),
+        [
+          '# RAW SOURCE MARKER',
+          'languagesystem latn dflt;',
+          '@Letters = [f i];',
+          'feature liga {',
+          '  script latn;',
+          '  language dflt;',
+          '  sub f i by f_i;',
+          '} liga;',
+        ].join('\n')
+      )
+    )
+
+    expect(state.sourceSections[0]).toMatchObject({
+      id: 'source_raw_feature_text',
+      stage: 'classified',
+      status: 'classified',
+      meta: {
+        classifiedIntoModel: true,
+        preserveRawTextInGeneratedFea: false,
+      },
+    })
+    expect(state.languagesystems).toEqual(
+      expect.arrayContaining([
+        { id: 'languagesystem_latn_dflt', script: 'latn', language: 'dflt' },
+      ])
+    )
+    expect(state.glyphClasses).toMatchObject([
+      {
+        id: 'glyph_class_raw_Letters',
+        name: '@Letters',
+        glyphs: ['f', 'i'],
+        origin: 'manual',
+      },
+    ])
+    expect(state.features).toMatchObject([
+      {
+        id: 'feature_raw_liga',
+        tag: 'liga',
+        entries: [
+          {
+            script: 'latn',
+            language: 'dflt',
+            lookupIds: ['lookup_raw_liga_0'],
+          },
+        ],
+      },
+    ])
+    expect(state.lookups).toMatchObject([
+      {
+        id: 'lookup_raw_liga_0',
+        table: 'GSUB',
+        lookupType: 'ligatureSubst',
+        rules: [
+          {
+            kind: 'ligatureSubstitution',
+            components: ['f', 'i'],
+            replacement: 'f_i',
+          },
+        ],
+      },
+    ])
+    expect(state.sourceSections[0]?.recordRefs).toEqual(
+      expect.arrayContaining([
+        { kind: 'languageSystem', id: 'languagesystem_latn_dflt' },
+        { kind: 'glyphClass', id: 'glyph_class_raw_Letters' },
+        { kind: 'lookup', id: 'lookup_raw_liga_0', table: 'GSUB' },
+        { kind: 'feature', id: 'feature_raw_liga' },
+      ])
+    )
+
+    const generated = generateFea(state)
+    expect(generated.text).not.toContain('RAW SOURCE MARKER')
+    expect(generated.text).toContain('sub f i by f_i;')
+  })
+
+  it('preserves unsupported raw .fea source instead of partially committing it', () => {
+    const state = classifyRawFeatureTextSource(
+      setRawFeatureTextSource(
+        createEmptyOpenTypeFeaturesState(),
+        [
+          '# RAW SOURCE MARKER',
+          'feature calt {',
+          "  sub A' lookup SomeLookup B;",
+          '} calt;',
+        ].join('\n')
+      )
+    )
+
+    expect(state.sourceSections[0]).toMatchObject({
+      id: 'source_raw_feature_text',
+      stage: 'source',
+      status: 'raw',
+      recordRefs: [],
+      meta: {
+        classifiedIntoModel: false,
+        preserveRawTextInGeneratedFea: true,
+        unsupportedStatementCount: 1,
+      },
+    })
+    expect(state.features).toEqual([])
+    expect(state.lookups).toEqual([])
+    expect(
+      (state.diagnostics ?? []).map((diagnostic) => diagnostic.id)
+    ).toEqual(
+      expect.arrayContaining([
+        'feature-diagnostic-warning-raw-fea-parser-unsupported-statements',
+      ])
+    )
+    expect(generateFea(state).text).toContain('RAW SOURCE MARKER')
   })
 
   it('includes raw .fea source in generated FEA output', () => {
