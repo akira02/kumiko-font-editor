@@ -628,9 +628,9 @@ function OverviewCustomFilterModalForm({
                 pr={1}
                 sx={{
                   maskImage:
-                    'linear-gradient(to bottom, black calc(100% - 48px), transparent)',
+                    'linear-gradient(to bottom, transparent, black 72px, black calc(100% - 72px), transparent)',
                   WebkitMaskImage:
-                    'linear-gradient(to bottom, black calc(100% - 48px), transparent)',
+                    'linear-gradient(to bottom, transparent, black 72px, black calc(100% - 72px), transparent)',
                 }}
               >
                 <PresetFilterList
