@@ -621,21 +621,23 @@ function OverviewCustomFilterModalForm({
         <ModalBody flex={1} minH={0} pb={5}>
           <TabPanels h="100%">
             <TabPanel h="100%" p={0} position="relative">
-              <Box h="100%" overflow="auto" pb={8} pr={1}>
+              <Box
+                h="100%"
+                overflow="auto"
+                pb={8}
+                pr={1}
+                sx={{
+                  maskImage:
+                    'linear-gradient(to bottom, black calc(100% - 48px), transparent)',
+                  WebkitMaskImage:
+                    'linear-gradient(to bottom, black calc(100% - 48px), transparent)',
+                }}
+              >
                 <PresetFilterList
                   presets={presets}
                   onCreatePreset={handleCreatePreset}
                 />
               </Box>
-              <Box
-                bgGradient="linear(to-b, rgba(255,255,255,0), field.paper)"
-                bottom={0}
-                h={12}
-                left={0}
-                pointerEvents="none"
-                position="absolute"
-                right={0}
-              />
             </TabPanel>
             <TabPanel h="100%" overflow="auto" p={0} pr={1}>
               <AdvancedFilterFields
