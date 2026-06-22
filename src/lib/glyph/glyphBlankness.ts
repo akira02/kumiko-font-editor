@@ -1,4 +1,5 @@
-import { activeLayer, type GlyphData } from 'src/store'
+import { activeLayer } from 'src/store/glyphLayer'
+import type { GlyphData } from 'src/store/types'
 import { isGlyphGeometryLoaded } from 'src/lib/glyph/glyphGeometryState'
 import { getPrimaryGlyphUnicode } from 'src/lib/glyph/glyphUnicode'
 

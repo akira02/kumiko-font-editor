@@ -6,7 +6,7 @@ import type {
 import {
   DEFAULT_OVERVIEW_SEARCH_FIELDS,
   filterGlyphsByOverviewSearch,
-} from 'src/lib/glyph/glyphOverview'
+} from 'src/lib/glyph/glyphOverviewFilters'
 
 export const DEFAULT_OVERVIEW_SEARCH_OPTIONS = {
   fields: DEFAULT_OVERVIEW_SEARCH_FIELDS,

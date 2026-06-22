@@ -10,7 +10,7 @@ import {
 } from 'src/lib/project/unicode'
 import type { GlyphEditTimes } from 'src/lib/glyph/glyphEditTimes'
 import { activeLayer } from 'src/store/glyphLayer'
-import type { GlyphData } from 'src/store'
+import type { GlyphData } from 'src/store/types'
 
 export type OverviewGroupBy = 'none' | 'script' | 'block'
 export type GlyphOverviewTreeKind = 'all' | 'category' | 'language' | 'filter'
