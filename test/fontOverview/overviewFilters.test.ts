@@ -192,9 +192,9 @@ describe('Glyphs-like overview tree', () => {
   it('groups the sidebar into Glyphs-style top-level sections', () => {
     expect(tree.map((node) => node.id)).toEqual([
       'all',
+      'filters',
       'categories',
       'languages',
-      'filters',
     ])
   })
 

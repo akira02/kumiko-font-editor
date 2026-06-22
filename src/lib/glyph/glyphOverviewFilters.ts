@@ -820,6 +820,13 @@ export const getGlyphOverviewTree = (
   return [
     createSectionNode('all', 'All', sortedGlyphs, 'all'),
     createSectionNode(
+      'filters',
+      'Filters',
+      uniqueGlyphs(filterNodes.flatMap((node) => node.glyphs)),
+      'filter',
+      filterNodes
+    ),
+    createSectionNode(
       'categories',
       'Categories',
       sortedGlyphs,
@@ -832,13 +839,6 @@ export const getGlyphOverviewTree = (
       sortedGlyphs,
       'language',
       languageNodes
-    ),
-    createSectionNode(
-      'filters',
-      'Filters',
-      uniqueGlyphs(filterNodes.flatMap((node) => node.glyphs)),
-      'filter',
-      filterNodes
     ),
   ]
 }
