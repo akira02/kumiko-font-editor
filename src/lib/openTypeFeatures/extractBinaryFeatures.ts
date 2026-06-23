@@ -348,6 +348,16 @@ const getFeatureIdsForLookupIds = (
     )
     .map((feature) => feature.id)
 
+const getCompiledRecordIdsForTable = (
+  records: Array<{ id: string }>,
+  table: 'GSUB' | 'GPOS'
+) => {
+  const tablePart = table.toLowerCase()
+  return records
+    .filter((record) => record.id.includes(`_${tablePart}_`))
+    .map((record) => record.id)
+}
+
 const toCompiledLayoutSourceSections = (
   inventories: LayoutTableInventory[],
   state: OpenTypeFeaturesState,
@@ -376,6 +386,14 @@ const toCompiledLayoutSourceSections = (
         table: inventory.table,
         featureIds: getFeatureIdsForLookupIds(state.features, lookupIdSet),
         lookupIds,
+        glyphClassIds: getCompiledRecordIdsForTable(
+          state.glyphClasses,
+          inventory.table
+        ),
+        markClassIds: getCompiledRecordIdsForTable(
+          state.markClasses,
+          inventory.table
+        ),
         unsupportedLookupIds,
         diagnosticIds,
         meta: {

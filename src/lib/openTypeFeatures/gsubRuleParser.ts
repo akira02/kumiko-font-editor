@@ -1,12 +1,15 @@
 import { BinaryReader } from 'src/lib/openTypeFeatures/binaryReader'
 import {
   parseChainingContextSubstitutionFormat1,
+  parseChainingContextSubstitutionFormat3,
   parseContextSubstitutionFormat1,
+  parseContextSubstitutionFormat3,
 } from 'src/lib/openTypeFeatures/gsubContextRuleParser'
 import type { LayoutLookupInventory } from 'src/lib/openTypeFeatures/layoutTableInventory'
 import type {
   AlternateSubstitutionRule,
   FeatureDiagnostic,
+  GlyphClass,
   LigatureSubstitutionRule,
   MultipleSubstitutionRule,
   Rule,
@@ -17,7 +20,13 @@ import type {
 export interface GsubRuleParseResult {
   rules: Rule[]
   diagnostics: FeatureDiagnostic[]
+  glyphClasses?: GlyphClass[]
   unsupportedReason?: string
+}
+
+interface ParsedSubtableResult {
+  rules: Rule[]
+  glyphClasses?: GlyphClass[]
 }
 
 const makeParserDiagnostic = (
@@ -397,7 +406,7 @@ const parseSupportedSubtable = (
   glyphOrder: string[],
   lookup: LayoutLookupInventory,
   subtableIndex: number
-) => {
+): ParsedSubtableResult | null => {
   const format = subtableReader.uint16(0)
   if (format !== lookup.subtableFormats[subtableIndex]) return null
 
@@ -411,39 +420,52 @@ const parseSupportedSubtable = (
   }
 
   if (lookup.lookupType === 1) {
-    return parseSingleSubstitution(
+    const rules = parseSingleSubstitution(
       subtableReader,
       glyphOrder,
       lookup,
       subtableIndex
     )
+    return rules ? { rules } : null
   }
   if (lookup.lookupType === 2 && format === 1) {
-    return parseMultipleSubstitution(
+    const rules = parseMultipleSubstitution(
       subtableReader,
       glyphOrder,
       lookup,
       subtableIndex
     )
+    return rules ? { rules } : null
   }
   if (lookup.lookupType === 3 && format === 1) {
-    return parseAlternateSubstitution(
+    const rules = parseAlternateSubstitution(
       subtableReader,
       glyphOrder,
       lookup,
       subtableIndex
     )
+    return rules ? { rules } : null
   }
   if (lookup.lookupType === 4 && format === 1) {
-    return parseLigatureSubstitution(
+    const rules = parseLigatureSubstitution(
       subtableReader,
       glyphOrder,
       lookup,
       subtableIndex
     )
+    return rules ? { rules } : null
   }
   if (lookup.lookupType === 5 && format === 1) {
-    return parseContextSubstitutionFormat1(
+    const rules = parseContextSubstitutionFormat1(
+      subtableReader,
+      glyphOrder,
+      lookup,
+      subtableIndex
+    )
+    return rules ? { rules } : null
+  }
+  if (lookup.lookupType === 5 && format === 3) {
+    return parseContextSubstitutionFormat3(
       subtableReader,
       glyphOrder,
       lookup,
@@ -451,7 +473,16 @@ const parseSupportedSubtable = (
     )
   }
   if (lookup.lookupType === 6 && format === 1) {
-    return parseChainingContextSubstitutionFormat1(
+    const rules = parseChainingContextSubstitutionFormat1(
+      subtableReader,
+      glyphOrder,
+      lookup,
+      subtableIndex
+    )
+    return rules ? { rules } : null
+  }
+  if (lookup.lookupType === 6 && format === 3) {
+    return parseChainingContextSubstitutionFormat3(
       subtableReader,
       glyphOrder,
       lookup,
@@ -480,7 +511,7 @@ const parseExtensionSubstitution = (
   glyphOrder: string[],
   lookup: LayoutLookupInventory,
   subtableIndex: number
-): Rule[] | null => {
+): ParsedSubtableResult | null => {
   const extensionLookupType = subtableReader.uint16(2)
   const extensionOffset = subtableReader.uint32(4)
   if (
@@ -507,14 +538,23 @@ const parseExtensionSubstitution = (
     subtableFormats: [extensionFormat],
     subtableOffsets: [lookup.subtableOffsets[subtableIndex] + extensionOffset],
   }
-  const rules = parseSupportedSubtable(
+  const parsedSubtable = parseSupportedSubtable(
     extensionReader,
     glyphOrder,
     delegatedLookup,
     0
   )
 
-  return rules ? withExtensionProvenance(rules, lookup, subtableIndex) : null
+  return parsedSubtable
+    ? {
+        ...parsedSubtable,
+        rules: withExtensionProvenance(
+          parsedSubtable.rules,
+          lookup,
+          subtableIndex
+        ),
+      }
+    : null
 }
 
 export const parseGsubLookupRules = (
@@ -559,6 +599,7 @@ export const parseGsubLookupRules = (
 
   const rules: Rule[] = []
   const diagnostics: FeatureDiagnostic[] = []
+  const glyphClasses = new Map<string, GlyphClass>()
 
   for (
     let subtableIndex = 0;
@@ -566,7 +607,7 @@ export const parseGsubLookupRules = (
     subtableIndex += 1
   ) {
     const subtableReader = tableReader.at(lookup.subtableOffsets[subtableIndex])
-    const parsedRules = subtableReader
+    const parsedSubtable = subtableReader
       ? parseSupportedSubtable(
           subtableReader,
           glyphOrder,
@@ -575,7 +616,7 @@ export const parseGsubLookupRules = (
         )
       : null
 
-    if (!parsedRules) {
+    if (!parsedSubtable) {
       diagnostics.push(
         makeParserDiagnostic(
           'warning',
@@ -589,11 +630,19 @@ export const parseGsubLookupRules = (
         diagnostics,
         unsupportedReason:
           'One or more GSUB subtables could not be reconstructed as editable rules.',
+        glyphClasses: Array.from(glyphClasses.values()),
       }
     }
 
-    rules.push(...parsedRules)
+    rules.push(...parsedSubtable.rules)
+    for (const glyphClass of parsedSubtable.glyphClasses ?? []) {
+      glyphClasses.set(glyphClass.id, glyphClass)
+    }
   }
 
-  return { rules, diagnostics }
+  return {
+    rules,
+    diagnostics,
+    glyphClasses: Array.from(glyphClasses.values()),
+  }
 }

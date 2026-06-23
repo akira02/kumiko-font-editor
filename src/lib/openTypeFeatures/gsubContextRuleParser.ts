@@ -3,9 +3,15 @@ import type { LayoutLookupInventory } from 'src/lib/openTypeFeatures/layoutTable
 import type {
   ContextInput,
   ContextualRule,
+  GlyphClass,
   GlyphSelector,
   SourceProvenance,
 } from 'src/lib/openTypeFeatures/types'
+
+export interface GsubContextSubtableParseResult {
+  rules: ContextualRule[]
+  glyphClasses?: GlyphClass[]
+}
 
 const glyphNameForId = (glyphOrder: string[], glyphId: number) =>
   glyphOrder[glyphId] ?? null
@@ -16,6 +22,13 @@ const makeRuleId = (
   kind: string,
   ruleIndex: number
 ) => `rule_gsub_${lookupIndex}_${subtableIndex}_${kind}_${ruleIndex}`
+
+const makeClassId = (
+  lookupIndex: number,
+  subtableIndex: number,
+  kind: string,
+  classId: number
+) => `class_gsub_${lookupIndex}_${subtableIndex}_${kind}_${classId}`
 
 const makeProvenance = (
   lookup: LayoutLookupInventory,
@@ -76,6 +89,37 @@ const readCoverageGlyphIds = (
   return null
 }
 
+const resolveGlyphNames = (glyphOrder: string[], glyphIds: number[]) => {
+  const glyphNames = glyphIds.map((glyphId) =>
+    glyphNameForId(glyphOrder, glyphId)
+  )
+  return glyphNames.every(
+    (glyphName): glyphName is string => glyphName !== null
+  )
+    ? glyphNames
+    : null
+}
+
+const readCoverageGlyphNames = (
+  subtableReader: BinaryReader,
+  glyphOrder: string[],
+  coverageOffset: number
+) => {
+  const glyphIds = readCoverageGlyphIds(subtableReader, coverageOffset)
+  return glyphIds ? resolveGlyphNames(glyphOrder, glyphIds) : null
+}
+
+const makeImportedGlyphClass = (
+  id: string,
+  name: string,
+  glyphs: string[]
+): GlyphClass => ({
+  id,
+  name,
+  glyphs,
+  origin: 'imported',
+})
+
 const resolveGlyphSelectors = (
   glyphOrder: string[],
   glyphIds: number[]
@@ -90,6 +134,41 @@ const resolveGlyphSelectors = (
   )
     ? selectors
     : null
+}
+
+const parseCoverageSelectorClass = (
+  subtableReader: BinaryReader,
+  glyphOrder: string[],
+  coverageOffset: number,
+  lookup: LayoutLookupInventory,
+  subtableIndex: number,
+  kind: string,
+  index: number,
+  glyphClasses: Map<string, GlyphClass>
+): GlyphSelector | null => {
+  const glyphs = readCoverageGlyphNames(
+    subtableReader,
+    glyphOrder,
+    coverageOffset
+  )
+  if (!glyphs?.length) return null
+  if (glyphs.length === 1) return { kind: 'glyph', glyph: glyphs[0] }
+
+  const classId = makeClassId(
+    lookup.lookupIndex,
+    subtableIndex,
+    `${kind}_${index}`,
+    0
+  )
+  glyphClasses.set(
+    classId,
+    makeImportedGlyphClass(
+      classId,
+      `@GSUB_${lookup.lookupIndex}_${subtableIndex}_${kind}_${index}`,
+      glyphs
+    )
+  )
+  return { kind: 'class', classId }
 }
 
 const readSubstLookupRecords = (
@@ -221,6 +300,66 @@ export const parseContextSubstitutionFormat1 = (
   return rules
 }
 
+export const parseContextSubstitutionFormat3 = (
+  subtableReader: BinaryReader,
+  glyphOrder: string[],
+  lookup: LayoutLookupInventory,
+  subtableIndex: number
+): GsubContextSubtableParseResult | null => {
+  const glyphClasses = new Map<string, GlyphClass>()
+  const input: ContextInput[] = []
+  let cursor = 2
+
+  const glyphCount = subtableReader.uint16(cursor)
+  if (glyphCount === null || glyphCount < 1) return null
+  cursor += 2
+
+  for (let index = 0; index < glyphCount; index += 1) {
+    const coverageOffset = subtableReader.uint16(cursor)
+    if (coverageOffset === null) return null
+    const selector = parseCoverageSelectorClass(
+      subtableReader,
+      glyphOrder,
+      coverageOffset,
+      lookup,
+      subtableIndex,
+      'input',
+      index,
+      glyphClasses
+    )
+    if (!selector) return null
+    input.push({ selector })
+    cursor += 2
+  }
+
+  const substCount = subtableReader.uint16(cursor)
+  if (substCount === null) return null
+  cursor += 2
+
+  const records = readSubstLookupRecords(subtableReader, cursor, substCount)
+  if (!records) return null
+  const inputWithLookups = attachLookupRecords(input, records)
+  if (!inputWithLookups) return null
+
+  return {
+    rules: [
+      {
+        id: makeRuleId(lookup.lookupIndex, subtableIndex, 'context', 0),
+        kind: 'contextualSubstitution',
+        mode: 'context',
+        backtrack: [],
+        input: inputWithLookups,
+        lookahead: [],
+        meta: {
+          origin: 'imported',
+          provenance: makeProvenance(lookup, subtableIndex),
+        },
+      },
+    ],
+    glyphClasses: Array.from(glyphClasses.values()),
+  }
+}
+
 export const parseChainingContextSubstitutionFormat1 = (
   subtableReader: BinaryReader,
   glyphOrder: string[],
@@ -340,4 +479,107 @@ export const parseChainingContextSubstitutionFormat1 = (
   }
 
   return rules
+}
+
+export const parseChainingContextSubstitutionFormat3 = (
+  subtableReader: BinaryReader,
+  glyphOrder: string[],
+  lookup: LayoutLookupInventory,
+  subtableIndex: number
+): GsubContextSubtableParseResult | null => {
+  const glyphClasses = new Map<string, GlyphClass>()
+  const input: ContextInput[] = []
+  const backtrack: GlyphSelector[] = []
+  const lookahead: GlyphSelector[] = []
+  let cursor = 2
+
+  const backtrackGlyphCount = subtableReader.uint16(cursor)
+  if (backtrackGlyphCount === null) return null
+  cursor += 2
+  for (let index = 0; index < backtrackGlyphCount; index += 1) {
+    const coverageOffset = subtableReader.uint16(cursor)
+    if (coverageOffset === null) return null
+    const selector = parseCoverageSelectorClass(
+      subtableReader,
+      glyphOrder,
+      coverageOffset,
+      lookup,
+      subtableIndex,
+      'backtrack',
+      index,
+      glyphClasses
+    )
+    if (!selector) return null
+    backtrack.unshift(selector)
+    cursor += 2
+  }
+
+  const inputGlyphCount = subtableReader.uint16(cursor)
+  if (inputGlyphCount === null || inputGlyphCount < 1) return null
+  cursor += 2
+  for (let index = 0; index < inputGlyphCount; index += 1) {
+    const coverageOffset = subtableReader.uint16(cursor)
+    if (coverageOffset === null) return null
+    const selector = parseCoverageSelectorClass(
+      subtableReader,
+      glyphOrder,
+      coverageOffset,
+      lookup,
+      subtableIndex,
+      'input',
+      index,
+      glyphClasses
+    )
+    if (!selector) return null
+    input.push({ selector })
+    cursor += 2
+  }
+
+  const lookaheadGlyphCount = subtableReader.uint16(cursor)
+  if (lookaheadGlyphCount === null) return null
+  cursor += 2
+  for (let index = 0; index < lookaheadGlyphCount; index += 1) {
+    const coverageOffset = subtableReader.uint16(cursor)
+    if (coverageOffset === null) return null
+    const selector = parseCoverageSelectorClass(
+      subtableReader,
+      glyphOrder,
+      coverageOffset,
+      lookup,
+      subtableIndex,
+      'lookahead',
+      index,
+      glyphClasses
+    )
+    if (!selector) return null
+    lookahead.push(selector)
+    cursor += 2
+  }
+
+  const substCount = subtableReader.uint16(cursor)
+  if (substCount === null) return null
+  cursor += 2
+
+  const records = readSubstLookupRecords(subtableReader, cursor, substCount)
+  if (!records) return null
+  const inputWithLookups = attachLookupRecords(input, records)
+  if (!inputWithLookups) return null
+
+  return {
+    rules: [
+      {
+        id: makeRuleId(lookup.lookupIndex, subtableIndex, 'chaining', 0),
+        kind: 'contextualSubstitution',
+        mode: 'chaining',
+        backtrack,
+        input: inputWithLookups,
+        lookahead,
+        meta: {
+          origin: 'imported',
+          provenance: makeProvenance(lookup, subtableIndex),
+        },
+      },
+    ],
+    glyphClasses: Array.from(glyphClasses.values()),
+  }
 }

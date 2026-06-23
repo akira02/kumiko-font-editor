@@ -259,6 +259,42 @@ const makeChainingContextSubstitutionSubtable = () =>
     writeUint16(view, 34, 1)
   })
 
+const writeCoverageFormat1 = (
+  view: DataView,
+  offset: number,
+  glyphIds: number[]
+) => {
+  writeUint16(view, offset, 1)
+  writeUint16(view, offset + 2, glyphIds.length)
+  glyphIds.forEach((glyphId, index) => {
+    writeUint16(view, offset + 4 + index * 2, glyphId)
+  })
+}
+
+const makeChainingContextSubstitutionFormat3Subtable = () =>
+  makeBytes(50, (view) => {
+    writeUint16(view, 0, 3)
+
+    writeUint16(view, 2, 1)
+    writeUint16(view, 4, 22)
+
+    writeUint16(view, 6, 2)
+    writeUint16(view, 8, 30)
+    writeUint16(view, 10, 36)
+
+    writeUint16(view, 12, 1)
+    writeUint16(view, 14, 44)
+
+    writeUint16(view, 16, 1)
+    writeUint16(view, 18, 1)
+    writeUint16(view, 20, 0)
+
+    writeCoverageFormat1(view, 22, [3, 5])
+    writeCoverageFormat1(view, 30, [1])
+    writeCoverageFormat1(view, 36, [2, 6])
+    writeCoverageFormat1(view, 44, [4])
+  })
+
 const makeSinglePositioningSubtable = () =>
   makeBytes(14, (view) => {
     writeUint16(view, 0, 1)
@@ -717,6 +753,91 @@ describe('SFNT binary inventory', () => {
         ],
       },
     ])
+  })
+
+  it('extracts editable GSUB ChainingContextSubst format 3 coverage rules', () => {
+    const state = extractBinaryFeatures(
+      makeSfnt([
+        {
+          tag: 'GSUB',
+          data: makeGsubTable(
+            'calt',
+            6,
+            makeChainingContextSubstitutionFormat3Subtable()
+          ),
+        },
+      ]),
+      null,
+      ['.notdef', 'A', 'B', 'X', 'Y', 'Z', 'C']
+    )
+
+    expect(state.unsupportedLookups).toEqual([])
+    expect(state.glyphClasses).toMatchObject([
+      {
+        id: 'class_gsub_0_0_backtrack_0_0',
+        name: '@GSUB_0_0_backtrack_0',
+        glyphs: ['X', 'Z'],
+        origin: 'imported',
+      },
+      {
+        id: 'class_gsub_0_0_input_1_0',
+        name: '@GSUB_0_0_input_1',
+        glyphs: ['B', 'C'],
+        origin: 'imported',
+      },
+    ])
+    expect(state.lookups).toMatchObject([
+      {
+        id: 'lookup_gsub_0',
+        lookupType: 'chainingContextSubst',
+        editable: true,
+        origin: 'imported',
+        rules: [
+          {
+            kind: 'contextualSubstitution',
+            mode: 'chaining',
+            backtrack: [
+              { kind: 'class', classId: 'class_gsub_0_0_backtrack_0_0' },
+            ],
+            input: [
+              { selector: { kind: 'glyph', glyph: 'A' } },
+              {
+                selector: {
+                  kind: 'class',
+                  classId: 'class_gsub_0_0_input_1_0',
+                },
+                lookupIds: ['lookup_gsub_0'],
+              },
+            ],
+            lookahead: [{ kind: 'glyph', glyph: 'Y' }],
+            meta: {
+              origin: 'imported',
+              provenance: {
+                table: 'GSUB',
+                lookupIndex: 0,
+                lookupType: 6,
+                subtableIndex: 0,
+                subtableFormat: 3,
+              },
+            },
+          },
+        ],
+      },
+    ])
+    expect(state.sourceSections[0]?.recordRefs).toEqual(
+      expect.arrayContaining([
+        {
+          kind: 'glyphClass',
+          id: 'class_gsub_0_0_backtrack_0_0',
+          table: 'GSUB',
+        },
+        {
+          kind: 'glyphClass',
+          id: 'class_gsub_0_0_input_1_0',
+          table: 'GSUB',
+        },
+      ])
+    )
   })
 
   it('extracts editable GPOS SinglePos rules from straightforward subtables', () => {
