@@ -105,6 +105,7 @@ export {
   upsertSpacingBehavior,
 } from 'src/lib/openTypeFeatures/behaviorFacade'
 export {
+  deriveOpenTypeExportImpactItems,
   deriveOpenTypeExportWarnings,
   hasBlockingExportWarnings,
   hasManagedFeatureEdits,

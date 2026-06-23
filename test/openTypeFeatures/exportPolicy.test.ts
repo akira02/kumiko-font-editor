@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createCompilerRuntimeStatus } from 'src/lib/openTypeFeatures/compilerRuntimePlan'
 import { createEmptyOpenTypeFeaturesState } from 'src/lib/openTypeFeatures/defaults'
 import {
+  deriveOpenTypeExportImpactItems,
   deriveOpenTypeExportWarnings,
   needsOpenTypeFeatureCompilationForBinaryExport,
   requiresDropUnsupportedConfirmation,
@@ -147,5 +148,89 @@ describe('OpenType binary export compiler gate', () => {
     ).toEqual([
       'GSUB lookup 0: Chaining contextual substitution is not editable yet. (GSUB type 6 formats 3)',
     ])
+  })
+
+  it('summarizes source and unsupported lookup export impact', () => {
+    const state = {
+      ...createEmptyOpenTypeFeaturesState(),
+      sourceSections: [
+        {
+          id: 'source_raw_feature_text',
+          title: 'Handwritten .fea source',
+          kind: 'manual-fea' as const,
+          origin: 'manual-input' as const,
+          format: 'fea' as const,
+          stage: 'source' as const,
+          status: 'raw' as const,
+          textRef: 'rawFeatureText' as const,
+          recordRefs: [],
+          preservationPolicy: 'editable-rebuild' as const,
+        },
+        {
+          id: 'source_compiled_gsub',
+          title: 'GSUB compiled table',
+          kind: 'compiled-table' as const,
+          origin: 'binary-import' as const,
+          format: 'opentype-layout-table' as const,
+          stage: 'classified' as const,
+          status: 'partially-classified' as const,
+          table: 'GSUB' as const,
+          recordRefs: [
+            {
+              kind: 'lookup' as const,
+              id: 'lookup_gsub_0',
+              table: 'GSUB' as const,
+            },
+            {
+              kind: 'unsupportedLookup' as const,
+              id: 'unsupported_gsub_1',
+              table: 'GSUB' as const,
+            },
+          ],
+          preservationPolicy: 'preserve-if-unchanged' as const,
+        },
+      ],
+      unsupportedLookups: [
+        {
+          id: 'unsupported_gsub_1',
+          table: 'GSUB' as const,
+          lookupIndex: 1,
+          lookupType: 8,
+          subtableFormats: [1],
+          reason: 'Reverse chaining is not editable yet.',
+          rawSummary: 'GSUB type 8 format 1',
+          preserveMode: 'preserve-if-unchanged' as const,
+          provenance: {
+            table: 'GSUB' as const,
+            lookupIndex: 1,
+            lookupType: 8,
+          },
+        },
+      ],
+    }
+
+    expect(
+      deriveOpenTypeExportImpactItems(state).map((item) => [
+        item.kind,
+        item.title,
+        item.status,
+      ])
+    ).toEqual([
+      ['source', 'Handwritten .fea source', 'raw'],
+      ['source', 'GSUB compiled table', 'review'],
+      ['unsupportedLookup', 'GSUB lookup 1', 'review'],
+    ])
+    expect(
+      deriveOpenTypeExportImpactItems({
+        ...state,
+        exportPolicy: 'preserve-compiled-layout-tables',
+      }).map((item) => item.status)
+    ).toEqual(['raw', 'preserve', 'preserve'])
+    expect(
+      deriveOpenTypeExportImpactItems({
+        ...state,
+        exportPolicy: 'drop-unsupported-and-rebuild',
+      }).map((item) => item.status)
+    ).toEqual(['raw', 'review', 'drop'])
   })
 })

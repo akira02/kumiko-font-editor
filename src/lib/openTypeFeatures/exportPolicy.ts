@@ -2,7 +2,9 @@ import type { CompilerRuntimeStatus } from 'src/lib/openTypeFeatures/compilerTyp
 import type {
   ExportPolicy,
   FeatureDiagnostic,
+  FeatureSourceSection,
   OpenTypeFeaturesState,
+  UnsupportedLookup,
 } from 'src/lib/openTypeFeatures/types'
 
 export type OpenTypeExportWarningSeverity = 'info' | 'warning' | 'error'
@@ -23,6 +25,25 @@ export interface OpenTypeExportWarning {
   title: string
   message: string
   details?: string[]
+}
+
+export type OpenTypeExportImpactStatus =
+  | 'rebuild'
+  | 'preserve'
+  | 'raw'
+  | 'drop'
+  | 'review'
+
+export interface OpenTypeExportImpactItem {
+  id: string
+  kind: 'source' | 'unsupportedLookup'
+  title: string
+  detail: string
+  status: OpenTypeExportImpactStatus
+  statusLabel: string
+  table?: FeatureSourceSection['table']
+  sourceId?: string
+  unsupportedLookupId?: string
 }
 
 interface DeriveExportWarningsOptions {
@@ -246,4 +267,120 @@ export const deriveOpenTypeExportWarnings = (
     getFeatureVariationWarning(state, options.diagnostics),
     getDropUnsupportedWarning(state),
   ].filter((warning): warning is OpenTypeExportWarning => Boolean(warning))
+}
+
+export const deriveOpenTypeExportImpactItems = (
+  state: OpenTypeFeaturesState
+): OpenTypeExportImpactItem[] => [
+  ...(state.sourceSections ?? []).map((section) =>
+    getSourceImpactItem(state.exportPolicy, section)
+  ),
+  ...state.unsupportedLookups.map((lookup) =>
+    getUnsupportedLookupImpactItem(state.exportPolicy, lookup)
+  ),
+]
+
+function getSourceImpactItem(
+  exportPolicy: ExportPolicy,
+  section: FeatureSourceSection
+): OpenTypeExportImpactItem {
+  const linkedRecords = section.recordRefs.length
+
+  if (section.status === 'raw') {
+    return {
+      id: `export-impact-source-${section.id}`,
+      kind: 'source',
+      sourceId: section.id,
+      table: section.table,
+      title: section.title,
+      detail: `Raw source remains in generated FEA. ${linkedRecords} linked records.`,
+      status: 'raw',
+      statusLabel: 'Raw FEA',
+    }
+  }
+
+  if (
+    section.kind === 'compiled-table' &&
+    exportPolicy === 'preserve-compiled-layout-tables'
+  ) {
+    return {
+      id: `export-impact-source-${section.id}`,
+      kind: 'source',
+      sourceId: section.id,
+      table: section.table,
+      title: section.title,
+      detail: `Compiled source is preserved from the imported font. ${linkedRecords} linked records.`,
+      status: 'preserve',
+      statusLabel: 'Preserve',
+    }
+  }
+
+  if (
+    section.kind === 'compiled-table' &&
+    section.preservationPolicy === 'preserve-if-unchanged'
+  ) {
+    return {
+      id: `export-impact-source-${section.id}`,
+      kind: 'source',
+      sourceId: section.id,
+      table: section.table,
+      title: section.title,
+      detail: `Compiled source has unsupported records and needs review before rebuild. ${linkedRecords} linked records.`,
+      status: 'review',
+      statusLabel: 'Review',
+    }
+  }
+
+  return {
+    id: `export-impact-source-${section.id}`,
+    kind: 'source',
+    sourceId: section.id,
+    table: section.table,
+    title: section.title,
+    detail: `Classified source is rebuilt from the Kumiko feature model. ${linkedRecords} linked records.`,
+    status: 'rebuild',
+    statusLabel: 'Rebuild',
+  }
+}
+
+function getUnsupportedLookupImpactItem(
+  exportPolicy: ExportPolicy,
+  lookup: UnsupportedLookup
+): OpenTypeExportImpactItem {
+  if (exportPolicy === 'preserve-compiled-layout-tables') {
+    return {
+      id: `export-impact-unsupported-${lookup.id}`,
+      kind: 'unsupportedLookup',
+      unsupportedLookupId: lookup.id,
+      table: lookup.table,
+      title: `${lookup.table} lookup ${lookup.lookupIndex}`,
+      detail: `Unsupported lookup is preserved with compiled layout tables. ${lookup.reason}`,
+      status: 'preserve',
+      statusLabel: 'Preserve',
+    }
+  }
+
+  if (exportPolicy === 'drop-unsupported-and-rebuild') {
+    return {
+      id: `export-impact-unsupported-${lookup.id}`,
+      kind: 'unsupportedLookup',
+      unsupportedLookupId: lookup.id,
+      table: lookup.table,
+      title: `${lookup.table} lookup ${lookup.lookupIndex}`,
+      detail: `Unsupported lookup is intentionally dropped on rebuild. ${lookup.reason}`,
+      status: 'drop',
+      statusLabel: 'Drop',
+    }
+  }
+
+  return {
+    id: `export-impact-unsupported-${lookup.id}`,
+    kind: 'unsupportedLookup',
+    unsupportedLookupId: lookup.id,
+    table: lookup.table,
+    title: `${lookup.table} lookup ${lookup.lookupIndex}`,
+    detail: `Unsupported lookup is not rebuilt; choose preserve or explicit drop before binary export. ${lookup.reason}`,
+    status: 'review',
+    statusLabel: 'Review',
+  }
 }

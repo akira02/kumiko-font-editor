@@ -17,8 +17,10 @@ import type {
 } from 'src/lib/openTypeFeatures'
 import {
   createCompilerRuntimeStatus,
+  deriveOpenTypeExportImpactItems,
   deriveOpenTypeExportWarnings,
 } from 'src/lib/openTypeFeatures'
+import { ExportImpactSummary } from 'src/features/common/projectControl/fontSettings/features/components/ExportImpactSummary'
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -65,6 +67,10 @@ export function ExportPolicyControl({
       }),
     [compilerRuntimeStatus, diagnostics, state]
   )
+  const impactItems = useMemo(
+    () => deriveOpenTypeExportImpactItems(state),
+    [state]
+  )
 
   return (
     <Stack spacing={3}>
@@ -86,6 +92,7 @@ export function ExportPolicyControl({
       <Text fontSize="sm" color="field.muted">
         {t('projectControl.exportBehaviorIsExplicitBecauseCompiling')}
       </Text>
+      <ExportImpactSummary items={impactItems} />
       {warnings.map((warning) => (
         <Alert
           key={warning.id}

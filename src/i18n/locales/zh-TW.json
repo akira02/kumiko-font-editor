@@ -427,6 +427,7 @@
     "errors": "errors",
     "export": "匯出",
     "exportBehaviorIsExplicitBecauseCompiling": "Export behavior is explicit because compiling generated FEA may replace existing compiled GSUB, GPOS, or GDEF tables.",
+    "exportImpact": "匯出影響",
     "exportInstances": "Export instances",
     "featureCodeIsOrganizedByScript": "Feature code is organized by script/language entries and the lookups they reference.",
     "featureCodeLookups": "Feature code lookups",
