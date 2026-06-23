@@ -1,5 +1,6 @@
 import {
   Badge,
+  Divider,
   FormControl,
   FormHelperText,
   FormLabel,
@@ -104,11 +105,12 @@ function SourceSectionCard({
   sectionRecords: SourceSectionRecordGroup
 }) {
   const { section, records } = sectionRecords
-  const visibleRecords = records.slice(0, 10)
+  const visibleRecords = records.slice(0, 12)
   const hiddenRecordRefCount = Math.max(
     records.length - visibleRecords.length,
     0
   )
+  const metaBadges = formatSourceSectionMeta(section.meta)
 
   return (
     <Stack borderWidth="1px" borderRadius="sm" p={3} spacing={2}>
@@ -128,6 +130,15 @@ function SourceSectionCard({
         <Badge variant="subtle">{section.stage}</Badge>
         <Badge variant="subtle">{section.preservationPolicy}</Badge>
       </HStack>
+      {metaBadges.length > 0 ? (
+        <HStack wrap="wrap" gap={1}>
+          {metaBadges.map((badge) => (
+            <Badge key={badge} fontFamily="mono" variant="outline">
+              {badge}
+            </Badge>
+          ))}
+        </HStack>
+      ) : null}
       <Text fontSize="xs" color="field.muted">
         {sectionRecords.resolvedCount} / {section.recordRefs.length}{' '}
         {recordsLabel}
@@ -137,18 +148,21 @@ function SourceSectionCard({
           <Text fontSize="xs" color="field.muted">
             {recordRefsLabel}
           </Text>
-          <HStack wrap="wrap" gap={1}>
+          <Stack
+            spacing={0}
+            borderTopWidth="1px"
+            divider={<Divider />}
+            maxH="280px"
+            overflowY="auto"
+          >
             {visibleRecords.map((record, index) => (
-              <Badge
+              <SourceRecordRow
                 key={`${record.kind}-${record.id}-${index}`}
-                colorScheme={record.status === 'missing' ? 'red' : undefined}
-                fontFamily="mono"
-                title={record.detail}
-                variant="outline"
-              >
-                {formatRecordSummary(record)}
-              </Badge>
+                record={record}
+              />
             ))}
+          </Stack>
+          <HStack wrap="wrap" gap={1}>
             {hiddenRecordRefCount > 0 ? (
               <Badge variant="subtle">+{hiddenRecordRefCount}</Badge>
             ) : null}
@@ -159,5 +173,70 @@ function SourceSectionCard({
   )
 }
 
-const formatRecordSummary = (record: SourceSectionRecordSummary) =>
-  `${record.kind}${record.table ? ` ${record.table}` : ''}: ${record.label}`
+function SourceRecordRow({ record }: { record: SourceSectionRecordSummary }) {
+  const colorScheme =
+    record.status === 'missing'
+      ? 'red'
+      : record.severity === 'error'
+        ? 'red'
+        : record.severity === 'warning'
+          ? 'yellow'
+          : record.severity === 'info'
+            ? 'blue'
+            : undefined
+
+  return (
+    <Stack py={2} spacing={1}>
+      <HStack justify="space-between" align="flex-start" gap={2}>
+        <HStack minW={0} gap={1}>
+          <Badge flexShrink={0} fontFamily="mono" variant="subtle">
+            {record.kind}
+          </Badge>
+          {record.table ? (
+            <Badge flexShrink={0} variant="outline">
+              {record.table}
+            </Badge>
+          ) : null}
+          <Text
+            fontSize="xs"
+            fontFamily="mono"
+            fontWeight="semibold"
+            noOfLines={1}
+          >
+            {record.label}
+          </Text>
+        </HStack>
+        <Badge flexShrink={0} colorScheme={colorScheme} variant="outline">
+          {record.status}
+        </Badge>
+      </HStack>
+      <Text fontSize="xs" color="field.muted" noOfLines={2}>
+        {record.detail}
+      </Text>
+    </Stack>
+  )
+}
+
+function formatSourceSectionMeta(meta: Record<string, unknown> | undefined) {
+  if (!meta) return []
+
+  return [
+    formatNumberMeta(meta.tableOffset, 'offset'),
+    formatNumberMeta(meta.featureCount, 'features'),
+    formatNumberMeta(meta.lookupCount, 'lookups'),
+    formatNumberMeta(meta.languageCount, 'languages'),
+    formatNumberMeta(meta.extensionLookupCount, 'extensions'),
+    meta.featureVariationsPresent === true ? 'FeatureVariations' : null,
+    formatArrayMeta(meta.unreconstructedTableData, 'compiled-only'),
+  ].filter((item): item is string => Boolean(item))
+}
+
+function formatNumberMeta(value: unknown, label: string) {
+  return typeof value === 'number' ? `${label}: ${value}` : null
+}
+
+function formatArrayMeta(value: unknown, label: string) {
+  return Array.isArray(value) && value.length > 0
+    ? `${label}: ${value.filter((item) => typeof item === 'string').join(', ')}`
+    : null
+}
