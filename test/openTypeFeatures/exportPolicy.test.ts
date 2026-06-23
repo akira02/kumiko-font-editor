@@ -82,7 +82,11 @@ describe('OpenType binary export compiler gate', () => {
               table: 'GSUB' as const,
             },
           ],
-          preservationPolicy: 'editable-rebuild' as const,
+          preservationPolicy: 'preserve-if-unchanged' as const,
+          meta: {
+            featureVariationsPresent: true,
+            unreconstructedTableData: ['FeatureVariations'],
+          },
         },
       ],
       diagnostics: [featureVariationDiagnostic],
@@ -95,6 +99,10 @@ describe('OpenType binary export compiler gate', () => {
     expect(
       rebuildWarnings.some((warning) => warning.code === 'feature-variations')
     ).toBe(true)
+    expect(deriveOpenTypeExportImpactItems(state)[0]).toMatchObject({
+      status: 'review',
+      detail: expect.stringContaining('unreconstructed FeatureVariations data'),
+    })
 
     const preserveWarnings = deriveOpenTypeExportWarnings(
       {
@@ -109,6 +117,12 @@ describe('OpenType binary export compiler gate', () => {
     expect(
       preserveWarnings.some((warning) => warning.code === 'feature-variations')
     ).toBe(false)
+    expect(
+      deriveOpenTypeExportImpactItems({
+        ...state,
+        exportPolicy: 'preserve-compiled-layout-tables',
+      })[0]?.detail
+    ).toContain('FeatureVariations remains compiled-only source data.')
   })
 
   it('warns when rebuilding editable extension lookup wrappers', () => {

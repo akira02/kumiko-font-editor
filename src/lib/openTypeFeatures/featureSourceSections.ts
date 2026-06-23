@@ -75,6 +75,7 @@ interface CompiledTableSourceSectionOptions {
   markClassIds?: string[]
   unsupportedLookupIds?: string[]
   diagnosticIds?: string[]
+  unreconstructedTableData?: string[]
   title?: string
   meta?: Record<string, unknown>
 }
@@ -114,18 +115,20 @@ export const createCompiledTableSourceSection = ({
   markClassIds,
   unsupportedLookupIds,
   diagnosticIds,
+  unreconstructedTableData = [],
   title,
   meta,
 }: CompiledTableSourceSectionOptions): FeatureSourceSection => {
   const lookupCount = lookupIds?.length ?? 0
   const unsupportedCount = unsupportedLookupIds?.length ?? 0
   const editableLookupCount = Math.max(lookupCount - unsupportedCount, 0)
-  const status =
-    unsupportedCount === 0
-      ? 'classified'
-      : editableLookupCount > 0
-        ? 'partially-classified'
-        : 'inventoried'
+  const hasPreservedCompiledData =
+    unsupportedCount > 0 || unreconstructedTableData.length > 0
+  const status = !hasPreservedCompiledData
+    ? 'classified'
+    : editableLookupCount > 0
+      ? 'partially-classified'
+      : 'inventoried'
 
   return {
     id: `source_compiled_${table.toLowerCase()}`,
@@ -147,8 +150,14 @@ export const createCompiledTableSourceSection = ({
         ? [{ kind: 'gdef' as const, id: 'gdef', table }]
         : []),
     ]),
-    preservationPolicy:
-      unsupportedCount > 0 ? 'preserve-if-unchanged' : 'editable-rebuild',
-    meta,
+    preservationPolicy: hasPreservedCompiledData
+      ? 'preserve-if-unchanged'
+      : 'editable-rebuild',
+    meta: {
+      ...meta,
+      ...(unreconstructedTableData.length > 0
+        ? { unreconstructedTableData }
+        : {}),
+    },
   }
 }

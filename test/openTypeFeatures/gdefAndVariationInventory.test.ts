@@ -8,6 +8,7 @@ import {
   writeUint16,
   writeUint32,
 } from './helpers/binaryTableFixtures'
+import { makeSingleSubstitutionSubtable } from './helpers/layoutTableFixtures'
 
 const makeLookupTable = (
   tableTag: 'GSUB' | 'GPOS',
@@ -188,6 +189,43 @@ describe('GDEF and variation inventory', () => {
     ).toContain(
       'feature-diagnostic-warning-binary-extractor-gpos-feature-variations-present'
     )
+  })
+
+  it('marks FeatureVariations tables as preserve-if-unchanged even when lookups are editable', () => {
+    const state = extractBinaryFeatures(
+      makeSfnt([
+        {
+          tag: 'GSUB',
+          data: makeLookupTable(
+            'GSUB',
+            1,
+            makeSingleSubstitutionSubtable(),
+            true
+          ),
+        },
+      ]),
+      null,
+      ['.notdef', 'b', 'b.salt']
+    )
+
+    expect(state.unsupportedLookups).toEqual([])
+    expect(state.sourceSections[0]).toMatchObject({
+      id: 'source_compiled_gsub',
+      status: 'partially-classified',
+      preservationPolicy: 'preserve-if-unchanged',
+      meta: {
+        featureVariationsPresent: true,
+        featureVariationsOffset: 60,
+        unreconstructedTableData: ['FeatureVariations'],
+      },
+      recordRefs: expect.arrayContaining([
+        {
+          kind: 'diagnostic',
+          id: 'feature-diagnostic-warning-binary-extractor-gsub-feature-variations-present',
+          table: 'GSUB',
+        },
+      ]),
+    })
   })
 
   it('keeps every GSUB and GPOS lookup type either editable or explicitly unsupported', () => {

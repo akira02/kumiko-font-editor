@@ -377,6 +377,8 @@ const toCompiledLayoutSourceSections = (
   const sections: FeatureSourceSection[] = []
 
   for (const inventory of inventories) {
+    const featureVariationsPresent =
+      inventory.featureVariationsOffset !== undefined
     const lookupIds = state.lookups
       .filter((lookup) => lookup.table === inventory.table)
       .map((lookup) => lookup.id)
@@ -414,13 +416,18 @@ const toCompiledLayoutSourceSections = (
         ),
         unsupportedLookupIds,
         diagnosticIds,
+        unreconstructedTableData: featureVariationsPresent
+          ? ['FeatureVariations']
+          : [],
         meta: {
           tableOffset: inventory.tableOffset,
           featureCount: inventory.features.length,
           lookupCount: inventory.lookups.length,
           languageCount: inventory.languages.length,
-          featureVariationsPresent:
-            inventory.featureVariationsOffset !== undefined,
+          featureVariationsPresent,
+          ...(inventory.featureVariationsOffset !== undefined
+            ? { featureVariationsOffset: inventory.featureVariationsOffset }
+            : {}),
           extensionLookupCount: extensionLookupIds.length,
           ...(extensionLookupIds.length > 0 ? { extensionLookupIds } : {}),
         },

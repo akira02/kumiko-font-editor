@@ -320,6 +320,7 @@ function getSourceImpactItem(
 ): OpenTypeExportImpactItem {
   const linkedRecords = section.recordRefs.length
   const extensionDetail = getExtensionWrapperImpactDetail(section)
+  const unreconstructedDataDetail = getUnreconstructedDataDetail(section)
 
   if (section.status === 'raw') {
     return {
@@ -344,7 +345,7 @@ function getSourceImpactItem(
       sourceId: section.id,
       table: section.table,
       title: section.title,
-      detail: `Compiled source is preserved from the imported font. ${linkedRecords} linked records.`,
+      detail: `Compiled source is preserved from the imported font. ${linkedRecords} linked records.${unreconstructedDataDetail}`,
       status: 'preserve',
       statusLabel: 'Preserve',
     }
@@ -360,7 +361,7 @@ function getSourceImpactItem(
       sourceId: section.id,
       table: section.table,
       title: section.title,
-      detail: `Compiled source has unsupported records and needs review before rebuild. ${linkedRecords} linked records.${extensionDetail}`,
+      detail: `${getPreservedCompiledDataReason(section)} ${linkedRecords} linked records.${extensionDetail}`,
       status: 'review',
       statusLabel: 'Review',
     }
@@ -388,6 +389,34 @@ function getExtensionWrapperImpactDetail(section: FeatureSourceSection) {
   return ` ${extensionLookupCount} extension lookup wrapper${
     extensionLookupCount === 1 ? '' : 's'
   } may be emitted as equivalent regular lookup rules.`
+}
+
+function getUnreconstructedTableData(section: FeatureSourceSection) {
+  return Array.isArray(section.meta?.unreconstructedTableData)
+    ? section.meta.unreconstructedTableData.filter(
+        (item): item is string => typeof item === 'string'
+      )
+    : []
+}
+
+function getUnreconstructedDataDetail(section: FeatureSourceSection) {
+  const unreconstructedTableData = getUnreconstructedTableData(section)
+  if (unreconstructedTableData.length === 0) return ''
+
+  return ` ${unreconstructedTableData.join(
+    ', '
+  )} remains compiled-only source data.`
+}
+
+function getPreservedCompiledDataReason(section: FeatureSourceSection) {
+  const unreconstructedTableData = getUnreconstructedTableData(section)
+  if (unreconstructedTableData.length > 0) {
+    return `Compiled source has unreconstructed ${unreconstructedTableData.join(
+      ', '
+    )} data and needs preservation review before rebuild.`
+  }
+
+  return 'Compiled source has unsupported records and needs review before rebuild.'
 }
 
 function getUnsupportedLookupImpactItem(
