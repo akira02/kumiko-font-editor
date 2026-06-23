@@ -20,6 +20,7 @@ interface FeatureWorkflowPanelProps {
     sourceMap: GeneratedFeaSourceMap
     text: string
   }
+  showGeneratedPreview?: boolean
   state: OpenTypeFeaturesState
   suggestions: AutoFeatureSuggestion[]
   onAcceptSuggestion: (suggestion: AutoFeatureSuggestion) => void
@@ -31,6 +32,7 @@ interface FeatureWorkflowPanelProps {
 export function FeatureWorkflowPanel({
   diagnostics,
   generatedFea,
+  showGeneratedPreview = true,
   state,
   suggestions,
   onAcceptSuggestion,
@@ -67,11 +69,15 @@ export function FeatureWorkflowPanel({
       <UnsupportedLookupList unsupportedLookups={state.unsupportedLookups} />
       <Divider />
       <FeatureDiagnosticsList diagnostics={diagnostics} />
-      <Divider />
-      <GeneratedFeaPreview
-        feaText={generatedFea.text}
-        sourceMap={generatedFea.sourceMap}
-      />
+      {showGeneratedPreview ? (
+        <>
+          <Divider />
+          <GeneratedFeaPreview
+            feaText={generatedFea.text}
+            sourceMap={generatedFea.sourceMap}
+          />
+        </>
+      ) : null}
     </Stack>
   )
 }

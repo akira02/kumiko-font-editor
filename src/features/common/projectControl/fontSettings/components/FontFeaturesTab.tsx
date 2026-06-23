@@ -1,15 +1,11 @@
 import { Box, Grid, GridItem, Stack } from '@chakra-ui/react'
 import { useMemo, useState } from 'react'
-import { FeatureClassesPanel } from 'src/features/common/projectControl/fontSettings/features/components/FeatureClassesPanel'
-import { FeatureDetailPanel } from 'src/features/common/projectControl/fontSettings/features/components/FeatureDetailPanel'
-import { FeatureSourcePanel } from 'src/features/common/projectControl/fontSettings/features/components/FeatureSourcePanel'
+import { FeatureFeaWorkspace } from 'src/features/common/projectControl/fontSettings/features/components/FeatureFeaWorkspace'
 import { FeatureSummary } from 'src/features/common/projectControl/fontSettings/features/components/FeatureSummary'
 import {
   FeatureWorkbenchSidebar,
   type FeatureWorkbenchSelection,
 } from 'src/features/common/projectControl/fontSettings/features/components/FeatureWorkbenchSidebar'
-import { FeatureWorkflowPanel } from 'src/features/common/projectControl/fontSettings/features/components/FeatureWorkflowPanel'
-import { updateLookupRule } from 'src/features/common/projectControl/fontSettings/features/utils/ruleEditorState'
 import {
   applyAutoFeatureSuggestion,
   buildAutoFeatureSuggestions,
@@ -22,7 +18,6 @@ import {
   type AutoFeatureSuggestion,
   type ExportPolicy,
   type OpenTypeFeaturesState,
-  type Rule,
 } from 'src/lib/openTypeFeatures'
 import type { FontData } from 'src/store'
 
@@ -76,10 +71,6 @@ export function FontFeaturesTab({
     onOpenTypeFeaturesChange({ ...openTypeFeatures, exportPolicy })
   }
 
-  const updateRule = (lookupId: string, rule: Rule) => {
-    onOpenTypeFeaturesChange(updateLookupRule(openTypeFeatures, lookupId, rule))
-  }
-
   const updateRawFeatureText = (rawFeatureText: string) => {
     onOpenTypeFeaturesChange(
       classifyRawFeatureTextSource(
@@ -97,10 +88,9 @@ export function FontFeaturesTab({
           (feature) => feature.id === selected.featureId
         ) ?? null)
       : null
-  const activeSelection =
-    selected.kind === 'feature' && !selectedFeature
-      ? ({ kind: 'source' } as const)
-      : selected
+  const activeSelection = selectedFeature
+    ? selected
+    : ({ kind: 'source' } as const)
 
   return (
     <Stack spacing={5} h="100%" minH={0}>
@@ -123,35 +113,21 @@ export function FontFeaturesTab({
         </GridItem>
         <GridItem minH={0} minW={0} overflow="auto" pr={1}>
           <Box pb={1}>
-            {activeSelection.kind === 'classes' ? (
-              <FeatureClassesPanel state={openTypeFeatures} />
-            ) : activeSelection.kind === 'workflow' ? (
-              <FeatureWorkflowPanel
-                diagnostics={diagnostics}
-                generatedFea={generatedFea}
-                state={openTypeFeatures}
-                suggestions={suggestions}
-                onAcceptSuggestion={acceptSuggestion}
-                onExportPolicyChange={updateExportPolicy}
-                onIgnoreSuggestion={ignoreSuggestion}
-                onScanSuggestions={() =>
-                  onOpenTypeFeaturesChange({ ...openTypeFeatures })
-                }
-              />
-            ) : selectedFeature ? (
-              <FeatureDetailPanel
-                diagnostics={diagnostics}
-                feature={selectedFeature}
-                state={openTypeFeatures}
-                onRuleChange={updateRule}
-              />
-            ) : (
-              <FeatureSourcePanel
-                rawFeatureText={openTypeFeatures.rawFeatureText ?? ''}
-                state={openTypeFeatures}
-                onRawFeatureTextChange={updateRawFeatureText}
-              />
-            )}
+            <FeatureFeaWorkspace
+              diagnostics={diagnostics}
+              generatedFea={generatedFea}
+              rawFeatureText={openTypeFeatures.rawFeatureText ?? ''}
+              selectedFeature={selectedFeature}
+              state={openTypeFeatures}
+              suggestions={suggestions}
+              onAcceptSuggestion={acceptSuggestion}
+              onExportPolicyChange={updateExportPolicy}
+              onIgnoreSuggestion={ignoreSuggestion}
+              onRawFeatureTextChange={updateRawFeatureText}
+              onScanSuggestions={() =>
+                onOpenTypeFeaturesChange({ ...openTypeFeatures })
+              }
+            />
           </Box>
         </GridItem>
       </Grid>
