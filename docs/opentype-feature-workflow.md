@@ -226,6 +226,7 @@ generated .fea / UI / export policy
 - 簡單 ligature `sub f i by f_i;`
 - contextual substitution，例如 `sub A' lookup SomeLookup B;`
 - contextual ignore rule，例如 `ignore sub A A' B;`
+- comma-separated contextual ignore rule，例如 `ignore sub f' i, f' l;`
 - contextual positioning，例如 `pos A' lookup PairLookup V;` 與 `ignore pos X X' V;`
 - rule selector 內的 inline glyph list，例如 `pos [A Aacute] [V W] -80;`，會分類成 synthetic glyph class 後輸出
 - `markClass` 宣告，支援單 glyph、bracket glyph list 與 glyph class selector

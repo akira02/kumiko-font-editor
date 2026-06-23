@@ -532,6 +532,78 @@ describe('OpenType raw FEA classifier', () => {
     )
   })
 
+  it('classifies comma-separated raw contextual ignore rules as separate rules', () => {
+    const state = classifyRawFeatureTextSource(
+      setRawFeatureTextSource(
+        createEmptyOpenTypeFeaturesState(),
+        [
+          'feature calt {',
+          "  ignore sub f' i, f' l;",
+          '} calt;',
+          'feature kern {',
+          "  ignore pos A A' V, A A' W;",
+          '} kern;',
+        ].join('\n')
+      )
+    )
+
+    expect(state.sourceSections[0]).toMatchObject({
+      id: 'source_raw_feature_text',
+      stage: 'classified',
+      status: 'classified',
+    })
+    expect(state.lookups).toMatchObject([
+      {
+        id: 'lookup_raw_calt_0',
+        table: 'GSUB',
+        lookupType: 'chainingContextSubst',
+        rules: [
+          {
+            kind: 'contextualSubstitution',
+            id: 'lookup_raw_calt_0_rule_0_0',
+            input: [{ selector: { kind: 'glyph', glyph: 'f' } }],
+            lookahead: [{ kind: 'glyph', glyph: 'i' }],
+          },
+          {
+            kind: 'contextualSubstitution',
+            id: 'lookup_raw_calt_0_rule_0_1',
+            input: [{ selector: { kind: 'glyph', glyph: 'f' } }],
+            lookahead: [{ kind: 'glyph', glyph: 'l' }],
+          },
+        ],
+      },
+      {
+        id: 'lookup_raw_kern_1',
+        table: 'GPOS',
+        lookupType: 'chainingContextPos',
+        rules: [
+          {
+            kind: 'contextualPositioning',
+            id: 'lookup_raw_kern_1_rule_0_0',
+            backtrack: [{ kind: 'glyph', glyph: 'A' }],
+            input: [{ selector: { kind: 'glyph', glyph: 'A' } }],
+            lookahead: [{ kind: 'glyph', glyph: 'V' }],
+          },
+          {
+            kind: 'contextualPositioning',
+            id: 'lookup_raw_kern_1_rule_0_1',
+            backtrack: [{ kind: 'glyph', glyph: 'A' }],
+            input: [{ selector: { kind: 'glyph', glyph: 'A' } }],
+            lookahead: [{ kind: 'glyph', glyph: 'W' }],
+          },
+        ],
+      },
+    ])
+
+    const generated = generateFea(state).text
+    expect(generated).toContain("ignore sub f' i;")
+    expect(generated).toContain("ignore sub f' l;")
+    expect(generated).toContain("ignore pos A A' V;")
+    expect(generated).toContain("ignore pos A A' W;")
+    expect(generated).not.toContain('i,')
+    expect(generated).not.toContain('V,')
+  })
+
   it('classifies raw pair positioning with second value records', () => {
     const state = classifyRawFeatureTextSource(
       setRawFeatureTextSource(

@@ -59,6 +59,38 @@ export const splitGlyphPatternTokens = (body: string) => {
   return tokens
 }
 
+export const splitCommaSeparatedContexts = (body: string) => {
+  const contexts: string[] = []
+  let bracketDepth = 0
+  let startIndex = 0
+
+  for (let index = 0; index < body.length; index += 1) {
+    const character = body[index]
+    if (character === '[') {
+      bracketDepth += 1
+      continue
+    }
+    if (character === ']') {
+      bracketDepth -= 1
+      if (bracketDepth < 0) return null
+      continue
+    }
+    if (character !== ',' || bracketDepth !== 0) continue
+
+    const context = body.slice(startIndex, index).trim()
+    if (!context) return null
+    contexts.push(context)
+    startIndex = index + 1
+  }
+
+  if (bracketDepth !== 0) return null
+
+  const finalContext = body.slice(startIndex).trim()
+  if (!finalContext) return null
+  contexts.push(finalContext)
+  return contexts
+}
+
 const parseInlineGlyphClassToken = (token: string) => {
   const marked = token.endsWith("'")
   const cleanToken = marked ? token.slice(0, -1) : token

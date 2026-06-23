@@ -10,6 +10,7 @@ import {
   isInlineGlyphClassToken,
   selectorFromRawMarkedToken,
   selectorFromRawToken,
+  splitCommaSeparatedContexts,
   splitFirstGlyphPatternToken,
   splitGlyphPatternTokens,
   type InlineGlyphClassRegistrar,
@@ -214,18 +215,14 @@ const parseCursiveAnchor = (value: string) => {
 }
 
 const parseContextualSubstitutionRule = (
-  statement: string,
+  context: string,
+  ignore: boolean,
   ruleId: string,
   origin: FeatureOrigin,
   glyphClassIdByName: Map<string, string>,
   lookupIdByName: Map<string, string>,
   registerInlineGlyphClass?: InlineGlyphClassRegistrar
 ): Rule | null => {
-  const ignoreMatch = statement.match(
-    new RegExp(`^ignore\\s+${SUBSTITUTION_KEYWORD}\\s+(.+)$`, 'i')
-  )
-  const substituteMatch = matchSubstitutionStatement(statement, '(.+)')
-  const context = ignoreMatch?.[1] ?? substituteMatch?.[1]
   if (!context || /\sby\s/i.test(context)) return null
 
   const selectorEntries: Array<{
@@ -270,13 +267,10 @@ const parseContextualSubstitutionRule = (
     lastInputIndex + 1
   )
   if (inputEntries.some((entry) => !entry.marked)) return null
-  if (ignoreMatch && inputEntries.some((entry) => entry.lookupIds.length > 0)) {
+  if (ignore && inputEntries.some((entry) => entry.lookupIds.length > 0)) {
     return null
   }
-  if (
-    substituteMatch &&
-    inputEntries.every((entry) => entry.lookupIds.length === 0)
-  ) {
+  if (!ignore && inputEntries.every((entry) => entry.lookupIds.length === 0)) {
     return null
   }
 
@@ -301,19 +295,49 @@ const parseContextualSubstitutionRule = (
   }
 }
 
-const parseContextualPositioningRule = (
+const parseContextualSubstitutionRules = (
   statement: string,
   ruleId: string,
   origin: FeatureOrigin,
   glyphClassIdByName: Map<string, string>,
   lookupIdByName: Map<string, string>,
   registerInlineGlyphClass?: InlineGlyphClassRegistrar
-): Rule | null => {
+): Rule[] | null => {
   const ignoreMatch = statement.match(
-    new RegExp(`^ignore\\s+${POSITIONING_KEYWORD}\\s+(.+)$`, 'i')
+    new RegExp(`^ignore\\s+${SUBSTITUTION_KEYWORD}\\s+(.+)$`, 'i')
   )
-  const positionMatch = matchPositioningStatement(statement, '(.+)')
-  const context = ignoreMatch?.[1] ?? positionMatch?.[1]
+  const substituteMatch = matchSubstitutionStatement(statement, '(.+)')
+  const context = ignoreMatch?.[1] ?? substituteMatch?.[1]
+  const contexts = ignoreMatch
+    ? splitCommaSeparatedContexts(context ?? '')
+    : context
+      ? [context]
+      : null
+  if (!contexts) return null
+
+  const rules = contexts.map((entry, index) =>
+    parseContextualSubstitutionRule(
+      entry,
+      Boolean(ignoreMatch),
+      contexts.length === 1 ? ruleId : `${ruleId}_${index}`,
+      origin,
+      glyphClassIdByName,
+      lookupIdByName,
+      registerInlineGlyphClass
+    )
+  )
+  return rules.every((rule): rule is Rule => Boolean(rule)) ? rules : null
+}
+
+const parseContextualPositioningRule = (
+  context: string,
+  ignore: boolean,
+  ruleId: string,
+  origin: FeatureOrigin,
+  glyphClassIdByName: Map<string, string>,
+  lookupIdByName: Map<string, string>,
+  registerInlineGlyphClass?: InlineGlyphClassRegistrar
+): Rule | null => {
   if (!context || /(?:^|\s)(?:-?\d+|<[^>]+>)\s*$/i.test(context)) return null
 
   const selectorEntries: Array<{
@@ -358,13 +382,10 @@ const parseContextualPositioningRule = (
     lastInputIndex + 1
   )
   if (inputEntries.some((entry) => !entry.marked)) return null
-  if (ignoreMatch && inputEntries.some((entry) => entry.lookupIds.length > 0)) {
+  if (ignore && inputEntries.some((entry) => entry.lookupIds.length > 0)) {
     return null
   }
-  if (
-    positionMatch &&
-    inputEntries.every((entry) => entry.lookupIds.length === 0)
-  ) {
+  if (!ignore && inputEntries.every((entry) => entry.lookupIds.length === 0)) {
     return null
   }
 
@@ -387,6 +408,40 @@ const parseContextualPositioningRule = (
       provenance: { table: 'GPOS' },
     },
   }
+}
+
+const parseContextualPositioningRules = (
+  statement: string,
+  ruleId: string,
+  origin: FeatureOrigin,
+  glyphClassIdByName: Map<string, string>,
+  lookupIdByName: Map<string, string>,
+  registerInlineGlyphClass?: InlineGlyphClassRegistrar
+): Rule[] | null => {
+  const ignoreMatch = statement.match(
+    new RegExp(`^ignore\\s+${POSITIONING_KEYWORD}\\s+(.+)$`, 'i')
+  )
+  const positionMatch = matchPositioningStatement(statement, '(.+)')
+  const context = ignoreMatch?.[1] ?? positionMatch?.[1]
+  const contexts = ignoreMatch
+    ? splitCommaSeparatedContexts(context ?? '')
+    : context
+      ? [context]
+      : null
+  if (!contexts) return null
+
+  const rules = contexts.map((entry, index) =>
+    parseContextualPositioningRule(
+      entry,
+      Boolean(ignoreMatch),
+      contexts.length === 1 ? ruleId : `${ruleId}_${index}`,
+      origin,
+      glyphClassIdByName,
+      lookupIdByName,
+      registerInlineGlyphClass
+    )
+  )
+  return rules.every((rule): rule is Rule => Boolean(rule)) ? rules : null
 }
 
 const parseSubstitutionRule = (
@@ -748,23 +803,24 @@ export const parseLookupStatements = (
     }
 
     const ruleId = `${idPrefix}_rule_${index}`
+    const parsedRules =
+      parseContextualSubstitutionRules(
+        statement,
+        ruleId,
+        origin,
+        glyphClassIdByName,
+        lookupIdByName,
+        registerInlineGlyphClass
+      ) ??
+      parseContextualPositioningRules(
+        statement,
+        ruleId,
+        origin,
+        glyphClassIdByName,
+        lookupIdByName,
+        registerInlineGlyphClass
+      )
     const rule =
-      parseContextualSubstitutionRule(
-        statement,
-        ruleId,
-        origin,
-        glyphClassIdByName,
-        lookupIdByName,
-        registerInlineGlyphClass
-      ) ??
-      parseContextualPositioningRule(
-        statement,
-        ruleId,
-        origin,
-        glyphClassIdByName,
-        lookupIdByName,
-        registerInlineGlyphClass
-      ) ??
       parseSubstitutionRule(
         statement,
         ruleId,
@@ -788,7 +844,9 @@ export const parseLookupStatements = (
         registerInlineGlyphClass
       )
 
-    if (rule) {
+    if (parsedRules) {
+      rules.push(...parsedRules)
+    } else if (rule) {
       rules.push(rule)
     } else {
       unsupportedStatements.push(statement)
