@@ -118,6 +118,19 @@ const ruleToNode = (
         })),
         lookahead: rule.lookahead,
       }
+    case 'contextualPositioning':
+      return {
+        kind: 'ContextualPositioning',
+        ruleId: rule.id,
+        backtrack: rule.backtrack,
+        input: rule.input.map((entry) => ({
+          selector: entry.selector,
+          lookupNames: (entry.lookupIds ?? [])
+            .map((lookupId) => lookupNameById.get(lookupId))
+            .filter((name): name is string => Boolean(name)),
+        })),
+        lookahead: rule.lookahead,
+      }
     case 'markToBase': {
       const missingIds = missingMarkClassIds(rule.anchors, markClassNameById)
       if (missingIds.length > 0) {
@@ -186,11 +199,13 @@ const ruleToNode = (
             kind: 'Comment',
             value: `Cannot serialize rule ${rule.id}: cursive positioning rule has no entry or exit anchor`,
           }
-    default:
+    default: {
+      const unsupportedRule = rule as { kind: string }
       return {
         kind: 'Comment',
-        value: `Unsupported generated rule kind: ${rule.kind}`,
+        value: `Unsupported generated rule kind: ${unsupportedRule.kind}`,
       }
+    }
   }
 }
 

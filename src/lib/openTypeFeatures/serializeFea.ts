@@ -189,6 +189,42 @@ const serializeContextualSubstitution = (
   recordRuleSource(context, node.ruleId, lineStart, lineStart)
 }
 
+const serializeContextualPositioning = (
+  node: Extract<FeaNode, { kind: 'ContextualPositioning' }>,
+  context: SerializeContext,
+  indent: string
+) => {
+  if (node.ruleId) {
+    pushLine(context, `${indent}# kumiko-rule-id: ${node.ruleId}`)
+  }
+  const lineStart = context.lines.length + 1
+  const backtrack = node.backtrack.map((selector) =>
+    formatSelector(context, selector)
+  )
+  const input = node.input.map((entry) => {
+    const selector = `${formatSelector(context, entry.selector)}'`
+    return entry.lookupNames.reduce(
+      (value, lookupName) => `${value} lookup ${lookupName}`,
+      selector
+    )
+  })
+  const lookahead = node.lookahead.map((selector) =>
+    formatSelector(context, selector)
+  )
+  const hasLookupReferences = node.input.some(
+    (entry) => entry.lookupNames.length > 0
+  )
+  pushLine(
+    context,
+    `${indent}${hasLookupReferences ? 'pos' : 'ignore pos'} ${[
+      ...backtrack,
+      ...input,
+      ...lookahead,
+    ].join(' ')};`
+  )
+  recordRuleSource(context, node.ruleId, lineStart, lineStart)
+}
+
 const recordRuleSource = (
   context: SerializeContext,
   ruleId: string | undefined,
@@ -359,6 +395,9 @@ function serializeNode(
       return
     case 'ContextualSubstitution':
       serializeContextualSubstitution(node, context, indent)
+      return
+    case 'ContextualPositioning':
+      serializeContextualPositioning(node, context, indent)
       return
     case 'Positioning':
       serializePositioning(node, context, indent)

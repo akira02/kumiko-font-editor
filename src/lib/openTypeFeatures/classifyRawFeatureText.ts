@@ -364,6 +364,86 @@ const parseContextualSubstitutionRule = (
   }
 }
 
+const parseContextualPositioningRule = (
+  statement: string,
+  ruleId: string,
+  origin: FeatureOrigin,
+  glyphClassIdByName: Map<string, string>,
+  lookupIdByName: Map<string, string>
+): Rule | null => {
+  const ignoreMatch = statement.match(/^ignore\s+pos\s+(.+)$/i)
+  const positionMatch = statement.match(/^pos\s+(.+)$/i)
+  const context = ignoreMatch?.[1] ?? positionMatch?.[1]
+  if (!context || /(?:^|\s)(?:-?\d+|<[^>]+>)\s*$/i.test(context)) return null
+
+  const selectorEntries: Array<{
+    lookupIds: string[]
+    marked: boolean
+    selector: GlyphSelector
+  }> = []
+  const tokens = context.trim().split(/\s+/).filter(Boolean)
+
+  for (let index = 0; index < tokens.length; index += 1) {
+    const token = tokens[index]
+    if (/^lookup$/i.test(token)) {
+      const lookupName = tokens[index + 1]
+      const lookupId = lookupName ? lookupIdByName.get(lookupName) : undefined
+      const previousEntry = selectorEntries.at(-1)
+      if (!lookupId || !previousEntry?.marked) return null
+      previousEntry.lookupIds.push(lookupId)
+      index += 1
+      continue
+    }
+
+    const parsed = selectorFromMarkedToken(token, glyphClassIdByName)
+    if (!parsed) return null
+    selectorEntries.push({
+      lookupIds: [],
+      marked: parsed.marked,
+      selector: parsed.selector,
+    })
+  }
+
+  const firstInputIndex = selectorEntries.findIndex((entry) => entry.marked)
+  const lastInputIndex = selectorEntries.findLastIndex((entry) => entry.marked)
+  if (firstInputIndex < 0 || lastInputIndex < firstInputIndex) return null
+
+  const inputEntries = selectorEntries.slice(
+    firstInputIndex,
+    lastInputIndex + 1
+  )
+  if (inputEntries.some((entry) => !entry.marked)) return null
+  if (ignoreMatch && inputEntries.some((entry) => entry.lookupIds.length > 0)) {
+    return null
+  }
+  if (
+    positionMatch &&
+    inputEntries.every((entry) => entry.lookupIds.length === 0)
+  ) {
+    return null
+  }
+
+  return {
+    id: ruleId,
+    kind: 'contextualPositioning',
+    mode: 'chaining',
+    backtrack: selectorEntries
+      .slice(0, firstInputIndex)
+      .map((entry) => entry.selector),
+    input: inputEntries.map((entry) => ({
+      selector: entry.selector,
+      ...(entry.lookupIds.length > 0 ? { lookupIds: entry.lookupIds } : {}),
+    })),
+    lookahead: selectorEntries
+      .slice(lastInputIndex + 1)
+      .map((entry) => entry.selector),
+    meta: {
+      origin,
+      provenance: { table: 'GPOS' },
+    },
+  }
+}
+
 const parseSubstitutionRule = (
   statement: string,
   ruleId: string,
@@ -612,6 +692,7 @@ const getLookupShape = (rules: Rule[]) => {
     alternateSubstitution: 'alternateSubst',
     ligatureSubstitution: 'ligatureSubst',
     contextualSubstitution: 'chainingContextSubst',
+    contextualPositioning: 'chainingContextPos',
     singlePositioning: 'singlePos',
     pairPositioning: 'pairPos',
     cursivePositioning: 'cursivePos',
@@ -625,6 +706,7 @@ const getLookupShape = (rules: Rule[]) => {
   const table: LookupRecord['table'] =
     firstRule.kind === 'singlePositioning' ||
     firstRule.kind === 'pairPositioning' ||
+    firstRule.kind === 'contextualPositioning' ||
     firstRule.kind === 'cursivePositioning' ||
     firstRule.kind === 'markToBase' ||
     firstRule.kind === 'markToMark' ||
@@ -670,6 +752,13 @@ const parseLookupStatements = (
     const ruleId = `${idPrefix}_rule_${index}`
     const rule =
       parseContextualSubstitutionRule(
+        statement,
+        ruleId,
+        origin,
+        glyphClassIdByName,
+        lookupIdByName
+      ) ??
+      parseContextualPositioningRule(
         statement,
         ruleId,
         origin,
@@ -733,7 +822,8 @@ const collectGdefBlocks = (text: string) =>
 
 const referencedLookupIdsForRules = (rules: Rule[]) =>
   rules.flatMap((rule) =>
-    rule.kind === 'contextualSubstitution'
+    rule.kind === 'contextualSubstitution' ||
+    rule.kind === 'contextualPositioning'
       ? rule.input.flatMap((entry) => entry.lookupIds ?? [])
       : []
   )

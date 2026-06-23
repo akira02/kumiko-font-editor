@@ -94,6 +94,17 @@ export interface ContextualSubstitutionNode {
   lookahead: GlyphSelector[]
 }
 
+export interface ContextualPositioningNode {
+  kind: 'ContextualPositioning'
+  ruleId?: string
+  backtrack: GlyphSelector[]
+  input: Array<{
+    selector: GlyphSelector
+    lookupNames: string[]
+  }>
+  lookahead: GlyphSelector[]
+}
+
 export interface MarkAttachment {
   markClassName: string
   anchor: { x: number; y: number }
@@ -140,6 +151,7 @@ export type FeaNode =
   | LanguageStatementNode
   | SubstitutionNode
   | ContextualSubstitutionNode
+  | ContextualPositioningNode
   | PositioningNode
   | MarkToBaseNode
   | MarkToMarkNode

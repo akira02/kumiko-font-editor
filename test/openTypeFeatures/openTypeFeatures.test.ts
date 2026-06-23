@@ -504,6 +504,87 @@ describe('OpenType FEA source maps', () => {
     expect(generated).toContain('sub B from [B.alt B.swash];')
   })
 
+  it('classifies raw contextual positioning rules', () => {
+    const state = classifyRawFeatureTextSource(
+      setRawFeatureTextSource(
+        createEmptyOpenTypeFeaturesState(),
+        [
+          'languagesystem latn dflt;',
+          'lookup KernAV {',
+          '  pos A V -80;',
+          '} KernAV;',
+          'feature kern {',
+          '  script latn;',
+          '  language dflt;',
+          "  pos A' lookup KernAV V;",
+          "  ignore pos X X' V;",
+          '} kern;',
+        ].join('\n')
+      )
+    )
+
+    expect(state.sourceSections[0]).toMatchObject({
+      id: 'source_raw_feature_text',
+      stage: 'classified',
+      status: 'classified',
+    })
+    expect(state.lookups).toMatchObject([
+      {
+        id: 'lookup_raw_KernAV',
+        table: 'GPOS',
+        lookupType: 'pairPos',
+        rules: [
+          {
+            kind: 'pairPositioning',
+            left: { kind: 'glyph', glyph: 'A' },
+            right: { kind: 'glyph', glyph: 'V' },
+            firstValue: { xAdvance: -80 },
+          },
+        ],
+      },
+      {
+        id: 'lookup_raw_kern_0',
+        table: 'GPOS',
+        lookupType: 'chainingContextPos',
+        rules: [
+          {
+            kind: 'contextualPositioning',
+            mode: 'chaining',
+            input: [
+              {
+                selector: { kind: 'glyph', glyph: 'A' },
+                lookupIds: ['lookup_raw_KernAV'],
+              },
+            ],
+            lookahead: [{ kind: 'glyph', glyph: 'V' }],
+          },
+          {
+            kind: 'contextualPositioning',
+            mode: 'chaining',
+            backtrack: [{ kind: 'glyph', glyph: 'X' }],
+            input: [{ selector: { kind: 'glyph', glyph: 'X' } }],
+            lookahead: [{ kind: 'glyph', glyph: 'V' }],
+          },
+        ],
+      },
+    ])
+    expect(state.sourceSections[0]?.recordRefs).toEqual(
+      expect.arrayContaining([
+        { kind: 'lookup', id: 'lookup_raw_KernAV', table: 'GPOS' },
+        { kind: 'lookup', id: 'lookup_raw_kern_0', table: 'GPOS' },
+        { kind: 'feature', id: 'feature_raw_kern' },
+      ])
+    )
+
+    const generated = generateFea(state).text
+    expect(generated.indexOf('lookup KernAV {')).toBeLessThan(
+      generated.indexOf('lookup raw_kern_0 {')
+    )
+    expect(generated).toContain("pos A' lookup KernAV V;")
+    expect(generated).toContain("ignore pos X X' V;")
+    expect(generated).not.toContain('Unsupported generated rule kind')
+  })
+
   it('classifies raw mark classes and mark positioning lookup blocks', () => {
     const state = classifyRawFeatureTextSource(
       setRawFeatureTextSource(
