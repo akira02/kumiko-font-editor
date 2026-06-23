@@ -354,20 +354,66 @@ const parseSubstitutionRule = (
   origin: FeatureOrigin,
   glyphClassIdByName: Map<string, string>
 ): Rule | null => {
-  const match = statement.match(/^sub\s+(.+?)\s+by\s+(\S+)$/i)
+  const alternateMatch = statement.match(/^sub\s+(\S+)\s+from\s+\[([^\]]+)\]$/i)
+  if (alternateMatch) {
+    const target = alternateMatch[1]
+    const alternates = splitGlyphList(alternateMatch[2])
+    if (
+      target.startsWith('@') ||
+      target.includes("'") ||
+      alternates.length === 0 ||
+      alternates.some((glyph) => glyph.startsWith('@') || glyph.includes("'"))
+    ) {
+      return null
+    }
+
+    return {
+      id: ruleId,
+      kind: 'alternateSubstitution',
+      target,
+      alternates,
+      meta: {
+        origin,
+        provenance: { table: 'GSUB' },
+      },
+    }
+  }
+
+  const match = statement.match(/^sub\s+(.+?)\s+by\s+(.+)$/i)
   if (!match) return null
 
   const pattern = match[1].trim().split(/\s+/).filter(Boolean)
-  const replacement = match[2]
-  if (pattern.length === 0 || replacement.startsWith('@')) return null
+  const replacement = match[2].trim().split(/\s+/).filter(Boolean)
+  if (
+    pattern.length === 0 ||
+    replacement.length === 0 ||
+    replacement.some((glyph) => glyph.startsWith('@') || glyph.includes("'"))
+  ) {
+    return null
+  }
 
   if (pattern.length === 1) {
     const target = selectorFromToken(pattern[0], glyphClassIdByName)
-    return target
+    if (!target) return null
+
+    if (replacement.length === 1) {
+      return {
+        id: ruleId,
+        kind: 'singleSubstitution',
+        target,
+        replacement: replacement[0],
+        meta: {
+          origin,
+          provenance: { table: 'GSUB' },
+        },
+      }
+    }
+
+    return target.kind === 'glyph'
       ? {
           id: ruleId,
-          kind: 'singleSubstitution',
-          target,
+          kind: 'multipleSubstitution',
+          target: target.glyph,
           replacement,
           meta: {
             origin,
@@ -377,7 +423,10 @@ const parseSubstitutionRule = (
       : null
   }
 
-  if (pattern.some((token) => token.startsWith('@') || token.includes("'"))) {
+  if (
+    replacement.length !== 1 ||
+    pattern.some((token) => token.startsWith('@') || token.includes("'"))
+  ) {
     return null
   }
 
@@ -385,7 +434,7 @@ const parseSubstitutionRule = (
     id: ruleId,
     kind: 'ligatureSubstitution',
     components: pattern,
-    replacement,
+    replacement: replacement[0],
     meta: {
       origin,
       provenance: { table: 'GSUB' },
@@ -515,6 +564,8 @@ const getLookupShape = (rules: Rule[]) => {
     Record<Rule['kind'], LookupRecord['lookupType']>
   > = {
     singleSubstitution: 'singleSubst',
+    multipleSubstitution: 'multipleSubst',
+    alternateSubstitution: 'alternateSubst',
     ligatureSubstitution: 'ligatureSubst',
     contextualSubstitution: 'chainingContextSubst',
     singlePositioning: 'singlePos',

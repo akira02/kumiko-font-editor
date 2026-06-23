@@ -427,6 +427,83 @@ describe('OpenType FEA source maps', () => {
     expect(generated).toContain("ignore sub C C' D;")
   })
 
+  it('classifies raw multiple and alternate substitution lookup blocks', () => {
+    const state = classifyRawFeatureTextSource(
+      setRawFeatureTextSource(
+        createEmptyOpenTypeFeaturesState(),
+        [
+          'languagesystem latn dflt;',
+          'lookup ExpandA {',
+          '  sub A by A A.alt;',
+          '} ExpandA;',
+          'lookup AlternateB {',
+          '  sub B from [B.alt B.swash];',
+          '} AlternateB;',
+          'feature salt {',
+          '  script latn;',
+          '  language dflt;',
+          '  lookup ExpandA;',
+          '  lookup AlternateB;',
+          '} salt;',
+        ].join('\n')
+      )
+    )
+
+    expect(state.sourceSections[0]).toMatchObject({
+      id: 'source_raw_feature_text',
+      stage: 'classified',
+      status: 'classified',
+    })
+    expect(state.lookups).toMatchObject([
+      {
+        id: 'lookup_raw_ExpandA',
+        table: 'GSUB',
+        lookupType: 'multipleSubst',
+        rules: [
+          {
+            kind: 'multipleSubstitution',
+            target: 'A',
+            replacement: ['A', 'A.alt'],
+          },
+        ],
+      },
+      {
+        id: 'lookup_raw_AlternateB',
+        table: 'GSUB',
+        lookupType: 'alternateSubst',
+        rules: [
+          {
+            kind: 'alternateSubstitution',
+            target: 'B',
+            alternates: ['B.alt', 'B.swash'],
+          },
+        ],
+      },
+    ])
+    expect(state.features).toMatchObject([
+      {
+        id: 'feature_raw_salt',
+        tag: 'salt',
+        entries: [
+          {
+            lookupIds: ['lookup_raw_ExpandA', 'lookup_raw_AlternateB'],
+          },
+        ],
+      },
+    ])
+    expect(state.sourceSections[0]?.recordRefs).toEqual(
+      expect.arrayContaining([
+        { kind: 'lookup', id: 'lookup_raw_ExpandA', table: 'GSUB' },
+        { kind: 'lookup', id: 'lookup_raw_AlternateB', table: 'GSUB' },
+        { kind: 'feature', id: 'feature_raw_salt' },
+      ])
+    )
+
+    const generated = generateFea(state).text
+    expect(generated).toContain('sub A by A A.alt;')
+    expect(generated).toContain('sub B from [B.alt B.swash];')
+  })
+
   it('classifies raw mark classes and mark positioning lookup blocks', () => {
     const state = classifyRawFeatureTextSource(
       setRawFeatureTextSource(

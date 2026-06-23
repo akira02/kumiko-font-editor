@@ -212,6 +212,8 @@ generated .fea / UI / export policy
 - top-level `lookup Name { ... } Name;` block
 - `lookupflag` 的 `RightToLeft` / ignore flags / `MarkAttachmentType` / `UseMarkFilteringSet`
 - 簡單 `sub a by a.alt;`
+- multiple substitution，例如 `sub a by a a.alt;`
+- alternate substitution，例如 `sub a from [a.alt a.swash];`
 - 簡單 ligature `sub f i by f_i;`
 - contextual substitution，例如 `sub A' lookup SomeLookup B;`
 - contextual ignore rule，例如 `ignore sub A A' B;`
