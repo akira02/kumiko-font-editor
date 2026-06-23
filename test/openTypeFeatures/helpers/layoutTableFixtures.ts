@@ -328,6 +328,46 @@ const writeCoverageFormat1 = (
   })
 }
 
+const writeClassDefFormat2 = (
+  view: DataView,
+  offset: number,
+  ranges: Array<{ startGlyphId: number; endGlyphId: number; classId: number }>
+) => {
+  writeUint16(view, offset, 2)
+  writeUint16(view, offset + 2, ranges.length)
+  ranges.forEach((range, index) => {
+    const rangeOffset = offset + 4 + index * 6
+    writeUint16(view, rangeOffset, range.startGlyphId)
+    writeUint16(view, rangeOffset + 2, range.endGlyphId)
+    writeUint16(view, rangeOffset + 4, range.classId)
+  })
+}
+
+export const makeContextSubstitutionFormat2Subtable = () =>
+  makeBytes(50, (view) => {
+    writeUint16(view, 0, 2)
+    writeUint16(view, 2, 26)
+    writeUint16(view, 4, 34)
+    writeUint16(view, 6, 2)
+    writeUint16(view, 8, 0)
+    writeUint16(view, 10, 12)
+
+    writeUint16(view, 12, 1)
+    writeUint16(view, 14, 4)
+
+    writeUint16(view, 16, 2)
+    writeUint16(view, 18, 1)
+    writeUint16(view, 20, 2)
+    writeUint16(view, 22, 1)
+    writeUint16(view, 24, 0)
+
+    writeCoverageFormat1(view, 26, [1, 2])
+    writeClassDefFormat2(view, 34, [
+      { startGlyphId: 1, endGlyphId: 2, classId: 1 },
+      { startGlyphId: 3, endGlyphId: 4, classId: 2 },
+    ])
+  })
+
 export const makeChainingContextSubstitutionFormat3Subtable = () =>
   makeBytes(50, (view) => {
     writeUint16(view, 0, 3)
@@ -350,6 +390,43 @@ export const makeChainingContextSubstitutionFormat3Subtable = () =>
     writeCoverageFormat1(view, 30, [1])
     writeCoverageFormat1(view, 36, [2, 6])
     writeCoverageFormat1(view, 44, [4])
+  })
+
+export const makeChainingContextSubstitutionFormat2Subtable = () =>
+  makeBytes(82, (view) => {
+    writeUint16(view, 0, 2)
+    writeUint16(view, 2, 38)
+    writeUint16(view, 4, 46)
+    writeUint16(view, 6, 56)
+    writeUint16(view, 8, 72)
+    writeUint16(view, 10, 2)
+    writeUint16(view, 12, 0)
+    writeUint16(view, 14, 16)
+
+    writeUint16(view, 16, 1)
+    writeUint16(view, 18, 4)
+
+    writeUint16(view, 20, 1)
+    writeUint16(view, 22, 1)
+    writeUint16(view, 24, 2)
+    writeUint16(view, 26, 2)
+    writeUint16(view, 28, 1)
+    writeUint16(view, 30, 1)
+    writeUint16(view, 32, 1)
+    writeUint16(view, 34, 1)
+    writeUint16(view, 36, 0)
+
+    writeCoverageFormat1(view, 38, [1, 2])
+    writeClassDefFormat2(view, 46, [
+      { startGlyphId: 5, endGlyphId: 6, classId: 1 },
+    ])
+    writeClassDefFormat2(view, 56, [
+      { startGlyphId: 1, endGlyphId: 2, classId: 1 },
+      { startGlyphId: 3, endGlyphId: 4, classId: 2 },
+    ])
+    writeClassDefFormat2(view, 72, [
+      { startGlyphId: 7, endGlyphId: 8, classId: 1 },
+    ])
   })
 
 export const makeSinglePositioningSubtable = () =>

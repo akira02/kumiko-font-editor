@@ -1,5 +1,9 @@
 import { BinaryReader } from 'src/lib/openTypeFeatures/binaryReader'
 import {
+  parseChainingContextSubstitutionFormat2,
+  parseContextSubstitutionFormat2,
+} from 'src/lib/openTypeFeatures/gsubClassContextRuleParser'
+import {
   parseChainingContextSubstitutionFormat1,
   parseChainingContextSubstitutionFormat3,
   parseContextSubstitutionFormat1,
@@ -464,6 +468,14 @@ const parseSupportedSubtable = (
     )
     return rules ? { rules } : null
   }
+  if (lookup.lookupType === 5 && format === 2) {
+    return parseContextSubstitutionFormat2(
+      subtableReader,
+      glyphOrder,
+      lookup,
+      subtableIndex
+    )
+  }
   if (lookup.lookupType === 5 && format === 3) {
     return parseContextSubstitutionFormat3(
       subtableReader,
@@ -480,6 +492,14 @@ const parseSupportedSubtable = (
       subtableIndex
     )
     return rules ? { rules } : null
+  }
+  if (lookup.lookupType === 6 && format === 2) {
+    return parseChainingContextSubstitutionFormat2(
+      subtableReader,
+      glyphOrder,
+      lookup,
+      subtableIndex
+    )
   }
   if (lookup.lookupType === 6 && format === 3) {
     return parseChainingContextSubstitutionFormat3(

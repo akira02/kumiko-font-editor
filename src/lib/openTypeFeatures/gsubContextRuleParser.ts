@@ -16,21 +16,21 @@ export interface GsubContextSubtableParseResult {
 const glyphNameForId = (glyphOrder: string[], glyphId: number) =>
   glyphOrder[glyphId] ?? null
 
-const makeRuleId = (
+export const makeRuleId = (
   lookupIndex: number,
   subtableIndex: number,
   kind: string,
   ruleIndex: number
 ) => `rule_gsub_${lookupIndex}_${subtableIndex}_${kind}_${ruleIndex}`
 
-const makeClassId = (
+export const makeClassId = (
   lookupIndex: number,
   subtableIndex: number,
   kind: string,
   classId: number
 ) => `class_gsub_${lookupIndex}_${subtableIndex}_${kind}_${classId}`
 
-const makeProvenance = (
+export const makeProvenance = (
   lookup: LayoutLookupInventory,
   subtableIndex: number
 ): SourceProvenance => ({
@@ -41,7 +41,7 @@ const makeProvenance = (
   subtableFormat: lookup.subtableFormats[subtableIndex],
 })
 
-const readCoverageGlyphIds = (
+export const readCoverageGlyphIds = (
   subtableReader: BinaryReader,
   coverageOffset: number
 ) => {
@@ -89,7 +89,7 @@ const readCoverageGlyphIds = (
   return null
 }
 
-const resolveGlyphNames = (glyphOrder: string[], glyphIds: number[]) => {
+export const resolveGlyphNames = (glyphOrder: string[], glyphIds: number[]) => {
   const glyphNames = glyphIds.map((glyphId) =>
     glyphNameForId(glyphOrder, glyphId)
   )
@@ -109,7 +109,7 @@ const readCoverageGlyphNames = (
   return glyphIds ? resolveGlyphNames(glyphOrder, glyphIds) : null
 }
 
-const makeImportedGlyphClass = (
+export const makeImportedGlyphClass = (
   id: string,
   name: string,
   glyphs: string[]
@@ -171,7 +171,7 @@ const parseCoverageSelectorClass = (
   return { kind: 'class', classId }
 }
 
-const readSubstLookupRecords = (
+export const readSubstLookupRecords = (
   reader: BinaryReader,
   offset: number,
   count: number
@@ -187,7 +187,7 @@ const readSubstLookupRecords = (
   return records
 }
 
-const attachLookupRecords = (
+export const attachLookupRecords = (
   input: ContextInput[],
   records: Array<{ sequenceIndex: number; lookupIndex: number }>
 ) => {

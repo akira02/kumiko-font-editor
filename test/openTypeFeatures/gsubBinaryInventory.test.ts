@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { extractBinaryFeatures } from 'src/lib/openTypeFeatures/extractBinaryFeatures'
 import {
   makeAlternateSubstitutionSubtable,
+  makeChainingContextSubstitutionFormat2Subtable,
   makeChainingContextSubstitutionFormat3Subtable,
   makeChainingContextSubstitutionSubtable,
+  makeContextSubstitutionFormat2Subtable,
   makeContextSubstitutionSubtable,
   makeExtensionSingleSubstitutionSubtable,
   makeGsubTable,
@@ -331,6 +333,80 @@ describe('GSUB binary inventory', () => {
     ])
   })
 
+  it('extracts editable GSUB ContextSubst class-based rules', () => {
+    const state = extractBinaryFeatures(
+      makeSfnt([
+        {
+          tag: 'GSUB',
+          data: makeGsubTable(
+            'calt',
+            5,
+            makeContextSubstitutionFormat2Subtable()
+          ),
+        },
+      ]),
+      null,
+      ['.notdef', 'A', 'Aacute', 'B', 'C']
+    )
+
+    expect(state.unsupportedLookups).toEqual([])
+    expect(state.glyphClasses).toMatchObject([
+      {
+        id: 'class_gsub_0_0_input_0_1',
+        name: '@GSUB_0_0_input_0_class_1',
+        glyphs: ['A', 'Aacute'],
+        origin: 'imported',
+      },
+      {
+        id: 'class_gsub_0_0_input_1_2',
+        name: '@GSUB_0_0_input_1_class_2',
+        glyphs: ['B', 'C'],
+        origin: 'imported',
+      },
+    ])
+    expect(state.lookups).toMatchObject([
+      {
+        id: 'lookup_gsub_0',
+        lookupType: 'contextSubst',
+        editable: true,
+        origin: 'imported',
+        rules: [
+          {
+            kind: 'contextualSubstitution',
+            mode: 'context',
+            backtrack: [],
+            input: [
+              {
+                selector: {
+                  kind: 'class',
+                  classId: 'class_gsub_0_0_input_0_1',
+                },
+              },
+              {
+                selector: {
+                  kind: 'class',
+                  classId: 'class_gsub_0_0_input_1_2',
+                },
+                lookupIds: ['lookup_gsub_0'],
+              },
+            ],
+            lookahead: [],
+            meta: {
+              origin: 'imported',
+              provenance: {
+                table: 'GSUB',
+                lookupIndex: 0,
+                lookupType: 5,
+                subtableIndex: 0,
+                subtableFormat: 2,
+              },
+            },
+          },
+        ],
+      },
+    ])
+  })
+
   it('extracts editable GSUB ChainingContextSubst glyph sequence rules', () => {
     const state = extractBinaryFeatures(
       makeSfnt([
@@ -381,6 +457,116 @@ describe('GSUB binary inventory', () => {
         ],
       },
     ])
+  })
+
+  it('extracts editable GSUB ChainingContextSubst class-based rules', () => {
+    const state = extractBinaryFeatures(
+      makeSfnt([
+        {
+          tag: 'GSUB',
+          data: makeGsubTable(
+            'calt',
+            6,
+            makeChainingContextSubstitutionFormat2Subtable()
+          ),
+        },
+      ]),
+      null,
+      ['.notdef', 'A', 'Aacute', 'B', 'C', 'X', 'X.alt', 'Y', 'Y.alt']
+    )
+
+    expect(state.unsupportedLookups).toEqual([])
+    expect(state.glyphClasses).toMatchObject([
+      {
+        id: 'class_gsub_0_0_input_0_1',
+        name: '@GSUB_0_0_input_0_class_1',
+        glyphs: ['A', 'Aacute'],
+        origin: 'imported',
+      },
+      {
+        id: 'class_gsub_0_0_backtrack_0_1',
+        name: '@GSUB_0_0_backtrack_0_class_1',
+        glyphs: ['X', 'X.alt'],
+        origin: 'imported',
+      },
+      {
+        id: 'class_gsub_0_0_input_1_2',
+        name: '@GSUB_0_0_input_1_class_2',
+        glyphs: ['B', 'C'],
+        origin: 'imported',
+      },
+      {
+        id: 'class_gsub_0_0_lookahead_0_1',
+        name: '@GSUB_0_0_lookahead_0_class_1',
+        glyphs: ['Y', 'Y.alt'],
+        origin: 'imported',
+      },
+    ])
+    expect(state.lookups).toMatchObject([
+      {
+        id: 'lookup_gsub_0',
+        lookupType: 'chainingContextSubst',
+        editable: true,
+        origin: 'imported',
+        rules: [
+          {
+            kind: 'contextualSubstitution',
+            mode: 'chaining',
+            backtrack: [
+              {
+                kind: 'class',
+                classId: 'class_gsub_0_0_backtrack_0_1',
+              },
+            ],
+            input: [
+              {
+                selector: {
+                  kind: 'class',
+                  classId: 'class_gsub_0_0_input_0_1',
+                },
+              },
+              {
+                selector: {
+                  kind: 'class',
+                  classId: 'class_gsub_0_0_input_1_2',
+                },
+                lookupIds: ['lookup_gsub_0'],
+              },
+            ],
+            lookahead: [
+              {
+                kind: 'class',
+                classId: 'class_gsub_0_0_lookahead_0_1',
+              },
+            ],
+            meta: {
+              origin: 'imported',
+              provenance: {
+                table: 'GSUB',
+                lookupIndex: 0,
+                lookupType: 6,
+                subtableIndex: 0,
+                subtableFormat: 2,
+              },
+            },
+          },
+        ],
+      },
+    ])
+    expect(state.sourceSections[0]?.recordRefs).toEqual(
+      expect.arrayContaining([
+        {
+          kind: 'glyphClass',
+          id: 'class_gsub_0_0_backtrack_0_1',
+          table: 'GSUB',
+        },
+        {
+          kind: 'glyphClass',
+          id: 'class_gsub_0_0_input_1_2',
+          table: 'GSUB',
+        },
+      ])
+    )
   })
 
   it('extracts editable GSUB ChainingContextSubst format 3 coverage rules', () => {

@@ -186,6 +186,7 @@ generated .fea / UI / export policy
   - synthetic OpenType stress fixture 的 HarfBuzz shaping comparison，確認 generated FEA rebuild 後行為一致。
   - GDEF compiled source section。
 - GSUB contextual parser
+  - `GSUB type 5 format 2` / `type 6 format 2` 會讀取 class-based context / chaining context rules，並把 class definition 提升成 imported glyph classes。
   - `GSUB type 5 format 3` / `type 6 format 3` 會讀取 coverage arrays 與 substitution lookup records。
   - coverage 只有單一 glyph 時輸出 glyph selector；多 glyph coverage 會提升成 imported glyph class。
   - compiled source section 會把 imported glyph class 加進 `recordRefs`，讓 UI 後續可從來源追到 class record。
