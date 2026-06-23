@@ -15,12 +15,36 @@ import {
 interface SerializeContext {
   lines: string[]
   sourceMap: GeneratedFeaSourceMap
+  glyphClassNameById: Map<string, string>
 }
 
 const pushLine = (context: SerializeContext, line: string) => {
   context.lines.push(line)
   return context.lines.length
 }
+
+const collectGlyphClassNames = (
+  nodes: FeaNode[],
+  glyphClassNameById = new Map<string, string>()
+) => {
+  for (const node of nodes) {
+    if (node.kind === 'GlyphClass' && node.classId) {
+      glyphClassNameById.set(node.classId, node.name)
+    }
+    if (node.kind === 'LookupBlock' || node.kind === 'FeatureBlock') {
+      collectGlyphClassNames(node.statements, glyphClassNameById)
+    }
+  }
+  return glyphClassNameById
+}
+
+const formatSelector = (
+  context: SerializeContext,
+  selector: Parameters<typeof formatGlyphSelector>[0]
+) =>
+  selector.kind === 'class'
+    ? (context.glyphClassNameById.get(selector.classId) ?? selector.classId)
+    : formatGlyphSelector(selector)
 
 const serializeNodes = (
   nodes: FeaNode[],
@@ -75,7 +99,9 @@ const serializeSubstitution = (
     pushLine(context, `${indent}# kumiko-rule-id: ${node.ruleId}`)
   }
   const lineStart = context.lines.length + 1
-  const pattern = node.pattern.map(formatGlyphSelector).join(' ')
+  const pattern = node.pattern
+    .map((selector) => formatSelector(context, selector))
+    .join(' ')
   if (node.alternates) {
     pushLine(
       context,
@@ -105,11 +131,11 @@ const serializePositioning = (
     pushLine(context, `${indent}# kumiko-rule-id: ${node.ruleId}`)
   }
   const lineStart = context.lines.length + 1
-  const left = formatGlyphSelector(node.left)
+  const left = formatSelector(context, node.left)
   const first = formatValueRecord(node.firstValue)
   const second = formatValueRecord(node.secondValue)
   if (node.right) {
-    const right = formatGlyphSelector(node.right)
+    const right = formatSelector(context, node.right)
     pushLine(
       context,
       `${indent}pos ${left} ${right}${first ? ` ${first}` : ''}${second ? ` ${second}` : ''};`
@@ -135,18 +161,29 @@ const serializeContextualSubstitution = (
     pushLine(context, `${indent}# kumiko-rule-id: ${node.ruleId}`)
   }
   const lineStart = context.lines.length + 1
-  const backtrack = node.backtrack.map(formatGlyphSelector)
+  const backtrack = node.backtrack.map((selector) =>
+    formatSelector(context, selector)
+  )
   const input = node.input.map((entry) => {
-    const selector = `${formatGlyphSelector(entry.selector)}'`
+    const selector = `${formatSelector(context, entry.selector)}'`
     return entry.lookupNames.reduce(
       (value, lookupName) => `${value} lookup ${lookupName}`,
       selector
     )
   })
-  const lookahead = node.lookahead.map(formatGlyphSelector)
+  const lookahead = node.lookahead.map((selector) =>
+    formatSelector(context, selector)
+  )
+  const hasLookupReferences = node.input.some(
+    (entry) => entry.lookupNames.length > 0
+  )
   pushLine(
     context,
-    `${indent}sub ${[...backtrack, ...input, ...lookahead].join(' ')};`
+    `${indent}${hasLookupReferences ? 'sub' : 'ignore sub'} ${[
+      ...backtrack,
+      ...input,
+      ...lookahead,
+    ].join(' ')};`
   )
   recordRuleSource(context, node.ruleId, lineStart, lineStart)
 }
@@ -174,7 +211,7 @@ const serializeMarkToBase = (
   const marks = node.marks.map(formatMarkAttachment).join(' ')
   pushLine(
     context,
-    `${indent}pos base ${formatGlyphSelector(node.base)} ${marks};`
+    `${indent}pos base ${formatSelector(context, node.base)} ${marks};`
   )
   recordRuleSource(context, node.ruleId, lineStart, lineStart)
 }
@@ -191,7 +228,7 @@ const serializeMarkToMark = (
   const marks = node.marks.map(formatMarkAttachment).join(' ')
   pushLine(
     context,
-    `${indent}pos mark ${formatGlyphSelector(node.baseMark)} ${marks};`
+    `${indent}pos mark ${formatSelector(context, node.baseMark)} ${marks};`
   )
   recordRuleSource(context, node.ruleId, lineStart, lineStart)
 }
@@ -214,7 +251,7 @@ const serializeMarkToLigature = (
   const components = node.componentMarks.map(formatLigatureComponent).join(' ')
   pushLine(
     context,
-    `${indent}pos ligature ${formatGlyphSelector(node.ligature)} ${components};`
+    `${indent}pos ligature ${formatSelector(context, node.ligature)} ${components};`
   )
   recordRuleSource(context, node.ruleId, lineStart, lineStart)
 }
@@ -293,6 +330,7 @@ export const serializeFeaDocument = (document: FeaDocument) => {
   const context: SerializeContext = {
     lines: [],
     sourceMap: { entries: [] },
+    glyphClassNameById: collectGlyphClassNames(document.statements),
   }
   serializeNodes(document.statements, context, 0)
   return {

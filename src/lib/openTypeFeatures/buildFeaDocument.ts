@@ -1,6 +1,7 @@
 import type { FeaNode, MarkAttachment } from 'src/lib/openTypeFeatures/feaAst'
 import type {
   FeatureEntry,
+  FeatureRecord,
   LookupFlagIR,
   LookupRecord,
   OpenTypeFeaturesState,
@@ -247,6 +248,28 @@ const featureEntryStatements = (
   return statements
 }
 
+const lookupReferenceStatement = (lookup: LookupRecord): FeaNode => ({
+  kind: 'Raw',
+  value: `  lookup ${lookup.name};`,
+})
+
+const featureStatements = (
+  feature: FeatureRecord,
+  lookupById: Map<string, LookupRecord>
+): FeaNode[] => {
+  if (feature.tag !== 'aalt') {
+    return feature.entries.flatMap((entry) =>
+      featureEntryStatements(entry, lookupById)
+    )
+  }
+
+  const lookupIds = new Set(feature.entries.flatMap((entry) => entry.lookupIds))
+  return [...lookupIds].flatMap((lookupId) => {
+    const lookup = lookupById.get(lookupId)
+    return lookup ? [lookupReferenceStatement(lookup)] : []
+  })
+}
+
 function collectNestedLookupIds(
   lookupId: string,
   lookupById: Map<string, LookupRecord>,
@@ -262,6 +285,45 @@ function collectNestedLookupIds(
     activeLookupIds.add(nestedLookupId)
     collectNestedLookupIds(nestedLookupId, lookupById, activeLookupIds)
   }
+}
+
+const orderLookupsForSerialization = (
+  lookups: LookupRecord[],
+  activeLookupIds: Set<string>
+) => {
+  const lookupById = new Map(lookups.map((lookup) => [lookup.id, lookup]))
+  const orderedLookups: LookupRecord[] = []
+  const visitedLookupIds = new Set<string>()
+  const visitingLookupIds = new Set<string>()
+
+  const visitLookup = (lookupId: string) => {
+    if (visitedLookupIds.has(lookupId)) return
+    const lookup = lookupById.get(lookupId)
+    if (!lookup) return
+    if (visitingLookupIds.has(lookupId)) {
+      return
+    }
+
+    visitingLookupIds.add(lookupId)
+    for (const nestedLookupId of lookup.rules.flatMap(
+      getNestedLookupReferences
+    )) {
+      if (activeLookupIds.has(nestedLookupId)) {
+        visitLookup(nestedLookupId)
+      }
+    }
+    visitingLookupIds.delete(lookupId)
+    visitedLookupIds.add(lookupId)
+    orderedLookups.push(lookup)
+  }
+
+  for (const lookup of lookups) {
+    if (activeLookupIds.has(lookup.id)) {
+      visitLookup(lookup.id)
+    }
+  }
+
+  return orderedLookups
 }
 
 const getRawFeatureTextForOutput = (state: OpenTypeFeaturesState) => {
@@ -296,6 +358,10 @@ export const buildFeaDocument = (state: OpenTypeFeaturesState) => {
   for (const lookupId of [...activeLookupIds]) {
     collectNestedLookupIds(lookupId, lookupById, activeLookupIds)
   }
+  const orderedLookups = orderLookupsForSerialization(
+    state.lookups,
+    activeLookupIds
+  )
 
   const statements: FeaNode[] = [
     ...headerComments.map((value) => ({ kind: 'Comment' as const, value })),
@@ -321,25 +387,21 @@ export const buildFeaDocument = (state: OpenTypeFeaturesState) => {
         className: markClass.name,
       }))
     ),
-    ...state.lookups
-      .filter((lookup) => activeLookupIds.has(lookup.id))
-      .map((lookup) =>
-        lookupToBlock(
-          lookup,
-          markClassNameById,
-          glyphClassNameById,
-          lookupNameById
-        )
-      ),
+    ...orderedLookups.map((lookup) =>
+      lookupToBlock(
+        lookup,
+        markClassNameById,
+        glyphClassNameById,
+        lookupNameById
+      )
+    ),
     ...state.features
       .filter((feature) => feature.isActive)
       .map((feature) => ({
         kind: 'FeatureBlock' as const,
         tag: feature.tag,
         featureId: feature.id,
-        statements: feature.entries.flatMap((entry) =>
-          featureEntryStatements(entry, lookupById)
-        ),
+        statements: featureStatements(feature, lookupById),
       })),
   ]
 
