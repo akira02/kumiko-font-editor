@@ -792,7 +792,7 @@ const parseRawFeatureText = (
     const glyphs = splitGlyphList(match[2])
     const classId = makeGlyphClassId(className)
     glyphClassIdByName.set(className, classId)
-    glyphClasses.push({
+    const glyphClass: GlyphClass = {
       id: classId,
       name: className,
       glyphs,
@@ -801,8 +801,9 @@ const parseRawFeatureText = (
         sourceSectionId: RAW_FEATURE_TEXT_SOURCE_ID,
         classifiedFromRawFeatureText: true,
       },
-    })
-    glyphClassById.set(classId, glyphClasses.at(-1)!)
+    }
+    glyphClasses.push(glyphClass)
+    glyphClassById.set(classId, glyphClass)
     workingText = blankRange(
       workingText,
       match.index ?? 0,
@@ -825,9 +826,15 @@ const parseRawFeatureText = (
   }
 
   for (const match of workingText.matchAll(
-    /\bmarkClass\s+(\S+)\s+<\s*anchor\s+(-?\d+)\s+(-?\d+)\s*>\s+(@[A-Za-z_][A-Za-z0-9_.-]*)\s*;/g
+    /\bmarkClass\s+(.+?)\s+<\s*anchor\s+(-?\d+)\s+(-?\d+)\s*>\s+(@[A-Za-z_][A-Za-z0-9_.-]*)\s*;/g
   )) {
-    const glyph = match[1]
+    const glyphs = glyphsForGdefClassToken(
+      match[1],
+      glyphClassIdByName,
+      glyphClassById
+    )
+    if (!glyphs || glyphs.length === 0) continue
+
     const className = match[4]
     const classId = makeMarkClassId(className)
     markClassIdByName.set(className, classId)
@@ -837,13 +844,15 @@ const parseRawFeatureText = (
       name: className,
       marks: [],
     }
-    markClass.marks.push({
-      glyph,
-      anchor: {
-        x: Number(match[2]),
-        y: Number(match[3]),
-      },
-    })
+    for (const glyph of glyphs) {
+      markClass.marks.push({
+        glyph,
+        anchor: {
+          x: Number(match[2]),
+          y: Number(match[3]),
+        },
+      })
+    }
     markClassById.set(classId, markClass)
     workingText = blankRange(
       workingText,

@@ -433,8 +433,9 @@ describe('OpenType FEA source maps', () => {
         createEmptyOpenTypeFeaturesState(),
         [
           'languagesystem latn dflt;',
-          'markClass acutecomb <anchor 0 520> @TOP;',
-          'markClass gravecomb <anchor 10 510> @TOP;',
+          '@CombiningMarks = [acutecomb gravecomb];',
+          'markClass @CombiningMarks <anchor 0 520> @TOP;',
+          'markClass [dotaccent] <anchor 20 530> @TOP;',
           'lookup MarkBase {',
           '  pos base A <anchor 300 700> mark @TOP;',
           '} MarkBase;',
@@ -470,7 +471,8 @@ describe('OpenType FEA source maps', () => {
         name: '@TOP',
         marks: [
           { glyph: 'acutecomb', anchor: { x: 0, y: 520 } },
-          { glyph: 'gravecomb', anchor: { x: 10, y: 510 } },
+          { glyph: 'gravecomb', anchor: { x: 0, y: 520 } },
+          { glyph: 'dotaccent', anchor: { x: 20, y: 530 } },
         ],
       },
     ])
@@ -539,6 +541,7 @@ describe('OpenType FEA source maps', () => {
     ])
     expect(state.sourceSections[0]?.recordRefs).toEqual(
       expect.arrayContaining([
+        { kind: 'glyphClass', id: 'glyph_class_raw_CombiningMarks' },
         { kind: 'markClass', id: 'mark_class_raw_TOP' },
         { kind: 'lookup', id: 'lookup_raw_MarkBase', table: 'GPOS' },
         { kind: 'lookup', id: 'lookup_raw_MarkLigature', table: 'GPOS' },
@@ -548,6 +551,8 @@ describe('OpenType FEA source maps', () => {
 
     const generated = generateFea(state).text
     expect(generated).toContain('markClass acutecomb <anchor 0 520> @TOP;')
+    expect(generated).toContain('markClass gravecomb <anchor 0 520> @TOP;')
+    expect(generated).toContain('markClass dotaccent <anchor 20 530> @TOP;')
     expect(generated).toContain('pos base A <anchor 300 700> mark @TOP;')
     expect(generated).toContain(
       'pos ligature f_i <anchor 200 700> mark @TOP ligComponent <anchor 420 700> mark @TOP;'
