@@ -606,7 +606,7 @@ const buildCategoryNodes = (glyphs: GlyphData[]) => {
       return left.localeCompare(right)
     })
     .map(([category, record]) => {
-      const categoryGlyphs = sortGlyphsByCodePoint(record.glyphs)
+      const categoryGlyphs = record.glyphs
       const children = [...record.subCategories.entries()]
         .sort(([left], [right]) => left.localeCompare(right))
         .map(([subCategory, subCategoryGlyphs]) =>
@@ -615,7 +615,7 @@ const buildCategoryNodes = (glyphs: GlyphData[]) => {
               subCategory
             )}`,
             subCategory,
-            sortGlyphsByCodePoint(subCategoryGlyphs),
+            subCategoryGlyphs,
             'category'
           )
         )
@@ -650,7 +650,7 @@ const buildLanguageNodes = (glyphs: GlyphData[]) => {
   return labelsByOrder
     .filter((label, index, labels) => labels.indexOf(label) === index)
     .map((label) => {
-      const scriptGlyphs = sortGlyphsByCodePoint(scriptMap.get(label) ?? [])
+      const scriptGlyphs = scriptMap.get(label) ?? []
       return createSectionNode(
         `script:${label}`,
         label,
@@ -940,7 +940,6 @@ export const getGlyphOverviewTree = (
   glyphEditTimes: GlyphEditTimes,
   customFilters: OverviewCustomFilter[] = createDefaultOverviewCustomFilters()
 ): GlyphOverviewTreeNode[] => {
-  const sortedGlyphs = sortGlyphsByCodePoint(glyphs)
   const categoryNodes = buildCategoryNodes(glyphs)
   const languageNodes = buildLanguageNodes(glyphs)
   const filterNodes = buildFilterNodes(
@@ -950,7 +949,7 @@ export const getGlyphOverviewTree = (
   )
 
   return [
-    createSectionNode('all', 'All', sortedGlyphs, 'all'),
+    createSectionNode('all', 'All', glyphs, 'all'),
     createSectionNode(
       'filters',
       'Filters',
@@ -961,14 +960,14 @@ export const getGlyphOverviewTree = (
     createSectionNode(
       'categories',
       'Categories',
-      sortedGlyphs,
+      glyphs,
       'category',
       categoryNodes
     ),
     createSectionNode(
       'languages',
       'Languages',
-      sortedGlyphs,
+      glyphs,
       'language',
       languageNodes
     ),

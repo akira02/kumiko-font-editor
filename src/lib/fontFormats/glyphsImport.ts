@@ -258,6 +258,155 @@ const parseG3Node = (raw: unknown, index: number): PathNode | null => {
   )
 }
 
+const isOnCurveNode = (
+  node: PathNode
+): node is Extract<PathNode, { kind: 'oncurve' }> => node.kind === 'oncurve'
+
+const layerHasSegmentType = (
+  paths: PathData[],
+  segmentType: Exclude<PathSegmentType, 'line'>
+) =>
+  paths.some((path) =>
+    path.nodes.some(
+      (node) => isOnCurveNode(node) && node.segmentType === segmentType
+    )
+  )
+
+const cubicHandle = (
+  id: string,
+  x: number,
+  y: number
+): Extract<PathNode, { kind: 'offcurve' }> => ({
+  id,
+  x,
+  y,
+  kind: 'offcurve',
+})
+
+const cubicOnCurve = (
+  node: Extract<PathNode, { kind: 'oncurve' }>
+): Extract<PathNode, { kind: 'oncurve' }> => ({
+  ...node,
+  segmentType: 'cubic',
+})
+
+const midpoint = (
+  left: Pick<PathNode, 'x' | 'y'>,
+  right: Pick<PathNode, 'x' | 'y'>
+) => ({
+  x: (left.x + right.x) / 2,
+  y: (left.y + right.y) / 2,
+})
+
+const quadraticToCubicHandles = (
+  start: Pick<PathNode, 'x' | 'y'>,
+  control: Pick<PathNode, 'x' | 'y'>,
+  end: Pick<PathNode, 'x' | 'y'>
+) => ({
+  first: {
+    x: start.x + (2 / 3) * (control.x - start.x),
+    y: start.y + (2 / 3) * (control.y - start.y),
+  },
+  second: {
+    x: end.x + (2 / 3) * (control.x - end.x),
+    y: end.y + (2 / 3) * (control.y - end.y),
+  },
+})
+
+const convertQuadraticSegmentToCubics = (
+  start: Extract<PathNode, { kind: 'oncurve' }>,
+  handles: Array<Extract<PathNode, { kind: 'offcurve' }>>,
+  end: Extract<PathNode, { kind: 'oncurve' }>,
+  segmentIndex: number
+): PathNode[] => {
+  if (handles.length === 0) {
+    return [{ ...end, segmentType: 'line' }]
+  }
+
+  const converted: PathNode[] = []
+  let segmentStart: Pick<PathNode, 'x' | 'y'> = start
+
+  handles.forEach((handle, handleIndex) => {
+    const isLastHandle = handleIndex === handles.length - 1
+    const segmentEnd = isLastHandle
+      ? { x: end.x, y: end.y }
+      : midpoint(handle, handles[handleIndex + 1]!)
+    const cubic = quadraticToCubicHandles(segmentStart, handle, segmentEnd)
+    const idPrefix = `${end.id}_q${segmentIndex}_${handleIndex}`
+
+    converted.push(
+      cubicHandle(`${idPrefix}_h1`, cubic.first.x, cubic.first.y),
+      cubicHandle(`${idPrefix}_h2`, cubic.second.x, cubic.second.y)
+    )
+
+    if (isLastHandle) {
+      converted.push(cubicOnCurve(end))
+    } else {
+      converted.push({
+        id: `${idPrefix}_implied`,
+        x: segmentEnd.x,
+        y: segmentEnd.y,
+        kind: 'oncurve',
+        segmentType: 'cubic',
+        smooth: true,
+      })
+    }
+
+    segmentStart = segmentEnd
+  })
+
+  return converted
+}
+
+const convertQuadraticPathToCubic = (path: PathData): PathData => {
+  let previousOnCurve: Extract<PathNode, { kind: 'oncurve' }> | null =
+    path.closed
+      ? (path.nodes.findLast((node) => isOnCurveNode(node)) as Extract<
+          PathNode,
+          { kind: 'oncurve' }
+        > | null)
+      : null
+  let pendingOffCurves: Array<Extract<PathNode, { kind: 'offcurve' }>> = []
+  const nodes: PathNode[] = []
+
+  path.nodes.forEach((node, index) => {
+    if (!isOnCurveNode(node)) {
+      pendingOffCurves.push(node)
+      return
+    }
+
+    if (node.segmentType === 'quadratic' && previousOnCurve) {
+      nodes.push(
+        ...convertQuadraticSegmentToCubics(
+          previousOnCurve,
+          pendingOffCurves,
+          node,
+          index
+        )
+      )
+    } else {
+      nodes.push(...pendingOffCurves, node)
+    }
+
+    pendingOffCurves = []
+    previousOnCurve = node
+  })
+
+  nodes.push(...pendingOffCurves)
+  return { ...path, nodes }
+}
+
+const normalizeMixedOutlinePaths = (paths: PathData[]): PathData[] => {
+  if (
+    !layerHasSegmentType(paths, 'cubic') ||
+    !layerHasSegmentType(paths, 'quadratic')
+  ) {
+    return paths
+  }
+
+  return paths.map(convertQuadraticPathToCubic)
+}
+
 const parseTransformString = (value: string): number[] | null => {
   const numbers = value
     .replace(/[{}()]/g, '')
@@ -745,7 +894,7 @@ const parseLayerContent = (layer: Raw): ParsedLayerContent => {
   }
 
   return {
-    paths,
+    paths: normalizeMixedOutlinePaths(paths),
     componentRefs,
     anchors: parseAnchors(layer),
     guidelines: parseGuidelines(layer),
@@ -912,6 +1061,42 @@ const buildLineMetrics = (
     })
   }
   return Object.keys(result).length > 0 ? result : undefined
+}
+
+const extractGlyphOrderCustomParameter = (
+  document: GlyphsDocument
+): string[] => {
+  for (const entry of asArray((document as Raw).customParameters)) {
+    const parameter = asRecord(entry)
+    if (asString(parameter.name) !== 'glyphOrder') {
+      continue
+    }
+    return asArray(parameter.value).flatMap((value) => {
+      const glyphName = asString(value)
+      return glyphName ? [glyphName] : []
+    })
+  }
+  return []
+}
+
+const mergeGlyphOrder = (
+  preferredOrder: string[],
+  fallbackOrder: string[],
+  glyphs: Record<string, GlyphData>
+) => {
+  const seen = new Set<string>()
+  const order: string[] = []
+  const append = (glyphName: string) => {
+    if (seen.has(glyphName) || !glyphs[glyphName]) {
+      return
+    }
+    seen.add(glyphName)
+    order.push(glyphName)
+  }
+
+  preferredOrder.forEach(append)
+  fallbackOrder.forEach(append)
+  return order
 }
 
 export const buildFontDataFromGlyphsDocument = (
@@ -1139,7 +1324,11 @@ export const buildFontDataFromGlyphsDocument = (
 
   return {
     glyphs,
-    glyphOrder,
+    glyphOrder: mergeGlyphOrder(
+      extractGlyphOrderCustomParameter(document),
+      glyphOrder,
+      glyphs
+    ),
     axes,
     sources,
     unitsPerEm,

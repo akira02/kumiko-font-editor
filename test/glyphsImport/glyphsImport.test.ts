@@ -8,6 +8,7 @@ import {
   extractGlyphsMetadata,
   type GlyphsDocument,
 } from 'src/lib/fontFormats/glyphsDocument'
+import { glyphDataToKumikoGlyphRecord } from 'src/lib/project/kumikoFontDataAdapter'
 import { getGlyphLayer } from 'src/store/glyphLayer'
 import { getGlyphDisplayCharacter } from 'src/lib/glyph/glyphOverview'
 
@@ -244,6 +245,24 @@ describe('buildFontDataFromGlyphsDocument (Glyphs 2)', () => {
       bracketAxisRules: { Weight: { min: 150, max: 200 } },
     })
   })
+
+  it('honors Glyphs custom glyphOrder and appends glyphs missing from it', () => {
+    const ordered = buildFontDataFromGlyphsDocument(
+      parse(`{
+fontMaster = ( { id = "M1"; name = Regular; } );
+customParameters = (
+{ name = glyphOrder; value = ( B, A ); }
+);
+glyphs = (
+{ glyphname = A; layers = ( { layerId = "M1"; width = 500; } ); },
+{ glyphname = B; layers = ( { layerId = "M1"; width = 500; } ); },
+{ glyphname = C; layers = ( { layerId = "M1"; width = 500; } ); }
+);
+}`)
+    )
+
+    expect(ordered.glyphOrder).toEqual(['B', 'A', 'C'])
+  })
 })
 
 describe('buildFontDataFromGlyphsDocument (Glyphs 3)', () => {
@@ -335,6 +354,66 @@ layers = (
       segmentType: 'quadratic',
       smooth: true,
     })
+  })
+
+  it('normalizes layers that mix quadratic and cubic segments to cubic', () => {
+    const mixed = buildFontDataFromGlyphsDocument(
+      parse(`{
+fontMaster = ( { id = "M1"; name = Regular; } );
+glyphs = (
+{
+glyphname = mixed;
+layers = (
+{
+layerId = "M1";
+width = 500;
+paths = (
+{ closed = 0; nodes = ( "0 0 LINE", "50 100 OFFCURVE", "100 0 QCURVE SMOOTH" ); },
+{ closed = 0; nodes = ( "0 200 LINE", "50 300 OFFCURVE", "75 325 OFFCURVE", "100 200 CURVE" ); },
+{ closed = 1; nodes = ( "150 100 OFFCURVE", "200 0 QCURVE SMOOTH", "100 0 LINE" ); }
+);
+}
+);
+}
+);
+}`)
+    )
+    const layer = getGlyphLayer(mixed.glyphs.mixed, 'M1')
+    const convertedPath = layer?.paths[0]
+    const convertedClosedPath = layer?.paths[2]
+    const quadraticSegments = layer?.paths.flatMap((path) =>
+      path.nodes.filter(
+        (node) => node.kind === 'oncurve' && node.segmentType === 'quadratic'
+      )
+    )
+
+    expect(quadraticSegments).toEqual([])
+    expect(convertedPath?.nodes[1]).toMatchObject({ kind: 'offcurve' })
+    expect(convertedPath?.nodes[1]?.x).toBeCloseTo(100 / 3)
+    expect(convertedPath?.nodes[1]?.y).toBeCloseTo(200 / 3)
+    expect(convertedPath?.nodes[2]).toMatchObject({ kind: 'offcurve' })
+    expect(convertedPath?.nodes[2]?.x).toBeCloseTo(200 / 3)
+    expect(convertedPath?.nodes[2]?.y).toBeCloseTo(200 / 3)
+    expect(convertedPath?.nodes[3]).toMatchObject({
+      kind: 'oncurve',
+      segmentType: 'cubic',
+      smooth: true,
+    })
+    expect(convertedClosedPath?.nodes[0]).toMatchObject({ kind: 'offcurve' })
+    expect(convertedClosedPath?.nodes[0]?.x).toBeCloseTo(400 / 3)
+    expect(convertedClosedPath?.nodes[0]?.y).toBeCloseTo(200 / 3)
+    expect(convertedClosedPath?.nodes[2]).toMatchObject({
+      kind: 'oncurve',
+      segmentType: 'cubic',
+      smooth: true,
+    })
+    expect(() =>
+      glyphDataToKumikoGlyphRecord({
+        projectId: 'project',
+        glyph: mixed.glyphs.mixed,
+        updatedAt: 1,
+      })
+    ).not.toThrow()
   })
 
   it('round-trips Glyphs node-level extra metadata without storing raw geometry', async () => {

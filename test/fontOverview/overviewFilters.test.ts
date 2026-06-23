@@ -240,11 +240,21 @@ describe('Glyphs-like overview tree', () => {
     ])
   })
 
+  it('keeps the incoming glyph order in overview sections', () => {
+    expect(ids(findNode(tree, 'all')?.glyphs ?? [])).toEqual([
+      'A',
+      'acute',
+      'Aacute',
+      'uni4E00',
+      'logo.alt',
+    ])
+  })
+
   it('uses explicit Glyphs categories and subcategories when available', () => {
     expect(ids(findNode(tree, 'category:Letter')?.glyphs ?? [])).toEqual([
       'A',
-      'Aacute',
       'acute',
+      'Aacute',
       'uni4E00',
     ])
     expect(

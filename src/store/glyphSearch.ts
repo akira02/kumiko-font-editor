@@ -22,8 +22,21 @@ export const IDS_DICTIONARY: Record<string, string[]> = {
   機: ['木', '幾'],
 }
 
-const getGlyphs = (fontData: FontData | null) =>
-  Object.values(fontData?.glyphs ?? {})
+const getGlyphs = (fontData: FontData | null) => {
+  if (!fontData) {
+    return []
+  }
+
+  const orderedGlyphIds = new Set(fontData.glyphOrder ?? [])
+  return [
+    ...(fontData.glyphOrder ?? []).flatMap((glyphId) =>
+      fontData.glyphs[glyphId] ? [fontData.glyphs[glyphId]] : []
+    ),
+    ...Object.values(fontData.glyphs).filter(
+      (glyph) => !orderedGlyphIds.has(glyph.id)
+    ),
+  ]
+}
 
 const filterGlyphs = (
   fontData: FontData | null,
