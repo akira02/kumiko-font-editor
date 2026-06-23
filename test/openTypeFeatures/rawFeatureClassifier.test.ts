@@ -412,6 +412,49 @@ describe('OpenType raw FEA classifier', () => {
     expect(generateFea(state).text).toContain('pos A V -80 -20;')
   })
 
+  it('classifies long-form substitute and position statement keywords', () => {
+    const state = classifyRawFeatureTextSource(
+      setRawFeatureTextSource(
+        createEmptyOpenTypeFeaturesState(),
+        [
+          'languagesystem latn dflt;',
+          'feature liga {',
+          '  script latn;',
+          '  language dflt;',
+          '  substitute f i by f_i;',
+          '} liga;',
+          'feature kern {',
+          '  script latn;',
+          '  language dflt;',
+          '  position A V -80;',
+          '} kern;',
+        ].join('\n')
+      )
+    )
+
+    expect(state.sourceSections[0]).toMatchObject({
+      id: 'source_raw_feature_text',
+      stage: 'classified',
+      status: 'classified',
+    })
+    expect(state.lookups).toMatchObject([
+      {
+        id: 'lookup_raw_liga_0',
+        lookupType: 'ligatureSubst',
+        rules: [{ kind: 'ligatureSubstitution' }],
+      },
+      {
+        id: 'lookup_raw_kern_1',
+        lookupType: 'pairPos',
+        rules: [{ kind: 'pairPositioning' }],
+      },
+    ])
+
+    const generated = generateFea(state).text
+    expect(generated).toContain('sub f i by f_i;')
+    expect(generated).toContain('pos A V -80;')
+  })
+
   it('classifies raw mark classes and mark positioning lookup blocks', () => {
     const state = classifyRawFeatureTextSource(
       setRawFeatureTextSource(

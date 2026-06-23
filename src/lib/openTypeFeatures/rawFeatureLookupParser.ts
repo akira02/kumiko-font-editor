@@ -29,6 +29,17 @@ export interface LookupDependencyCandidate {
   raw: string
 }
 
+const SUBSTITUTION_KEYWORD = '(?:sub|substitute)'
+const POSITIONING_KEYWORD = '(?:pos|position)'
+
+const matchSubstitutionStatement = (statement: string, bodyPattern: string) =>
+  statement.match(
+    new RegExp(`^${SUBSTITUTION_KEYWORD}\\s+${bodyPattern}$`, 'i')
+  )
+
+const matchPositioningStatement = (statement: string, bodyPattern: string) =>
+  statement.match(new RegExp(`^${POSITIONING_KEYWORD}\\s+${bodyPattern}$`, 'i'))
+
 const parseValueRecord = (value: string): ValueRecord | null => {
   if (/^-?\d+$/.test(value)) {
     return { xAdvance: Number(value) }
@@ -182,8 +193,10 @@ const parseContextualSubstitutionRule = (
   glyphClassIdByName: Map<string, string>,
   lookupIdByName: Map<string, string>
 ): Rule | null => {
-  const ignoreMatch = statement.match(/^ignore\s+sub\s+(.+)$/i)
-  const substituteMatch = statement.match(/^sub\s+(.+)$/i)
+  const ignoreMatch = statement.match(
+    new RegExp(`^ignore\\s+${SUBSTITUTION_KEYWORD}\\s+(.+)$`, 'i')
+  )
+  const substituteMatch = matchSubstitutionStatement(statement, '(.+)')
   const context = ignoreMatch?.[1] ?? substituteMatch?.[1]
   if (!context || /\sby\s/i.test(context)) return null
 
@@ -262,8 +275,10 @@ const parseContextualPositioningRule = (
   glyphClassIdByName: Map<string, string>,
   lookupIdByName: Map<string, string>
 ): Rule | null => {
-  const ignoreMatch = statement.match(/^ignore\s+pos\s+(.+)$/i)
-  const positionMatch = statement.match(/^pos\s+(.+)$/i)
+  const ignoreMatch = statement.match(
+    new RegExp(`^ignore\\s+${POSITIONING_KEYWORD}\\s+(.+)$`, 'i')
+  )
+  const positionMatch = matchPositioningStatement(statement, '(.+)')
   const context = ignoreMatch?.[1] ?? positionMatch?.[1]
   if (!context || /(?:^|\s)(?:-?\d+|<[^>]+>)\s*$/i.test(context)) return null
 
@@ -341,7 +356,10 @@ const parseSubstitutionRule = (
   origin: FeatureOrigin,
   glyphClassIdByName: Map<string, string>
 ): Rule | null => {
-  const alternateMatch = statement.match(/^sub\s+(\S+)\s+from\s+\[([^\]]+)\]$/i)
+  const alternateMatch = matchSubstitutionStatement(
+    statement,
+    '(\\S+)\\s+from\\s+\\[([^\\]]+)\\]'
+  )
   if (alternateMatch) {
     const target = alternateMatch[1]
     const alternates = splitGlyphList(alternateMatch[2])
@@ -366,7 +384,7 @@ const parseSubstitutionRule = (
     }
   }
 
-  const match = statement.match(/^sub\s+(.+?)\s+by\s+(.+)$/i)
+  const match = matchSubstitutionStatement(statement, '(.+?)\\s+by\\s+(.+)')
   if (!match) return null
 
   const pattern = match[1].trim().split(/\s+/).filter(Boolean)
@@ -436,11 +454,9 @@ const parseMarkPositioningRule = (
   glyphClassIdByName: Map<string, string>,
   markClassIdByName: Map<string, string>
 ): Rule | null => {
-  const cursiveMatch = statement.match(
-    new RegExp(
-      `^pos\\s+cursive\\s+(\\S+)\\s+(${CURSIVE_ANCHOR_PATTERN})\\s+(${CURSIVE_ANCHOR_PATTERN})$`,
-      'i'
-    )
+  const cursiveMatch = matchPositioningStatement(
+    statement,
+    `cursive\\s+(\\S+)\\s+(${CURSIVE_ANCHOR_PATTERN})\\s+(${CURSIVE_ANCHOR_PATTERN})`
   )
   if (cursiveMatch) {
     const glyphs = selectorFromToken(cursiveMatch[1], glyphClassIdByName)
@@ -464,7 +480,10 @@ const parseMarkPositioningRule = (
       : null
   }
 
-  const baseMatch = statement.match(/^pos\s+base\s+(\S+)\s+(.+)$/i)
+  const baseMatch = matchPositioningStatement(
+    statement,
+    'base\\s+(\\S+)\\s+(.+)'
+  )
   if (baseMatch) {
     const baseGlyphs = selectorFromToken(baseMatch[1], glyphClassIdByName)
     const anchors = parseMarkAttachments(baseMatch[2], markClassIdByName)
@@ -482,7 +501,10 @@ const parseMarkPositioningRule = (
       : null
   }
 
-  const markMatch = statement.match(/^pos\s+mark\s+(\S+)\s+(.+)$/i)
+  const markMatch = matchPositioningStatement(
+    statement,
+    'mark\\s+(\\S+)\\s+(.+)'
+  )
   if (markMatch) {
     const baseMarks = selectorFromToken(markMatch[1], glyphClassIdByName)
     const anchors = parseMarkAttachments(markMatch[2], markClassIdByName)
@@ -500,7 +522,10 @@ const parseMarkPositioningRule = (
       : null
   }
 
-  const ligatureMatch = statement.match(/^pos\s+ligature\s+(\S+)\s+(.+)$/i)
+  const ligatureMatch = matchPositioningStatement(
+    statement,
+    'ligature\\s+(\\S+)\\s+(.+)'
+  )
   if (ligatureMatch) {
     const ligatures = selectorFromToken(ligatureMatch[1], glyphClassIdByName)
     const componentAnchors = parseLigatureComponentAnchors(
@@ -530,7 +555,7 @@ const parsePositioningRule = (
   origin: FeatureOrigin,
   glyphClassIdByName: Map<string, string>
 ): Rule | null => {
-  const match = statement.match(/^pos\s+(\S+)\s+(.+)$/i)
+  const match = matchPositioningStatement(statement, '(\\S+)\\s+(.+)')
   if (!match) return null
 
   const left = selectorFromToken(match[1], glyphClassIdByName)
