@@ -131,6 +131,18 @@ export const glyphsFromRawClassToken = (
   return context.glyphClassGlyphsByName?.get(token) ?? null
 }
 
+export const glyphsFromRawSelectorToken = (
+  token: string,
+  context: RawSelectorContext
+) => {
+  const classGlyphs = glyphsFromRawClassToken(token, context)
+  if (classGlyphs) return classGlyphs
+  if (token.startsWith('@') || token.includes("'") || token.includes('[')) {
+    return null
+  }
+  return [token]
+}
+
 export const selectorFromRawToken = (
   token: string,
   context: RawSelectorContext

@@ -8,6 +8,7 @@ import type {
 } from 'src/lib/openTypeFeatures/types'
 import {
   glyphsFromRawClassToken,
+  glyphsFromRawSelectorToken,
   isInlineGlyphClassToken,
   selectorFromRawMarkedToken,
   selectorFromRawToken,
@@ -40,6 +41,7 @@ export interface LookupDependencyCandidate {
 
 const SUBSTITUTION_KEYWORD = '(?:sub|substitute)'
 const POSITIONING_KEYWORD = '(?:pos|position)'
+const ENUMERATED_POSITIONING_KEYWORD = `(?:enum|enumerate)\\s+${POSITIONING_KEYWORD}`
 
 const matchSubstitutionStatement = (statement: string, bodyPattern: string) =>
   statement.match(
@@ -774,6 +776,62 @@ const parsePositioningRule = (
   }
 }
 
+const parseEnumeratedPairPositioningRules = (
+  statement: string,
+  ruleId: string,
+  origin: FeatureOrigin,
+  glyphClassIdByName: Map<string, string>,
+  glyphClassGlyphsByName: Map<string, string[]>,
+  registerInlineGlyphClass?: InlineGlyphClassRegistrar
+): Rule[] | null => {
+  const match = statement.match(
+    new RegExp(`^${ENUMERATED_POSITIONING_KEYWORD}\\s+(.+)$`, 'i')
+  )
+  if (!match) return null
+
+  const selectorContext = makeSelectorContext(
+    glyphClassIdByName,
+    glyphClassGlyphsByName,
+    registerInlineGlyphClass
+  )
+  const parsedLeft = splitFirstGlyphPatternToken(match[1])
+  const parsedRight = parsedLeft
+    ? splitFirstGlyphPatternToken(parsedLeft.rest)
+    : null
+  if (!parsedLeft || !parsedRight) return null
+
+  const valueMatch = parsedRight.rest.match(
+    /^(-?\d+|<[^>]+>)(?:\s+(-?\d+|<[^>]+>))?$/
+  )
+  if (!valueMatch) return null
+
+  const leftGlyphs = glyphsFromRawSelectorToken(
+    parsedLeft.token,
+    selectorContext
+  )
+  const rightGlyphs = glyphsFromRawSelectorToken(
+    parsedRight.token,
+    selectorContext
+  )
+  const firstValue = parseValueRecord(valueMatch[1])
+  const secondValue = valueMatch[2] ? parseValueRecord(valueMatch[2]) : null
+  if (!leftGlyphs || !rightGlyphs || !firstValue) return null
+  if (valueMatch[2] && !secondValue) return null
+
+  const pairs = leftGlyphs.flatMap((left) =>
+    rightGlyphs.map((right) => ({ left, right }))
+  )
+  return pairs.map((pair, index) => ({
+    id: pairs.length === 1 ? ruleId : `${ruleId}_${index}`,
+    kind: 'pairPositioning',
+    left: { kind: 'glyph', glyph: pair.left },
+    right: { kind: 'glyph', glyph: pair.right },
+    firstValue,
+    ...(secondValue ? { secondValue } : {}),
+    meta: makeRuleMeta(origin, 'GPOS'),
+  }))
+}
+
 export const getLookupShape = (rules: Rule[]) => {
   const firstRule = rules[0]
   if (!firstRule) return null
@@ -865,6 +923,14 @@ export const parseLookupStatements = (
         origin,
         glyphClassIdByName,
         lookupIdByName,
+        registerInlineGlyphClass
+      ) ??
+      parseEnumeratedPairPositioningRules(
+        statement,
+        ruleId,
+        origin,
+        glyphClassIdByName,
+        glyphClassGlyphsByName,
         registerInlineGlyphClass
       )
     const substitutionRules = parseSubstitutionRule(

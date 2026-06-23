@@ -353,6 +353,110 @@ describe('OpenType raw FEA GPOS classifier', () => {
     expect(generated).not.toContain('subtable;')
   })
 
+  it('expands raw enumerated pair positioning into glyph pair rules', () => {
+    const state = classifyRawFeatureTextSource(
+      setRawFeatureTextSource(
+        createEmptyOpenTypeFeaturesState(),
+        [
+          '@Left = [A Aacute];',
+          '@Right = [V W];',
+          'feature kern {',
+          '  enum pos @Left @Right -80;',
+          '  enumerate position [T Y] o <0 0 -40 0> <0 0 -10 0>;',
+          '} kern;',
+        ].join('\n')
+      )
+    )
+
+    expect(state.sourceSections[0]).toMatchObject({
+      id: 'source_raw_feature_text',
+      stage: 'classified',
+      status: 'classified',
+    })
+    expect(state.lookups).toMatchObject([
+      {
+        id: 'lookup_raw_kern_0',
+        table: 'GPOS',
+        lookupType: 'pairPos',
+        rules: [
+          {
+            id: 'lookup_raw_kern_0_rule_0_0',
+            kind: 'pairPositioning',
+            left: { kind: 'glyph', glyph: 'A' },
+            right: { kind: 'glyph', glyph: 'V' },
+            firstValue: { xAdvance: -80 },
+          },
+          {
+            id: 'lookup_raw_kern_0_rule_0_1',
+            kind: 'pairPositioning',
+            left: { kind: 'glyph', glyph: 'A' },
+            right: { kind: 'glyph', glyph: 'W' },
+            firstValue: { xAdvance: -80 },
+          },
+          {
+            id: 'lookup_raw_kern_0_rule_0_2',
+            kind: 'pairPositioning',
+            left: { kind: 'glyph', glyph: 'Aacute' },
+            right: { kind: 'glyph', glyph: 'V' },
+            firstValue: { xAdvance: -80 },
+          },
+          {
+            id: 'lookup_raw_kern_0_rule_0_3',
+            kind: 'pairPositioning',
+            left: { kind: 'glyph', glyph: 'Aacute' },
+            right: { kind: 'glyph', glyph: 'W' },
+            firstValue: { xAdvance: -80 },
+          },
+          {
+            id: 'lookup_raw_kern_0_rule_1_0',
+            kind: 'pairPositioning',
+            left: { kind: 'glyph', glyph: 'T' },
+            right: { kind: 'glyph', glyph: 'o' },
+            firstValue: {
+              xPlacement: 0,
+              yPlacement: 0,
+              xAdvance: -40,
+              yAdvance: 0,
+            },
+            secondValue: {
+              xPlacement: 0,
+              yPlacement: 0,
+              xAdvance: -10,
+              yAdvance: 0,
+            },
+          },
+          {
+            id: 'lookup_raw_kern_0_rule_1_1',
+            kind: 'pairPositioning',
+            left: { kind: 'glyph', glyph: 'Y' },
+            right: { kind: 'glyph', glyph: 'o' },
+            firstValue: {
+              xPlacement: 0,
+              yPlacement: 0,
+              xAdvance: -40,
+              yAdvance: 0,
+            },
+            secondValue: {
+              xPlacement: 0,
+              yPlacement: 0,
+              xAdvance: -10,
+              yAdvance: 0,
+            },
+          },
+        ],
+      },
+    ])
+
+    const generated = generateFea(state).text
+    expect(generated).toContain('pos A V -80;')
+    expect(generated).toContain('pos A W -80;')
+    expect(generated).toContain('pos Aacute V -80;')
+    expect(generated).toContain('pos Aacute W -80;')
+    expect(generated).toContain('pos T o -40 -10;')
+    expect(generated).toContain('pos Y o -40 -10;')
+    expect(generated).not.toContain('enum pos')
+  })
+
   it('classifies raw mark classes and mark positioning lookup blocks', () => {
     const state = classifyRawFeatureTextSource(
       setRawFeatureTextSource(
