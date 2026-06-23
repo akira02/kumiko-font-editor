@@ -16,3 +16,15 @@ export const makeDiagnostic = (
   message,
   target,
 })
+
+export const mergeFeatureDiagnostics = (
+  ...diagnosticLists: Array<FeatureDiagnostic[] | undefined>
+): FeatureDiagnostic[] => {
+  const diagnosticsById = new Map<string, FeatureDiagnostic>()
+
+  for (const diagnostic of diagnosticLists.flatMap((list) => list ?? [])) {
+    diagnosticsById.set(diagnostic.id, diagnostic)
+  }
+
+  return Array.from(diagnosticsById.values())
+}

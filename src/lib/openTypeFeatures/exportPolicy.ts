@@ -11,6 +11,7 @@ export type OpenTypeExportWarningCode =
   | 'validation-errors'
   | 'compiler-runtime-not-configured'
   | 'unsupported-lookups'
+  | 'feature-variations'
   | 'preserve-ignores-edits'
   | 'rebuild-replaces-tables'
   | 'drop-unsupported-requires-confirmation'
@@ -179,6 +180,33 @@ const getUnsupportedWarning = (
   }
 }
 
+const getFeatureVariationWarning = (
+  state: OpenTypeFeaturesState,
+  diagnostics: FeatureDiagnostic[]
+): OpenTypeExportWarning | null => {
+  const featureVariationDiagnostics = diagnostics.filter((diagnostic) =>
+    diagnostic.id.includes('feature-variations-present')
+  )
+  if (
+    featureVariationDiagnostics.length === 0 ||
+    state.exportPolicy === 'preserve-compiled-layout-tables'
+  ) {
+    return null
+  }
+
+  return {
+    id: 'open-type-export-feature-variations',
+    code: 'feature-variations',
+    severity: 'warning',
+    title: 'FeatureVariations require preservation',
+    message:
+      'Imported FeatureVariations table data is preserved as compiled source material but is not reconstructed into editable rules. Rebuilding layout tables may omit it.',
+    details: featureVariationDiagnostics.map(
+      (diagnostic) => diagnostic.message
+    ),
+  }
+}
+
 const getDropUnsupportedWarning = (
   state: OpenTypeFeaturesState
 ): OpenTypeExportWarning | null => {
@@ -215,6 +243,7 @@ export const deriveOpenTypeExportWarnings = (
     getPreservePolicyWarning(state.exportPolicy, hasEdits),
     getRebuildPolicyWarning(state, hasEdits),
     getUnsupportedWarning(state),
+    getFeatureVariationWarning(state, options.diagnostics),
     getDropUnsupportedWarning(state),
   ].filter((warning): warning is OpenTypeExportWarning => Boolean(warning))
 }

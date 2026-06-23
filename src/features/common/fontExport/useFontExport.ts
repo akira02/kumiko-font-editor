@@ -8,6 +8,7 @@ import {
   deriveOpenTypeExportWarnings,
   hasBlockingExportWarnings,
   hasManagedFeatureEdits,
+  mergeFeatureDiagnostics,
   needsOpenTypeFeatureCompilationForBinaryExport,
   validateFeatures,
 } from 'src/lib/openTypeFeatures'
@@ -81,7 +82,10 @@ export function useFontExport() {
       fontData?.openTypeFeatures
         ? deriveOpenTypeExportWarnings(fontData.openTypeFeatures, {
             compilerRuntimeStatus,
-            diagnostics: validateFeatures(fontData.openTypeFeatures, fontData),
+            diagnostics: mergeFeatureDiagnostics(
+              fontData.openTypeFeatures.diagnostics,
+              validateFeatures(fontData.openTypeFeatures, fontData)
+            ),
             hasGeneratedFeatureEdits: hasManagedFeatureEdits(
               fontData.openTypeFeatures
             ),

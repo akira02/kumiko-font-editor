@@ -171,6 +171,7 @@ generated .fea / UI / export policy
   - Source panel 會顯示 source sections。
   - Lookup inspector 會顯示 compiled provenance、subtable format 與回指 source sections。
   - Workflow overview 會顯示 source / compiled / classified 計數。
+  - Binary importer diagnostics（例如 FeatureVariations）會併入 workflow diagnostics 與 export policy warnings。
 - 測試覆蓋
   - raw source section 建立。
   - raw `.fea` 成功分類與保留 raw 的兩條路。

@@ -15,6 +15,7 @@ export {
   makeSuggestionId,
   toStableIdPart,
 } from 'src/lib/openTypeFeatures/ids'
+export { mergeFeatureDiagnostics } from 'src/lib/openTypeFeatures/diagnostics'
 export { buildFeaDocument } from 'src/lib/openTypeFeatures/buildFeaDocument'
 export { buildAutoFeatureSuggestions } from 'src/lib/openTypeFeatures/buildAutoFeatureSuggestions'
 export { buildKerningSuggestions } from 'src/lib/openTypeFeatures/buildKerningSuggestions'

@@ -16,6 +16,7 @@ import {
   classifyRawFeatureTextSource,
   generateFea,
   ignoreAutoFeatureSuggestion,
+  mergeFeatureDiagnostics,
   setRawFeatureTextSource,
   validateFeatures,
   type AutoFeatureSuggestion,
@@ -40,7 +41,13 @@ export function FontFeaturesTab({
     kind: 'source',
   })
   const diagnostics = useMemo(
-    () => (fontData ? validateFeatures(openTypeFeatures, fontData) : []),
+    () =>
+      fontData
+        ? mergeFeatureDiagnostics(
+            openTypeFeatures.diagnostics,
+            validateFeatures(openTypeFeatures, fontData)
+          )
+        : (openTypeFeatures.diagnostics ?? []),
     [fontData, openTypeFeatures]
   )
   const generatedFea = useMemo(

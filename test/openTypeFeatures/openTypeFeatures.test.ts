@@ -1494,6 +1494,62 @@ describe('OpenType binary export compiler gate', () => {
     ).toBe(true)
   })
 
+  it('warns when rebuilding imported FeatureVariations table data', () => {
+    const featureVariationDiagnostic = {
+      id: 'feature-diagnostic-warning-binary-extractor-gsub-feature-variations-present',
+      severity: 'warning' as const,
+      message:
+        'GSUB FeatureVariations table is present. Kumiko preserves this as explicit unsupported compiled layout data; feature variation reconstruction is not implemented yet.',
+      target: { kind: 'global' as const },
+    }
+    const state = {
+      ...createEmptyOpenTypeFeaturesState(),
+      sourceSections: [
+        {
+          id: 'source_compiled_gsub',
+          title: 'GSUB compiled table',
+          kind: 'compiled-table' as const,
+          origin: 'binary-import' as const,
+          format: 'opentype-layout-table' as const,
+          stage: 'classified' as const,
+          status: 'classified' as const,
+          table: 'GSUB' as const,
+          recordRefs: [
+            {
+              kind: 'diagnostic' as const,
+              id: featureVariationDiagnostic.id,
+              table: 'GSUB' as const,
+            },
+          ],
+          preservationPolicy: 'editable-rebuild' as const,
+        },
+      ],
+      diagnostics: [featureVariationDiagnostic],
+    }
+
+    const rebuildWarnings = deriveOpenTypeExportWarnings(state, {
+      compilerRuntimeStatus: createCompilerRuntimeStatus(),
+      diagnostics: state.diagnostics,
+    })
+    expect(
+      rebuildWarnings.some((warning) => warning.code === 'feature-variations')
+    ).toBe(true)
+
+    const preserveWarnings = deriveOpenTypeExportWarnings(
+      {
+        ...state,
+        exportPolicy: 'preserve-compiled-layout-tables',
+      },
+      {
+        compilerRuntimeStatus: createCompilerRuntimeStatus(),
+        diagnostics: state.diagnostics,
+      }
+    )
+    expect(
+      preserveWarnings.some((warning) => warning.code === 'feature-variations')
+    ).toBe(false)
+  })
+
   it('marks drop-unsupported rebuilds as requiring explicit confirmation', () => {
     const warnings = deriveOpenTypeExportWarnings(
       {
