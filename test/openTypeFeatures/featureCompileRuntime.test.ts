@@ -31,6 +31,11 @@ const FEATURE_TEXT = `feature ss01 {
 } ss01;
 `
 
+const REPLACEMENT_FEATURE_TEXT = `feature ss02 {
+    sub A by B;
+} ss02;
+`
+
 const rectPath = (x: number, w: number) => {
   const path = new opentype.Path()
   path.moveTo(x, 0)
@@ -140,6 +145,49 @@ describe('fontTools FEA compile runtime', () => {
       )
     )
     expect(reparsed.glyphs.length).toBe(3)
+  })
+
+  it('removes affected layout tables before compiling replacement FEA', () => {
+    const inputPath = '/tmp/replace-in.otf'
+    const firstFeaPath = '/tmp/replace-first.fea'
+    const firstOutputPath = '/tmp/replace-first-out.otf'
+    const secondFeaPath = '/tmp/replace-second.fea'
+    const secondOutputPath = '/tmp/replace-second-out.otf'
+    pyodide.FS.writeFile(inputPath, new Uint8Array(buildPlainFont()))
+    pyodide.FS.writeFile(firstFeaPath, FEATURE_TEXT)
+    pyodide.FS.writeFile(secondFeaPath, REPLACEMENT_FEATURE_TEXT)
+
+    const firstResult = pyodide.runPython(
+      `kumiko_compile_fea(${JSON.stringify(inputPath)}, ${JSON.stringify(
+        firstFeaPath
+      )}, ${JSON.stringify(firstOutputPath)}, ["GSUB"])`
+    ) as {
+      toJs: (o?: { dict_converter?: typeof Object.fromEntries }) => unknown
+      destroy?: () => void
+    }
+    const firstCompiled = firstResult.toJs({
+      dict_converter: Object.fromEntries,
+    }) as { ok: boolean; message: string }
+    firstResult.destroy?.()
+    expect(firstCompiled.ok, firstCompiled.message).toBe(true)
+    expect(inspect(pyodide, firstOutputPath).features).toEqual(['ss01'])
+
+    const secondResult = pyodide.runPython(
+      `kumiko_compile_fea(${JSON.stringify(
+        firstOutputPath
+      )}, ${JSON.stringify(secondFeaPath)}, ${JSON.stringify(
+        secondOutputPath
+      )}, ["GSUB"])`
+    ) as {
+      toJs: (o?: { dict_converter?: typeof Object.fromEntries }) => unknown
+      destroy?: () => void
+    }
+    const secondCompiled = secondResult.toJs({
+      dict_converter: Object.fromEntries,
+    }) as { ok: boolean; message: string }
+    secondResult.destroy?.()
+    expect(secondCompiled.ok, secondCompiled.message).toBe(true)
+    expect(inspect(pyodide, secondOutputPath).features).toEqual(['ss02'])
   })
 
   it('reports a diagnostic for invalid FEA instead of throwing', () => {

@@ -10,6 +10,7 @@ const outputPath = resolve(
   repoRoot,
   'test/fixtures/otf/KumikoOpenTypeStress.otf'
 )
+const deterministicHeadTimestamp = 2082844800
 
 const rectPath = (x, y, width, height) => {
   const path = new opentype.Path()
@@ -187,8 +188,8 @@ font = TTFont("/tmp/base.otf", recalcTimestamp=False)
 with open("/tmp/features.fea", "r", encoding="utf-8") as feature_file:
     addOpenTypeFeaturesFromString(font, feature_file.read())
 font.recalcTimestamp = False
-font["head"].created = 0
-font["head"].modified = 0
+font["head"].created = ${deterministicHeadTimestamp}
+font["head"].modified = ${deterministicHeadTimestamp}
 font.save("/tmp/KumikoOpenTypeStress.otf")
 `)
 

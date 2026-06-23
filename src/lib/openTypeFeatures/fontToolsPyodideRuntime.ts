@@ -53,12 +53,13 @@ const runPythonCompile = (
   pyodide: PyodideAPI,
   inputPath: string,
   feaPath: string,
-  outputPath: string
+  outputPath: string,
+  options: CompileOptions
 ) => {
   const resultProxy = pyodide.runPython(
     `kumiko_compile_fea(${JSON.stringify(inputPath)}, ${JSON.stringify(
       feaPath
-    )}, ${JSON.stringify(outputPath)})`
+    )}, ${JSON.stringify(outputPath)}, ${JSON.stringify(options.affectedTables)})`
   ) as PyProxyLike
 
   try {
@@ -100,8 +101,6 @@ export const compileWithFontToolsRuntime = async (
   generatedFea: string,
   options: CompileOptions
 ): Promise<CompileResult> => {
-  void options
-
   const { pyodide } = await getFontToolsRuntime()
   const nonce = `${Date.now()}_${Math.random().toString(36).slice(2)}`
   const inputPath = `/tmp/kumiko_input_${nonce}.font`
@@ -112,7 +111,13 @@ export const compileWithFontToolsRuntime = async (
     pyodide.FS.writeFile(inputPath, new Uint8Array(inputFontBuffer))
     pyodide.FS.writeFile(feaPath, generatedFea)
 
-    const result = runPythonCompile(pyodide, inputPath, feaPath, outputPath)
+    const result = runPythonCompile(
+      pyodide,
+      inputPath,
+      feaPath,
+      outputPath,
+      options
+    )
 
     if (!result.ok) {
       throw Object.assign(new Error(result.message), {

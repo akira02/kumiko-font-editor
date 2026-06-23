@@ -4,9 +4,13 @@ from fontTools.ttLib import TTFont
 from fontTools.feaLib.builder import addOpenTypeFeaturesFromString
 
 
-def kumiko_compile_fea(input_path, fea_path, output_path, *unused_args):
+def kumiko_compile_fea(input_path, fea_path, output_path, affected_tables=None, *unused_args):
     try:
         font = TTFont(input_path)
+        for table_tag in affected_tables or []:
+            if table_tag in font:
+                del font[table_tag]
+
         with open(fea_path, "r", encoding="utf-8") as feature_file:
             feature_text = feature_file.read()
 

@@ -1,9 +1,12 @@
 import { readFile } from 'node:fs/promises'
 
 import { describe, expect, it } from 'vitest'
+import { loadPyodide } from 'pyodide'
 
 import { importBinaryFontFile } from 'src/lib/fontFormats/fontBinaryFormat'
+import { FONTTOOLS_COMPILER_PYTHON } from 'src/lib/openTypeFeatures/fontToolsCompilerPython'
 import { generateFea } from 'src/lib/openTypeFeatures/generateFea'
+import { shapeTextWithHarfBuzz } from 'src/lib/openTypeFeatures/shapeTextWithHarfBuzz'
 
 const STRESS_FIXTURE_URL = new URL(
   '../fixtures/otf/KumikoOpenTypeStress.otf',
@@ -15,6 +18,48 @@ const loadStressFixture = async () => {
   return new File([buffer], 'KumikoOpenTypeStress.otf', {
     type: 'font/otf',
   })
+}
+
+const toArrayBuffer = (bytes: Uint8Array): ArrayBuffer =>
+  bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)
+
+const compileGeneratedFea = async (
+  inputBuffer: ArrayBuffer,
+  generatedFea: string
+) => {
+  const pyodide = await loadPyodide()
+  await pyodide.loadPackage('fonttools')
+  pyodide.runPython(FONTTOOLS_COMPILER_PYTHON)
+  pyodide.FS.writeFile('/tmp/stress-in.otf', new Uint8Array(inputBuffer))
+  pyodide.FS.writeFile('/tmp/stress-generated.fea', generatedFea)
+
+  const result = pyodide.runPython(
+    `kumiko_compile_fea('/tmp/stress-in.otf', '/tmp/stress-generated.fea', '/tmp/stress-out.otf', ["GSUB", "GPOS", "GDEF"])`
+  ) as {
+    toJs: (o?: { dict_converter?: typeof Object.fromEntries }) => unknown
+    destroy?: () => void
+  }
+  try {
+    const compiled = result.toJs({ dict_converter: Object.fromEntries }) as {
+      ok: boolean
+      message: string
+      rawCompilerOutput?: string
+    }
+    expect(compiled.ok, compiled.rawCompilerOutput).toBe(true)
+    return toArrayBuffer(pyodide.FS.readFile('/tmp/stress-out.otf'))
+  } finally {
+    result.destroy?.()
+  }
+}
+
+const shapeComparable = async (fontBuffer: ArrayBuffer, text: string) => {
+  const result = await shapeTextWithHarfBuzz(fontBuffer, text, {
+    features: ['calt=1', 'frac=1', 'kern=1', 'liga=1', 'mark=1', 'mkmk=1'],
+    script: 'latn',
+  })
+
+  expect(result.ok).toBe(true)
+  return result.glyphs
 }
 
 describe('Kumiko synthetic OpenType stress fixture', () => {
@@ -113,4 +158,31 @@ describe('Kumiko synthetic OpenType stress fixture', () => {
     })
     expect(generateFea(state).text).toContain('feature calt')
   })
+
+  it('preserves shaping behavior after generated FEA is rebuilt', async () => {
+    const sourceBuffer = await readFile(STRESS_FIXTURE_URL)
+    const sourceArrayBuffer = toArrayBuffer(sourceBuffer)
+    const imported = await importBinaryFontFile(
+      new File([sourceBuffer], 'KumikoOpenTypeStress.otf', {
+        type: 'font/otf',
+      })
+    )
+    const rebuiltBuffer = await compileGeneratedFea(
+      sourceArrayBuffer,
+      generateFea(imported.fontData.openTypeFeatures!).text
+    )
+
+    for (const text of ['fi', 'A-A', 'AV', 'A\u0301', 'A\u0301\u0300']) {
+      expect(await shapeComparable(rebuiltBuffer, text)).toEqual(
+        await shapeComparable(sourceArrayBuffer, text)
+      )
+    }
+
+    expect(await shapeComparable(sourceArrayBuffer, 'fi')).toEqual([
+      expect.objectContaining({ glyphId: 7 }),
+    ])
+    expect((await shapeComparable(sourceArrayBuffer, 'A-A'))[1]).toEqual(
+      expect.objectContaining({ glyphId: 11 })
+    )
+  }, 180000)
 })
