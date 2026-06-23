@@ -1,6 +1,8 @@
 import {
   Alert,
   AlertDescription,
+  AlertIcon,
+  AlertTitle,
   FormControl,
   FormLabel,
   Select,
@@ -9,11 +11,19 @@ import {
 } from '@chakra-ui/react'
 import type {
   ExportPolicy,
+  FeatureDiagnostic,
+  OpenTypeExportWarning,
   OpenTypeFeaturesState,
 } from 'src/lib/openTypeFeatures'
+import {
+  createCompilerRuntimeStatus,
+  deriveOpenTypeExportWarnings,
+} from 'src/lib/openTypeFeatures'
+import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 
 interface ExportPolicyControlProps {
+  diagnostics: FeatureDiagnostic[]
   state: OpenTypeFeaturesState
   onChange: (policy: ExportPolicy) => void
 }
@@ -24,13 +34,37 @@ const POLICY_LABELS: Record<ExportPolicy, string> = {
   'drop-unsupported-and-rebuild': 'Drop unsupported and rebuild',
 }
 
+type AlertStatus = 'error' | 'warning' | 'info'
+
+const getAlertStatus = (
+  severity: OpenTypeExportWarning['severity']
+): AlertStatus => {
+  if (severity === 'error') {
+    return 'error'
+  }
+
+  if (severity === 'warning') {
+    return 'warning'
+  }
+
+  return 'info'
+}
+
 export function ExportPolicyControl({
+  diagnostics,
   state,
   onChange,
 }: ExportPolicyControlProps) {
   const { t } = useTranslation()
-
-  const warnings = getExportPolicyWarnings(state)
+  const compilerRuntimeStatus = useMemo(() => createCompilerRuntimeStatus(), [])
+  const warnings = useMemo(
+    () =>
+      deriveOpenTypeExportWarnings(state, {
+        compilerRuntimeStatus,
+        diagnostics,
+      }),
+    [compilerRuntimeStatus, diagnostics, state]
+  )
 
   return (
     <Stack spacing={3}>
@@ -53,45 +87,33 @@ export function ExportPolicyControl({
         {t('projectControl.exportBehaviorIsExplicitBecauseCompiling')}
       </Text>
       {warnings.map((warning) => (
-        <Alert key={warning} status="warning" borderRadius="sm">
-          <AlertDescription fontSize="sm">{warning}</AlertDescription>
+        <Alert
+          key={warning.id}
+          status={getAlertStatus(warning.severity)}
+          alignItems="flex-start"
+          borderRadius="sm"
+        >
+          <AlertIcon mt={1} />
+          <Stack spacing={0}>
+            <AlertTitle fontSize="sm">{warning.title}</AlertTitle>
+            <AlertDescription fontSize="sm">{warning.message}</AlertDescription>
+            {warning.details && warning.details.length > 0 && (
+              <Stack as="ul" spacing={1} mt={2} pl={4}>
+                {warning.details.slice(0, 8).map((detail) => (
+                  <Text key={detail} as="li" fontSize="sm">
+                    {detail}
+                  </Text>
+                ))}
+                {warning.details.length > 8 && (
+                  <Text as="li" fontSize="sm">
+                    +{warning.details.length - 8} more
+                  </Text>
+                )}
+              </Stack>
+            )}
+          </Stack>
         </Alert>
       ))}
     </Stack>
   )
-}
-
-function getExportPolicyWarnings(state: OpenTypeFeaturesState) {
-  const warnings: string[] = []
-  const hasEditableState = state.features.length > 0 || state.lookups.length > 0
-  const hasUnsupportedLookups = state.unsupportedLookups.length > 0
-
-  if (
-    state.exportPolicy === 'rebuild-managed-layout-tables' &&
-    hasUnsupportedLookups
-  ) {
-    warnings.push(
-      'Some imported OpenType lookups are not editable or not representable. Rebuilding layout tables may remove them.'
-    )
-  }
-
-  if (
-    state.exportPolicy === 'preserve-compiled-layout-tables' &&
-    hasEditableState
-  ) {
-    warnings.push(
-      'Compiled OpenType layout tables will be preserved. Current feature edits will not be included in the exported font.'
-    )
-  }
-
-  if (
-    state.exportPolicy === 'drop-unsupported-and-rebuild' &&
-    hasUnsupportedLookups
-  ) {
-    warnings.push(
-      'Unsupported imported lookups are marked to be removed when layout tables are rebuilt.'
-    )
-  }
-
-  return warnings
 }

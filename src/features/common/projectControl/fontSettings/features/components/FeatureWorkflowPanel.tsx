@@ -51,7 +51,11 @@ export function FeatureWorkflowPanel({
 
       <ImportExportOverview state={state} />
       <Divider />
-      <ExportPolicyControl state={state} onChange={onExportPolicyChange} />
+      <ExportPolicyControl
+        diagnostics={diagnostics}
+        state={state}
+        onChange={onExportPolicyChange}
+      />
       <Divider />
       <AutoFeatureSuggestions
         suggestions={suggestions}
