@@ -6,10 +6,9 @@ import type {
   Rule,
   ValueRecord,
 } from 'src/lib/openTypeFeatures/types'
+import { parseSubstitutionRules } from 'src/lib/openTypeFeatures/rawFeatureSubstitutionParser'
 import {
-  glyphsFromRawClassToken,
   glyphsFromRawSelectorToken,
-  isInlineGlyphClassToken,
   selectorFromRawMarkedToken,
   selectorFromRawToken,
   splitCommaSeparatedContexts,
@@ -18,10 +17,7 @@ import {
   type InlineGlyphClassRegistrar,
   type RawSelectorContext,
 } from 'src/lib/openTypeFeatures/rawFeatureSelectorParser'
-import {
-  splitGlyphList,
-  splitStatements,
-} from 'src/lib/openTypeFeatures/rawFeatureTextUtils'
+import { splitStatements } from 'src/lib/openTypeFeatures/rawFeatureTextUtils'
 
 export interface ParsedLookupStatements {
   rules: Rule[]
@@ -459,147 +455,6 @@ const parseContextualPositioningRules = (
   return rules.every((rule): rule is Rule => Boolean(rule)) ? rules : null
 }
 
-const parseSubstitutionRule = (
-  statement: string,
-  ruleId: string,
-  origin: FeatureOrigin,
-  glyphClassIdByName: Map<string, string>,
-  glyphClassGlyphsByName: Map<string, string[]>,
-  registerInlineGlyphClass?: InlineGlyphClassRegistrar
-): Rule[] | null => {
-  const selectorContext = makeSelectorContext(
-    glyphClassIdByName,
-    glyphClassGlyphsByName,
-    registerInlineGlyphClass
-  )
-  const alternateMatch = matchSubstitutionStatement(
-    statement,
-    '(\\S+)\\s+from\\s+\\[([^\\]]+)\\]'
-  )
-  if (alternateMatch) {
-    const target = alternateMatch[1]
-    const alternates = splitGlyphList(alternateMatch[2])
-    if (
-      target.startsWith('@') ||
-      target.includes("'") ||
-      alternates.length === 0 ||
-      alternates.some((glyph) => glyph.startsWith('@') || glyph.includes("'"))
-    ) {
-      return null
-    }
-
-    return [
-      {
-        id: ruleId,
-        kind: 'alternateSubstitution',
-        target,
-        alternates,
-        meta: makeRuleMeta(origin, 'GSUB'),
-      },
-    ]
-  }
-
-  const match = matchSubstitutionStatement(statement, '(.+?)\\s+by\\s+(.+)')
-  if (!match) return null
-
-  const pattern = splitGlyphPatternTokens(match[1])
-  const replacement = splitGlyphPatternTokens(match[2])
-  if (
-    !pattern ||
-    !replacement ||
-    pattern.length === 0 ||
-    replacement.length === 0 ||
-    replacement.some((glyph) => glyph.includes("'"))
-  ) {
-    return null
-  }
-
-  const classTargetGlyphs =
-    pattern.length === 1
-      ? glyphsFromRawClassToken(pattern[0], selectorContext)
-      : null
-  const classReplacementGlyphs =
-    replacement.length === 1
-      ? glyphsFromRawClassToken(replacement[0], selectorContext)
-      : null
-  if (classTargetGlyphs || classReplacementGlyphs) {
-    if (
-      !classTargetGlyphs ||
-      !classReplacementGlyphs ||
-      classTargetGlyphs.length !== classReplacementGlyphs.length
-    ) {
-      return null
-    }
-
-    return classTargetGlyphs.map((glyph, index) => ({
-      id: classTargetGlyphs.length === 1 ? ruleId : `${ruleId}_${index}`,
-      kind: 'singleSubstitution',
-      target: { kind: 'glyph', glyph },
-      replacement: classReplacementGlyphs[index],
-      meta: makeRuleMeta(origin, 'GSUB'),
-    }))
-  }
-
-  if (
-    replacement.some(
-      (glyph) => glyph.startsWith('@') || isInlineGlyphClassToken(glyph)
-    )
-  ) {
-    return null
-  }
-
-  if (pattern.length === 1) {
-    const target = selectorFromRawToken(pattern[0], selectorContext)
-    if (!target) return null
-
-    if (replacement.length === 1) {
-      return [
-        {
-          id: ruleId,
-          kind: 'singleSubstitution',
-          target,
-          replacement: replacement[0],
-          meta: makeRuleMeta(origin, 'GSUB'),
-        },
-      ]
-    }
-
-    return target.kind === 'glyph'
-      ? [
-          {
-            id: ruleId,
-            kind: 'multipleSubstitution',
-            target: target.glyph,
-            replacement,
-            meta: makeRuleMeta(origin, 'GSUB'),
-          },
-        ]
-      : null
-  }
-
-  if (
-    replacement.length !== 1 ||
-    pattern.some(
-      (token) =>
-        token.startsWith('@') ||
-        token.includes("'") ||
-        isInlineGlyphClassToken(token)
-    )
-  ) {
-    return null
-  }
-
-  return [
-    {
-      id: ruleId,
-      kind: 'ligatureSubstitution',
-      components: pattern,
-      replacement: replacement[0],
-      meta: makeRuleMeta(origin, 'GSUB'),
-    },
-  ]
-}
-
 const parseMarkPositioningRule = (
   statement: string,
   ruleId: string,
@@ -933,7 +788,7 @@ export const parseLookupStatements = (
         glyphClassGlyphsByName,
         registerInlineGlyphClass
       )
-    const substitutionRules = parseSubstitutionRule(
+    const substitutionRules = parseSubstitutionRules(
       statement,
       ruleId,
       origin,
