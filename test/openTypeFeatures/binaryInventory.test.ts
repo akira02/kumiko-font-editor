@@ -138,6 +138,66 @@ const makeGposTable = (
   return bytes
 }
 
+const makeGposTableWithSubtables = (
+  featureTag: string,
+  lookupType: number,
+  subtables: Uint8Array[]
+) => {
+  const lookupOffset = 48
+  const lookupHeaderLength = 6 + subtables.length * 2
+  const subtableStart = lookupOffset + lookupHeaderLength
+  const tableLength =
+    subtableStart +
+    subtables.reduce((total, subtable) => total + subtable.byteLength, 0)
+  const bytes = makeBytes(tableLength, (view) => {
+    writeUint16(view, 0, 1)
+    writeUint16(view, 2, 0)
+    writeUint16(view, 4, 10)
+    writeUint16(view, 6, 30)
+    writeUint16(view, 8, 44)
+
+    writeUint16(view, 10, 1)
+    writeTag(view, 12, 'latn')
+    writeUint16(view, 16, 8)
+
+    writeUint16(view, 18, 4)
+    writeUint16(view, 20, 0)
+
+    writeUint16(view, 22, 0)
+    writeUint16(view, 24, 0xffff)
+    writeUint16(view, 26, 1)
+    writeUint16(view, 28, 0)
+
+    writeUint16(view, 30, 1)
+    writeTag(view, 32, featureTag)
+    writeUint16(view, 36, 8)
+
+    writeUint16(view, 38, 0)
+    writeUint16(view, 40, 1)
+    writeUint16(view, 42, 0)
+
+    writeUint16(view, 44, 1)
+    writeUint16(view, 46, 4)
+
+    writeUint16(view, lookupOffset, lookupType)
+    writeUint16(view, lookupOffset + 2, 0)
+    writeUint16(view, lookupOffset + 4, subtables.length)
+
+    let cursor = lookupHeaderLength
+    subtables.forEach((subtable, index) => {
+      writeUint16(view, lookupOffset + 6 + index * 2, cursor)
+      cursor += subtable.byteLength
+    })
+  })
+
+  let cursor = subtableStart
+  subtables.forEach((subtable) => {
+    bytes.set(subtable, cursor)
+    cursor += subtable.byteLength
+  })
+  return bytes
+}
+
 const makeSingleSubstitutionSubtable = () =>
   makeBytes(14, (view) => {
     writeUint16(view, 0, 2)
@@ -323,6 +383,11 @@ const makePairPositioningSubtable = () =>
     writeUint16(view, 20, 1)
     writeUint16(view, 22, 2)
     writeUint16(view, 24, 0xffb0)
+  })
+
+const makeUnsupportedPositioningSubtable = () =>
+  makeBytes(2, (view) => {
+    writeUint16(view, 0, 3)
   })
 
 const makeDummyTable = (length = 4) => new Uint8Array(length)
@@ -878,6 +943,69 @@ describe('SFNT binary inventory', () => {
         ],
       },
     ])
+  })
+
+  it('preserves partially reconstructed GPOS lookups as unsupported', () => {
+    const state = extractBinaryFeatures(
+      makeSfnt([
+        {
+          tag: 'GPOS',
+          data: makeGposTableWithSubtables('mark', 1, [
+            makeSinglePositioningSubtable(),
+            makeUnsupportedPositioningSubtable(),
+          ]),
+        },
+      ]),
+      null,
+      ['.notdef', 'acutecomb']
+    )
+
+    expect(state.lookups).toMatchObject([
+      {
+        id: 'lookup_gpos_0',
+        lookupType: 'singlePos',
+        editable: false,
+        origin: 'unsupported',
+        rules: [],
+      },
+    ])
+    expect(state.unsupportedLookups).toMatchObject([
+      {
+        id: 'unsupported_gpos_0',
+        table: 'GPOS',
+        lookupIndex: 0,
+        lookupType: 1,
+        subtableFormats: [1, 3],
+        reason:
+          'One or more GPOS subtables could not be reconstructed as editable rules.',
+        preserveMode: 'preserve-if-unchanged',
+      },
+    ])
+    expect(state.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'feature-diagnostic-warning-gpos-parser-lookup-0-subtable-1-unsupported',
+          severity: 'warning',
+          target: { kind: 'lookup', lookupId: 'lookup_gpos_0' },
+        }),
+      ])
+    )
+    expect(state.sourceSections[0]).toMatchObject({
+      id: 'source_compiled_gpos',
+      status: 'inventoried',
+      preservationPolicy: 'preserve-if-unchanged',
+    })
+    expect(state.sourceSections[0]?.recordRefs).toEqual(
+      expect.arrayContaining([
+        { kind: 'lookup', id: 'lookup_gpos_0', table: 'GPOS' },
+        { kind: 'unsupportedLookup', id: 'unsupported_gpos_0', table: 'GPOS' },
+        {
+          kind: 'diagnostic',
+          id: 'feature-diagnostic-warning-gpos-parser-lookup-0-subtable-1-unsupported',
+          table: 'GPOS',
+        },
+      ])
+    )
   })
 
   it('extracts editable GPOS PairPos glyph-pair rules from straightforward subtables', () => {

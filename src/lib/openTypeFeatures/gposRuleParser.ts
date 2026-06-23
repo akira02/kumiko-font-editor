@@ -1173,7 +1173,14 @@ export const parseGposLookupRules = (
           lookupId
         )
       )
-      continue
+      return {
+        rules,
+        diagnostics,
+        unsupportedReason:
+          'One or more GPOS subtables could not be reconstructed as editable rules.',
+        glyphClasses: Array.from(glyphClasses.values()),
+        markClasses: Array.from(markClasses.values()),
+      }
     }
 
     rules.push(...parsedSubtable.rules)
@@ -1188,10 +1195,6 @@ export const parseGposLookupRules = (
   return {
     rules,
     diagnostics,
-    unsupportedReason:
-      rules.length === 0 && diagnostics.length > 0
-        ? 'No GPOS subtables could be reconstructed as editable rules.'
-        : undefined,
     glyphClasses: Array.from(glyphClasses.values()),
     markClasses: Array.from(markClasses.values()),
   }
