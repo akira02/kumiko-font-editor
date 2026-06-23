@@ -11,6 +11,7 @@ import {
 import { glyphDataToKumikoGlyphRecord } from 'src/lib/project/kumikoFontDataAdapter'
 import { getGlyphLayer } from 'src/store/glyphLayer'
 import { getGlyphDisplayCharacter } from 'src/lib/glyph/glyphOverview'
+import { GLYPHS_LABEL_COLORS } from 'src/lib/color/kumikoColor'
 
 const G2 = `{
 familyName = "TestFamily";
@@ -185,7 +186,7 @@ describe('buildFontDataFromGlyphsDocument (Glyphs 2)', () => {
       rightMetricsKey: 'O',
       customData: { reviewed: 1 },
       sourceData: { glyphs: { fields: { script: 'latin', color: 4 } } },
-      color: [0.18, 0.55, 0.85, 1],
+      color: GLYPHS_LABEL_COLORS[4],
     })
     expect(m01).toMatchObject({
       locked: true,
@@ -212,7 +213,7 @@ describe('buildFontDataFromGlyphsDocument (Glyphs 2)', () => {
         ],
       },
       hints: [{ type: 'stem', horizontal: 1, position: 120, width: 20 }],
-      color: [0.3, 0.69, 0.31, 1],
+      color: GLYPHS_LABEL_COLORS[3],
       customData: { layerFlag: 1 },
       sourceData: { glyphs: { fields: { color: 3 } } },
     })

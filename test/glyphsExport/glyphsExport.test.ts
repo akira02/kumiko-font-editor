@@ -13,6 +13,7 @@ import { createGlyphsPackageDataFromFontData } from 'src/lib/fontFormats/glyphsP
 import type { GlyphsDocument } from 'src/lib/fontFormats/glyphsDocument'
 import { saveProjectDraft } from 'src/lib/project/projectRepository'
 import type { FontData, GlyphData } from 'src/store'
+import { GLYPHS_LABEL_COLORS } from 'src/lib/color/kumikoColor'
 
 const glyph = (id: string, name: string, unicode: string | null): GlyphData =>
   ({
@@ -336,7 +337,7 @@ describe('serializeGlyphsFileToBlob glyph matching', () => {
           note: 'Needs review',
           leftMetricsKey: 'H',
           rightMetricsKey: 'O',
-          color: [0.18, 0.55, 0.85, 1],
+          color: GLYPHS_LABEL_COLORS[7],
           customData: { reviewed: 1 },
           sourceData: { glyphs: { fields: { script: 'latin' } } },
           layers: {
@@ -346,7 +347,7 @@ describe('serializeGlyphsFileToBlob glyph matching', () => {
               associatedMasterId: 'M1',
               locked: true,
               visible: false,
-              color: [0.3, 0.69, 0.31, 1],
+              color: GLYPHS_LABEL_COLORS[3],
               image: {
                 fileName: 'Images/A.png',
                 xScale: 1,
@@ -409,7 +410,7 @@ describe('serializeGlyphsFileToBlob glyph matching', () => {
     expect(text).toContain('leftMetricsKey = H')
     expect(text).toContain('rightMetricsKey = O')
     expect(text).toContain('script = latin')
-    expect(text).toContain('color = 4')
+    expect(text).toContain('color = 7')
     expect(text).toContain('userData = {')
     expect(text).toContain('reviewed = 1')
     expect(text).toContain('locked = 1')
