@@ -7,6 +7,7 @@ const makeReason = (overrides: Partial<RadarReason>): RadarReason => ({
   label: '頂部樹枝筆畫邊距',
   dimension: 'boundary',
   format: 'units',
+  basis: 'peers',
   value: 153,
   median: 80,
   p10: 60,
@@ -60,5 +61,25 @@ describe('buildRadarAdvice', () => {
     // 建議平移量 = (80 − 0) / 2
     expect(advice.action).toContain('往左')
     expect(advice.action).toContain('40')
+  })
+
+  it('names reference-adjusted expectations in balance advice', () => {
+    const advice = buildRadarAdvice(
+      makeReason({
+        key: 'balance:centroidY',
+        label: '重心垂直偏移',
+        dimension: 'balance',
+        format: 'percent',
+        basis: 'reference',
+        value: -0.13,
+        median: -0.09,
+        p10: -0.1,
+        p90: -0.08,
+        zScore: -2.7,
+      })
+    )
+    expect(advice.title).toContain('參考結構校正值')
+    expect(advice.title).toContain('偏低')
+    expect(advice.detail).toContain('-10.0%–-8.0%')
   })
 })

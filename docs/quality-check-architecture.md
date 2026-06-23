@@ -39,9 +39,9 @@
 - 左右框架字看似對稱，實際 lsb 和 rsb 不平衡。
 - 單字灰度比其他字黑或淡，排在文字裡會跳出來。
 
-## 三把尺
+## 四把尺
 
-品質建議同時使用三把尺。它們各自回答不同問題。
+品質建議同時使用四把尺。它們各自回答不同問題。
 
 ### 固定尺字組
 
@@ -92,6 +92,28 @@ glyphComplexity = sqrt(inkArea) / unitsPerEm
 - 字位於排序端點、缺乏真正同儕時，會用 peer-mismatch 折扣收縮 z-score。
 
 這把尺解決的是延伸性問題：例如「冒」可以比「二」更高，但如果同樣複雜度的字都在某個高度範圍內，單一字太高或太低仍值得檢查。
+
+### 參考結構 residual 尺
+
+參考字體尺回答的是「這個 Unicode 字本身，在成熟字體裡通常會相對同儕偏多少」。它不是把 Noto 或任何參考字體當成絕對形狀，也不是要求目前字體長得像參考字體。它只取一個相對值：
+
+```ts
+referenceResidual = referenceGlyphFeature - referencePeerMedian
+expectedFeature = currentPeerMedian + referenceResidual * confidence
+```
+
+也就是說，參考字體只提供「這個字相對同儕的自然偏移」。目前字體自己的整體風格仍由 `currentPeerMedian` 決定。
+
+例如「人」如果在參考資料中比同複雜度字的視覺重心自然低 4% UPM，而目前這套字的同儕重心本來就整體偏低 5% UPM，系統會把「人」的期待重心放在約 -9% UPM。若設計師正在做一套重心偏低的字體，這個設計方向會被同儕尺吸收；「人」不會只因為低於幾何中央就全部被警告。只有當「人」比「目前字體風格 + 參考結構偏移」還要更低時，才會顯示重心偏低的建議。
+
+第一版資料介面是 `RadarReferenceData`。它支援逐字、逐 feature 的 residual，並可用 `confidence` 降低參考字體風格對目前設計的影響。目前演算法先支援這些 feature：
+
+- `face:widthRatio`
+- `face:heightRatio`
+- `balance:centroidX`
+- `balance:centroidY`
+
+若某個字或 feature 沒有 reference residual，系統會直接退回固定尺或複雜度同儕尺。這個版本先把 scoring path 和資料介面接好；實際 Noto residual dataset 應該離線預先計算後載入，避免在編輯頁即時計算整套參考字體。
 
 ## 幾何怎麼取樣
 
@@ -153,8 +175,9 @@ bearing 的座標定義：
 每個 feature 會先找可用的比較尺：
 
 - boundary 和 `face:*` 若有固定尺統計，優先使用 `rulerStatsByKey`，且每個 feature/cohort 至少 5 個樣本才成立。
-- 沒有固定尺統計時，使用複雜度同儕視窗，且每個 feature/cohort 至少 20 個樣本才成立。
-- 墨量、密度、重心永遠使用複雜度同儕視窗。
+- 沒有固定尺統計時，先找複雜度同儕視窗，且每個 feature/cohort 至少 20 個樣本才成立。
+- `face:widthRatio`、`face:heightRatio`、`balance:centroidX`、`balance:centroidY` 若同時有同儕統計與 reference residual，會把同儕統計整體平移成該字的結構期待值，並把 `basis` 標成 `reference`。
+- 墨量、密度和其他未支援 reference 的 feature 使用複雜度同儕視窗。
 
 統計使用 robust median / MAD，並針對偏態分布使用 double-MAD：高於 median 與低於 median 各自有尺度。這是因為邊距分布常常不是對稱鐘形分布，單一尺度會高估長尾側、低估短尾側。
 
@@ -164,7 +187,7 @@ bearing 的座標定義：
 - `|z| >= 2.5` 才計入維度離群。
 - 單一 feature 的 `|z|` 封頂為 8，避免極端字以天文數字霸佔排序。
 - 同一維度多個 feature 只取最大偏離計分，避免「字面偏小」同時疊加邊距、比例、密度造成重複懲罰。
-- `RadarReason.basis` 會標記建議來自 `ruler` 或 `peers`，UI 文案會顯示「固定尺字組」或「複雜度相近的字」。
+- `RadarReason.basis` 會標記建議來自 `ruler`、`peers` 或 `reference`，UI 文案會顯示「固定尺字組」、「複雜度相近的字」或「參考結構校正值」。
 
 `radarAdvice.ts` 再把工程向 reason 翻成設計師可讀的語句，例如：
 

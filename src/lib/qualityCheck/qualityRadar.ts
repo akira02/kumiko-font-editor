@@ -61,8 +61,8 @@ export interface RadarReason {
   label: string
   dimension: RadarDimension
   format: RadarValueFormat
-  /** 這項建議使用的尺：固定參照字組或複雜度相近母體 */
-  basis: 'ruler' | 'peers'
+  /** 這項建議使用的尺：固定參照字組、複雜度相近母體、或參考字體 residual 校正 */
+  basis: RadarBasis
   value: number
   /** 比較母體（複雜度相鄰視窗）的中位數與 80% 區間 */
   median: number
@@ -78,6 +78,36 @@ export interface RadarGlyphEvaluation {
   /** 各維度最大偏離的平方和；0 表示完全落在群體內 */
   score: number
   reasons: RadarReason[]
+}
+
+export type RadarBasis = 'ruler' | 'peers' | 'reference'
+
+export type RadarReferenceFeatureKey =
+  | 'face:widthRatio'
+  | 'face:heightRatio'
+  | 'balance:centroidX'
+  | 'balance:centroidY'
+
+export interface RadarReferenceResidual {
+  /** 參考字體中「此字 − 參考同儕 median」的相對偏移，單位同 feature value */
+  value: number
+  /** 0–1；用來降低參考字體風格對目前字體的影響，未指定時用 dataset default */
+  confidence?: number
+}
+
+export type RadarReferenceResidualInput = number | RadarReferenceResidual
+
+export interface RadarReferenceData {
+  /** 顯示/除錯用，例如 Noto Sans CJK Regular */
+  source?: string
+  /** 未逐字指定 confidence 時使用；未指定表示完整套用 residual */
+  defaultConfidence?: number
+  residualsByCharacter: Partial<
+    Record<
+      string,
+      Partial<Record<RadarReferenceFeatureKey, RadarReferenceResidualInput>>
+    >
+  >
 }
 
 export interface RadarDimensionScore {
@@ -113,6 +143,8 @@ export interface RadarAnalysis {
   strata: RadarStrata
   /** 由固定尺字組推導出的外框特徵統計，用來穩定邊界/字面比例建議 */
   rulerStatsByKey: Map<string, RadarRobustStat>
+  /** 參考字體 residual 資料；用來把目前字體同儕 median 平移到該字的結構期待值 */
+  referenceData: RadarReferenceData | null
   /** 母體中被 GlyphWiki 組成資料判定為包圍結構的字（即時評分路徑沿用同一分類） */
   enclosureCharacters: Set<string>
   dimensionScores: RadarDimensionScore[]
@@ -151,6 +183,13 @@ const MAD_TO_SIGMA = 1.4826
 const IQR_TO_SIGMA = 1 / 1.349
 
 const STRUCTURE_SIDES: StructureSide[] = ['left', 'right', 'top', 'bottom']
+
+const REFERENCE_FEATURE_KEYS = new Set<RadarReferenceFeatureKey>([
+  'face:widthRatio',
+  'face:heightRatio',
+  'balance:centroidX',
+  'balance:centroidY',
+])
 
 const collectGlyphFeatures = (
   sample: GlyphGeometrySample,
@@ -395,6 +434,45 @@ const isRulerFeature = (feature: RadarFeatureValue) =>
   feature.key === 'face:heightRatio' ||
   feature.key === 'face:aspect'
 
+const isReferenceFeature = (
+  feature: RadarFeatureValue
+): feature is RadarFeatureValue & { key: RadarReferenceFeatureKey } =>
+  REFERENCE_FEATURE_KEYS.has(feature.key as RadarReferenceFeatureKey)
+
+const clamp01 = (value: number) => Math.min(1, Math.max(0, value))
+
+const referenceResidualValue = (
+  referenceData: RadarReferenceData | null | undefined,
+  character: string,
+  feature: RadarFeatureValue
+): number | null => {
+  if (!referenceData || !isReferenceFeature(feature)) {
+    return null
+  }
+  const entry = referenceData.residualsByCharacter[character]?.[feature.key]
+  if (entry === undefined) {
+    return null
+  }
+  if (typeof entry === 'number') {
+    const confidence = clamp01(referenceData.defaultConfidence ?? 1)
+    return entry * confidence
+  }
+  const confidence = clamp01(
+    entry.confidence ?? referenceData.defaultConfidence ?? 1
+  )
+  return entry.value * confidence
+}
+
+const shiftStat = (
+  stat: RadarRobustStat,
+  medianShift: number
+): RadarRobustStat => ({
+  ...stat,
+  median: stat.median + medianShift,
+  p10: stat.p10 + medianShift,
+  p90: stat.p90 + medianShift,
+})
+
 const buildRulerStats = (
   glyphFeatures: GlyphFeatureEntry[]
 ): Map<string, RadarRobustStat> => {
@@ -523,10 +601,12 @@ interface FeatureEvaluation {
 }
 
 const evaluateFeatures = (
+  sample: GlyphGeometrySample,
   features: RadarFeatureValue[],
   complexity: number,
   strata: RadarStrata,
-  rulerStatsByKey: Map<string, RadarRobustStat>
+  rulerStatsByKey: Map<string, RadarRobustStat>,
+  referenceData: RadarReferenceData | null
 ): FeatureEvaluation => {
   const reasons: RadarReason[] = []
   const outlierDimensions = new Set<RadarDimension>()
@@ -549,8 +629,20 @@ const evaluateFeatures = (
     const rulerStat = isRulerFeature(feature)
       ? rulerStatsByKey.get(statKey)
       : undefined
-    const basis = rulerStat ? 'ruler' : 'peers'
-    const stat = rulerStat ?? window.statsByKey.get(statKey)
+    const peerStat = window.statsByKey.get(statKey)
+    const referenceResidual =
+      rulerStat || !peerStat
+        ? null
+        : referenceResidualValue(referenceData, sample.character, feature)
+    let basis: RadarBasis = 'peers'
+    let stat: RadarRobustStat | undefined = peerStat
+    if (rulerStat) {
+      basis = 'ruler'
+      stat = rulerStat
+    } else if (referenceResidual !== null && peerStat) {
+      basis = 'reference'
+      stat = shiftStat(peerStat, referenceResidual)
+    }
     if (!stat) {
       continue
     }
@@ -597,13 +689,14 @@ export const evaluateSampleAgainstRadar = (
   sample: GlyphGeometrySample,
   radar: Pick<
     RadarAnalysis,
-    'strata' | 'enclosureCharacters' | 'rulerStatsByKey'
+    'strata' | 'enclosureCharacters' | 'rulerStatsByKey' | 'referenceData'
   >,
   bodyBox: { top: number; bottom: number; unitsPerEm: number }
 ): RadarGlyphEvaluation => {
   const unitsPerEm = bodyBox.unitsPerEm
   const bodyCenterY = (bodyBox.top + bodyBox.bottom) / 2
   const { score, reasons } = evaluateFeatures(
+    sample,
     collectGlyphFeatures(
       sample,
       unitsPerEm,
@@ -612,7 +705,8 @@ export const evaluateSampleAgainstRadar = (
     ),
     glyphComplexity(sample, unitsPerEm),
     radar.strata,
-    radar.rulerStatsByKey
+    radar.rulerStatsByKey,
+    radar.referenceData
   )
   return {
     glyphId: sample.glyphId,
@@ -630,7 +724,8 @@ export const evaluateSampleAgainstRadar = (
 export const computeRadarFromSamples = (
   samples: GlyphGeometrySample[],
   bodyBox: { top: number; bottom: number; unitsPerEm: number },
-  semanticEnclosureChars?: ReadonlySet<string>
+  semanticEnclosureChars?: ReadonlySet<string>,
+  referenceData?: RadarReferenceData | null
 ): RadarAnalysis | null => {
   if (samples.length < MIN_RADAR_SAMPLES) {
     return null
@@ -671,10 +766,12 @@ export const computeRadarFromSamples = (
 
   for (const entry of glyphFeatures) {
     const { score, reasons, outlierDimensions } = evaluateFeatures(
+      entry.sample,
       entry.features,
       entry.complexity,
       strata,
-      rulerStatsByKey
+      rulerStatsByKey,
+      referenceData ?? null
     )
     for (const dimension of outlierDimensions) {
       dimensionOutliers[dimension] += 1
@@ -707,6 +804,7 @@ export const computeRadarFromSamples = (
     sampleCount,
     strata,
     rulerStatsByKey,
+    referenceData: referenceData ?? null,
     enclosureCharacters,
     dimensionScores,
     overallScore,

@@ -37,6 +37,18 @@ const BEARING_ACTIONS: Record<StructureSide, [string, string]> = {
 const formatDelta = (reason: RadarReason) =>
   formatRadarValue(Math.abs(reason.value - reason.median), reason.format)
 
+const basisLabel = (reason: RadarReason) =>
+  reason.basis === 'ruler'
+    ? '固定尺字組'
+    : reason.basis === 'reference'
+      ? '參考結構校正值'
+      : '複雜度相近的字'
+
+const basisPrefix = (reason: RadarReason) =>
+  reason.basis === 'reference'
+    ? '以參考結構校正後來看'
+    : `以${basisLabel(reason)}來看`
+
 const describeBody = (
   reason: RadarReason
 ): Pick<RadarAdvice, 'title' | 'action'> => {
@@ -60,7 +72,7 @@ const describeBody = (
   if (reason.key.startsWith('bearing:')) {
     const side = reason.key.split(':')[1] as StructureSide
     return {
-      title: `${sideLabels[side]}留白比複雜度相近的字${high ? '多' : '少'}`,
+      title: `${sideLabels[side]}留白比${basisLabel(reason)}${high ? '多' : '少'}`,
       action: `${BEARING_ACTIONS[side][high ? 0 : 1]}約 ${delta}`,
     }
   }
@@ -68,12 +80,12 @@ const describeBody = (
   switch (reason.key) {
     case 'face:widthRatio':
       return {
-        title: `以複雜度相近的字來看，字面偏${high ? '寬' : '窄'}`,
+        title: `${basisPrefix(reason)}，字面偏${high ? '寬' : '窄'}`,
         action: `將字面寬度${high ? '收窄' : '拉寬'}約 ${delta}`,
       }
     case 'face:heightRatio':
       return {
-        title: `以複雜度相近的字來看，字面偏${high ? '高' : '矮'}`,
+        title: `${basisPrefix(reason)}，字面偏${high ? '高' : '矮'}`,
         action: `將字面高度${high ? '壓低' : '加高'}約 ${delta}`,
       }
     case 'face:aspect':
@@ -99,12 +111,12 @@ const describeBody = (
       }
     case 'balance:centroidX':
       return {
-        title: `視覺重心偏${high ? '右' : '左'}，字看起來會往${high ? '右' : '左'}倒`,
+        title: `視覺重心比${basisLabel(reason)}偏${high ? '右' : '左'}，字看起來會往${high ? '右' : '左'}倒`,
         action: `將整體往${high ? '左' : '右'}移，或加強${high ? '左' : '右'}半部筆畫`,
       }
     case 'balance:centroidY':
       return {
-        title: `視覺重心偏${high ? '高' : '低'}，字看起來會${high ? '頭重腳輕' : '下墜'}`,
+        title: `視覺重心比${basisLabel(reason)}偏${high ? '高' : '低'}，字看起來會${high ? '頭重腳輕' : '下墜'}`,
         action: `將整體往${high ? '下' : '上'}調整重量分布`,
       }
     default:
@@ -113,7 +125,7 @@ const describeBody = (
 }
 
 const describeRange = (reason: RadarReason) =>
-  `目前 ${formatRadarValue(reason.value, reason.format)}，${reason.basis === 'ruler' ? '固定尺字組' : '複雜度相近的字'}常見 ${formatRadarValue(reason.p10, reason.format)}–${formatRadarValue(reason.p90, reason.format)}`
+  `目前 ${formatRadarValue(reason.value, reason.format)}，${basisLabel(reason)}常見 ${formatRadarValue(reason.p10, reason.format)}–${formatRadarValue(reason.p90, reason.format)}`
 
 export const buildRadarAdvice = (reason: RadarReason): RadarAdvice => {
   const { title, action } = describeBody(reason)

@@ -33,6 +33,12 @@ const createOverviewCustomFilterId = () => {
     .slice(2, 8)}`
 }
 
+const uniqueGlyphIds = (ids: string[]) => [...new Set(ids)]
+
+const areStringArraysEqual = (left: string[], right: string[]) =>
+  left.length === right.length &&
+  left.every((value, index) => value === right[index])
+
 export const buildUiActions = (set: ImmerSet) => ({
   setSearchQuery: (query: string) =>
     set((state) => {
@@ -331,6 +337,17 @@ export const buildUiActions = (set: ImmerSet) => ({
       if (segment) {
         state.selectedNodeIds = []
       }
+    }),
+
+  setEditorReferenceGlyphIds: (ids: string[]) =>
+    set((state) => {
+      const nextIds = uniqueGlyphIds(ids).filter((id) =>
+        Boolean(state.fontData?.glyphs[id])
+      )
+      if (areStringArraysEqual(state.editorReferenceGlyphIds, nextIds)) {
+        return
+      }
+      state.editorReferenceGlyphIds = nextIds
     }),
 
   updateViewport: (zoom: number, panX: number, panY: number) =>

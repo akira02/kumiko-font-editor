@@ -12,6 +12,7 @@ import {
 } from 'src/lib/qualityCheck/structureRuler'
 import {
   computeRadarFromSamples,
+  type RadarReferenceData,
   type RadarAnalysis,
 } from 'src/lib/qualityCheck/qualityRadar'
 
@@ -28,7 +29,8 @@ export interface PopulationAnalysis {
 
 export const runPopulationAnalysis = (
   resolvedFont: ResolvedFont,
-  semanticEnclosureChars?: ReadonlySet<string>
+  semanticEnclosureChars?: ReadonlySet<string>,
+  referenceData?: RadarReferenceData | null
 ): PopulationAnalysis => {
   const samples = buildFontGeometrySamples(resolvedFont)
   const ruler = buildStructureRuler(samples, resolvedFont.bodyBox)
@@ -38,7 +40,8 @@ export const runPopulationAnalysis = (
     radar: computeRadarFromSamples(
       samples,
       resolvedFont.bodyBox,
-      semanticEnclosureChars
+      semanticEnclosureChars,
+      referenceData
     ),
   }
 }
@@ -49,13 +52,15 @@ export const runPopulationAnalysis = (
  */
 export const analyzeFontPopulation = (
   fontData: FontData | null | undefined,
-  semanticEnclosureChars?: ReadonlySet<string>
+  semanticEnclosureChars?: ReadonlySet<string>,
+  referenceData?: RadarReferenceData | null
 ): PopulationAnalysis => {
   if (!fontData) {
     return { baseline: null, ruler: null, radar: null }
   }
   return runPopulationAnalysis(
     resolveFontGlyphs(fontData),
-    semanticEnclosureChars
+    semanticEnclosureChars,
+    referenceData
   )
 }

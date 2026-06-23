@@ -237,7 +237,8 @@ const makeStratumSample = (
   faceWidth: number,
   inkArea: number,
   jitter: number,
-  sideType: 'framing' | 'branching' = 'branching'
+  sideType: 'framing' | 'branching' = 'branching',
+  centroidY = 380
 ): GlyphGeometrySample => {
   const advance = 1000
   const xMin = (advance - faceWidth) / 2 + jitter
@@ -277,7 +278,7 @@ const makeStratumSample = (
       inkToFaceRatio: Math.min(1, inkArea / faceArea),
       inkToEmRatio: inkArea / (advance * 1000),
       centroidX: (xMin + xMax) / 2,
-      centroidY: 380,
+      centroidY,
       spreadX: faceWidth / Math.sqrt(12),
       spreadY: 100,
     },
@@ -461,6 +462,60 @@ describe('complexity strata', () => {
     expect(
       radar.suspects.some((suspect) => suspect.glyphId === 'offcenter')
     ).toBe(true)
+  })
+
+  it('uses reference residuals to allow glyph-specific natural balance', () => {
+    const bodyBox = { top: 880, bottom: -120, unitsPerEm: 1000 }
+    const samples: GlyphGeometrySample[] = []
+    // 這套字的整體重心風格偏低：同儕 median 約 -5% UPM。
+    for (let index = 0; index < 24; index += 1) {
+      samples.push(
+        makeStratumSample(
+          `peer${index}`,
+          700,
+          100000,
+          ((index % 5) - 2) * 3,
+          'branching',
+          330 + ((index % 5) - 2)
+        )
+      )
+    }
+    // 「人」在參考字體中相對同儕又自然低 4% UPM，這裡落在 hybrid expected。
+    samples.push(makeStratumSample('人', 700, 100000, 0, 'branching', 290))
+    samples.push(
+      makeStratumSample('excessively-low', 700, 100000, 0, 'branching', 250)
+    )
+
+    const blindRadar = computeRadarFromSamples(samples, bodyBox)!
+    expect(
+      blindRadar.evaluationByGlyphId
+        .get('人')!
+        .reasons.some((reason) => reason.key === 'balance:centroidY')
+    ).toBe(true)
+
+    const radar = computeRadarFromSamples(samples, bodyBox, undefined, {
+      source: 'Synthetic Noto residuals',
+      residualsByCharacter: {
+        人: {
+          'balance:centroidY': { value: -0.04, confidence: 1 },
+        },
+        'excessively-low': {
+          'balance:centroidY': { value: -0.04, confidence: 1 },
+        },
+      },
+    })!
+    expect(
+      radar.evaluationByGlyphId
+        .get('人')!
+        .reasons.some((reason) => reason.key === 'balance:centroidY')
+    ).toBe(false)
+
+    const lowReason = radar.evaluationByGlyphId
+      .get('excessively-low')!
+      .reasons.find((reason) => reason.key === 'balance:centroidY')
+    expect(lowReason?.basis).toBe('reference')
+    expect(lowReason?.median).toBeCloseTo(-0.09, 2)
+    expect(lowReason?.zScore).toBeLessThan(-2)
   })
 })
 

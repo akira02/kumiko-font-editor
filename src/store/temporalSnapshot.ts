@@ -1,4 +1,5 @@
 import { isGlyphGeometryLoaded } from 'src/lib/glyph/glyphGeometryState'
+import { getGlyphLayer } from 'src/store/glyphLayer'
 import type { FontData, GlobalState, GlyphData } from 'src/store/types'
 
 type TemporalTrackedState = Pick<GlobalState, 'fontData'>
@@ -20,10 +21,48 @@ const stripGlyphGeometry = (glyph: GlyphData): GlyphData => {
   return stripped
 }
 
+const addGlyphGeometryClosure = (
+  fontData: FontData | null,
+  target: Set<string>,
+  glyphIds: Iterable<string>,
+  visited = new Set<string>()
+) => {
+  if (!fontData) {
+    return
+  }
+
+  for (const glyphId of glyphIds) {
+    if (visited.has(glyphId)) {
+      continue
+    }
+    visited.add(glyphId)
+
+    const glyph = fontData.glyphs[glyphId]
+    if (!glyph) {
+      continue
+    }
+
+    target.add(glyphId)
+    const layer = getGlyphLayer(glyph, null)
+    addGlyphGeometryClosure(
+      fontData,
+      target,
+      [
+        ...(layer?.componentRefs ?? []),
+        ...(layer?.background?.componentRefs ?? []),
+      ].map((componentRef) => componentRef.glyphId),
+      visited
+    )
+  }
+}
+
 const getTemporalGeometryGlyphIds = (state: GlobalState) => {
   const glyphIds = new Set<string>()
 
   for (const glyphId of state.editorGlyphIds) {
+    glyphIds.add(glyphId)
+  }
+  for (const glyphId of state.editorReferenceGlyphIds) {
     glyphIds.add(glyphId)
   }
   for (const glyphId of state.dirtyGlyphIds) {
@@ -38,6 +77,7 @@ const getTemporalGeometryGlyphIds = (state: GlobalState) => {
   if (state.selectedGlyphId) {
     glyphIds.add(state.selectedGlyphId)
   }
+  addGlyphGeometryClosure(state.fontData, glyphIds, [...glyphIds])
 
   return glyphIds
 }

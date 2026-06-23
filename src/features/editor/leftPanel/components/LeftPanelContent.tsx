@@ -28,7 +28,11 @@ export function LeftPanelContent({
   const fontData = useStore((state) => state.fontData)
   const projectId = useStore((state) => state.projectId)
   const hydrateGlyphGeometry = useStore((state) => state.hydrateGlyphGeometry)
+  const setEditorReferenceGlyphIds = useStore(
+    (state) => state.setEditorReferenceGlyphIds
+  )
   const loadingRef = useRef(new Map<string, Promise<GlyphData[]>>())
+  const visibleReferenceGlyphIdsRef = useRef<string[]>([])
 
   const {
     isCjkGlyph,
@@ -96,14 +100,27 @@ export function LeftPanelContent({
       const ids = resultGlyphs
         .slice(range.startIndex, range.endIndex + 1)
         .map((g) => g.id)
+      visibleReferenceGlyphIdsRef.current = ids
+      setEditorReferenceGlyphIds(previewGlyph ? [previewGlyph.id, ...ids] : ids)
       loadGeometry(ids)
     },
-    [resultGlyphs, loadGeometry]
+    [loadGeometry, previewGlyph, resultGlyphs, setEditorReferenceGlyphIds]
   )
 
   useEffect(() => {
+    const ids = previewGlyph
+      ? [previewGlyph.id, ...visibleReferenceGlyphIdsRef.current]
+      : visibleReferenceGlyphIdsRef.current
+    setEditorReferenceGlyphIds(ids)
     if (previewGlyph) loadGeometry([previewGlyph.id])
-  }, [previewGlyph, loadGeometry])
+  }, [previewGlyph, loadGeometry, setEditorReferenceGlyphIds])
+
+  useEffect(
+    () => () => {
+      setEditorReferenceGlyphIds([])
+    },
+    [setEditorReferenceGlyphIds]
+  )
 
   return (
     <>

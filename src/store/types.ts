@@ -393,6 +393,9 @@ export interface GlobalState {
   editorText: string
   editorTextCursorIndex: number
   editorActiveGlyphIndex: number
+  // Glyphs currently needed by editor-side reference previews. Their geometry
+  // should survive undo snapshots so previews do not immediately reload it.
+  editorReferenceGlyphIds: string[]
   previewGlyphMetrics: { glyphId: string; metrics: GlyphMetrics } | null
   // Ghost outline previewed in the editor before inserting a component copy.
   componentGhostPaths: PathData[] | null
@@ -501,6 +504,7 @@ export interface GlobalState {
   deleteAnchorBehavior: (glyphId: string, anchorId: string) => void
   setSelectedNodeIds: (ids: string[]) => void
   setSelectedSegment: (segment: SelectedSegmentState | null) => void
+  setEditorReferenceGlyphIds: (ids: string[]) => void
   setSelectedLayerId: (id: string | null) => void
   setActiveMasterId: (id: string | null) => void
   setEditLocation: (location: Record<string, number>) => void

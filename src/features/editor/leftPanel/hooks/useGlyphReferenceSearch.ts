@@ -31,6 +31,47 @@ const EMPTY_SEARCH_STATE: SearchState = {
   error: null,
 }
 
+const GLYPH_SUMMARY_KEY_SEPARATOR = '\u0001'
+const GLYPH_SUMMARY_ITEM_SEPARATOR = '\u0002'
+
+interface ProjectGlyphSummary {
+  id: string
+  name: string
+  unicode: string | null
+}
+
+interface StableModel<T> {
+  key: string
+  items: T[]
+}
+
+const STABLE_MODEL_CACHE_LIMIT = 24
+
+const projectGlyphSummaryCache = new Map<
+  string,
+  StableModel<ProjectGlyphSummary>
+>()
+const partFitGlyphCache = new Map<string, StableModel<GlyphData>>()
+
+const cacheStableModel = <T>(
+  cache: Map<string, StableModel<T>>,
+  model: StableModel<T>
+) => {
+  const cached = cache.get(model.key)
+  if (cached) {
+    return cached
+  }
+
+  cache.set(model.key, model)
+  if (cache.size > STABLE_MODEL_CACHE_LIMIT) {
+    const oldestKey = cache.keys().next().value
+    if (oldestKey !== undefined) {
+      cache.delete(oldestKey)
+    }
+  }
+  return model
+}
+
 interface UseGlyphReferenceSearchOptions {
   glyphs: GlyphData[]
   glyphMap: Record<string, GlyphData>
@@ -51,6 +92,7 @@ export function useGlyphReferenceSearch({
   const [searchState, setSearchState] = useState<SearchState | null>(null)
 
   const selectedCharacter = getGlyphCharacter(selectedGlyph)
+  const selectedGlyphId = selectedGlyph?.id ?? null
   const isCjkGlyph = isCjkCharacter(selectedCharacter)
 
   const relatedGlyphs = useMemo(
@@ -58,15 +100,23 @@ export function useGlyphReferenceSearch({
     [glyphs, isCjkGlyph, selectedGlyph]
   )
 
-  const projectGlyphSummaries = useMemo(
-    () =>
-      glyphs.map((glyph) => ({
-        id: glyph.id,
-        name: glyph.name,
-        unicode: getPrimaryGlyphUnicode(glyph),
-      })),
-    [glyphs]
-  )
+  const projectGlyphSummaries = useMemo(() => {
+    const items: ProjectGlyphSummary[] = glyphs.map((glyph) => ({
+      id: glyph.id,
+      name: glyph.name,
+      unicode: getPrimaryGlyphUnicode(glyph),
+    }))
+    return cacheStableModel(projectGlyphSummaryCache, {
+      key: items
+        .map((glyph) =>
+          [glyph.id, glyph.name, glyph.unicode ?? ''].join(
+            GLYPH_SUMMARY_KEY_SEPARATOR
+          )
+        )
+        .join(GLYPH_SUMMARY_ITEM_SEPARATOR),
+      items,
+    }).items
+  }, [glyphs])
 
   const unsortedResultGlyphs = useMemo(
     () =>
@@ -77,6 +127,20 @@ export function useGlyphReferenceSearch({
         .map((glyphId) => glyphMap[glyphId])
         .filter((glyph): glyph is GlyphData => Boolean(glyph)),
     [glyphMap, isCjkGlyph, relatedGlyphs, searchState]
+  )
+  const partFitGlyphs = useMemo(
+    () =>
+      cacheStableModel(partFitGlyphCache, {
+        key: unsortedResultGlyphs
+          .map((glyph) =>
+            [glyph.id, getGlyphCharacter(glyph) ?? ''].join(
+              GLYPH_SUMMARY_KEY_SEPARATOR
+            )
+          )
+          .join(GLYPH_SUMMARY_ITEM_SEPARATOR),
+        items: unsortedResultGlyphs,
+      }).items,
+    [unsortedResultGlyphs]
   )
 
   const activeComponentForRanking =
@@ -129,7 +193,7 @@ export function useGlyphReferenceSearch({
             ?.box ?? null
         const scoreByGlyphId = new Map<string, number>()
         if (targetPartBox) {
-          for (const glyph of unsortedResultGlyphs) {
+          for (const glyph of partFitGlyphs) {
             const character = getGlyphCharacter(glyph)
             if (!character) {
               continue
@@ -166,10 +230,10 @@ export function useGlyphReferenceSearch({
     }
   }, [
     activeComponentForRanking,
+    partFitGlyphs,
     partFitKey,
     searchComponents,
     selectedCharacter,
-    unsortedResultGlyphs,
   ])
 
   // Donors whose part proportions best match the target placement first;
@@ -195,7 +259,7 @@ export function useGlyphReferenceSearch({
   const activeComponent = selectedComponent ?? searchState?.activeComponent
 
   useEffect(() => {
-    if (!selectedGlyph || !selectedCharacter || !isCjkGlyph) {
+    if (!selectedGlyphId || !selectedCharacter || !isCjkGlyph) {
       return
     }
 
@@ -204,7 +268,7 @@ export function useGlyphReferenceSearch({
     void searchProjectGlyphsByComponent({
       character: selectedCharacter,
       selectedComponent,
-      currentGlyphId: selectedGlyph.id,
+      currentGlyphId: selectedGlyphId,
       projectGlyphs: projectGlyphSummaries,
       signal: controller.signal,
     })
@@ -242,7 +306,7 @@ export function useGlyphReferenceSearch({
     projectGlyphSummaries,
     selectedCharacter,
     selectedComponent,
-    selectedGlyph,
+    selectedGlyphId,
   ])
 
   const handleSelectComponent = (component: string) => {

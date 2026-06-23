@@ -118,6 +118,7 @@ const initialState = {
   editorText: '',
   editorTextCursorIndex: 0,
   editorActiveGlyphIndex: 0,
+  editorReferenceGlyphIds: [],
   previewGlyphMetrics: null,
   componentGhostPaths: null,
   componentTargetRect: null,
