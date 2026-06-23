@@ -367,6 +367,17 @@ const makeSinglePositioningSubtable = () =>
     writeUint16(view, 12, 1)
   })
 
+const makeExtensionSinglePositioningSubtable = () => {
+  const innerSubtable = makeSinglePositioningSubtable()
+  const bytes = makeBytes(8 + innerSubtable.byteLength, (view) => {
+    writeUint16(view, 0, 1)
+    writeUint16(view, 2, 1)
+    writeUint32(view, 4, 8)
+  })
+  bytes.set(innerSubtable, 8)
+  return bytes
+}
+
 const makePairPositioningSubtable = () =>
   makeBytes(26, (view) => {
     writeUint16(view, 0, 1)
@@ -935,6 +946,51 @@ describe('SFNT binary inventory', () => {
                 table: 'GPOS',
                 lookupIndex: 0,
                 lookupType: 1,
+                subtableIndex: 0,
+                subtableFormat: 1,
+              },
+            },
+          },
+        ],
+      },
+    ])
+  })
+
+  it('extracts editable GPOS rules through ExtensionPos wrappers', () => {
+    const state = extractBinaryFeatures(
+      makeSfnt([
+        {
+          tag: 'GPOS',
+          data: makeGposTable(
+            'mark',
+            9,
+            makeExtensionSinglePositioningSubtable()
+          ),
+        },
+      ]),
+      null,
+      ['.notdef', 'acutecomb']
+    )
+
+    expect(state.unsupportedLookups).toEqual([])
+    expect(state.lookups).toMatchObject([
+      {
+        id: 'lookup_gpos_0',
+        lookupType: 'extensionPos',
+        editable: true,
+        origin: 'imported',
+        rules: [
+          {
+            kind: 'singlePositioning',
+            target: { kind: 'glyph', glyph: 'acutecomb' },
+            value: { xAdvance: -50 },
+            meta: {
+              origin: 'imported',
+              reason: 'Reconstructed from a GPOS ExtensionPos wrapper.',
+              provenance: {
+                table: 'GPOS',
+                lookupIndex: 0,
+                lookupType: 9,
                 subtableIndex: 0,
                 subtableFormat: 1,
               },

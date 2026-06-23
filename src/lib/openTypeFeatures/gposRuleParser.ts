@@ -990,6 +990,20 @@ const parseContextPositioningFormat3 = (
   }
 }
 
+const withExtensionProvenance = (
+  rules: Rule[],
+  lookup: LayoutLookupInventory,
+  subtableIndex: number
+): Rule[] =>
+  rules.map((rule) => ({
+    ...rule,
+    meta: {
+      ...rule.meta,
+      provenance: makeProvenance(lookup, subtableIndex),
+      reason: 'Reconstructed from a GPOS ExtensionPos wrapper.',
+    },
+  }))
+
 const parseSupportedSubtable = (
   subtableReader: BinaryReader,
   glyphOrder: string[],
@@ -1090,24 +1104,46 @@ const parseSupportedSubtable = (
     const extensionOffset = subtableReader.uint32(4)
     const extensionReader =
       extensionOffset === null ? null : subtableReader.at(extensionOffset)
+    const extensionFormat = extensionReader?.uint16(0)
     if (
       extensionLookupType === null ||
+      extensionOffset === null ||
       extensionLookupType === 9 ||
-      !extensionReader
+      !extensionReader ||
+      extensionFormat === null ||
+      extensionFormat === undefined
     ) {
       return null
     }
 
-    return parseSupportedSubtable(
+    const delegatedSubtableFormats = lookup.subtableFormats.slice()
+    delegatedSubtableFormats[subtableIndex] = extensionFormat
+    const delegatedSubtableOffsets = lookup.subtableOffsets.slice()
+    delegatedSubtableOffsets[subtableIndex] =
+      lookup.subtableOffsets[subtableIndex] + extensionOffset
+
+    const parsedSubtable = parseSupportedSubtable(
       extensionReader,
       glyphOrder,
       {
         ...lookup,
         lookupType: extensionLookupType,
-        subtableFormats: [extensionReader.uint16(0) ?? 0],
+        subtableFormats: delegatedSubtableFormats,
+        subtableOffsets: delegatedSubtableOffsets,
       },
       subtableIndex
     )
+
+    return parsedSubtable
+      ? {
+          ...parsedSubtable,
+          rules: withExtensionProvenance(
+            parsedSubtable.rules,
+            lookup,
+            subtableIndex
+          ),
+        }
+      : null
   }
 
   return null
