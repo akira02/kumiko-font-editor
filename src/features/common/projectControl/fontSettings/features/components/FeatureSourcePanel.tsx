@@ -61,6 +61,7 @@ export function FeatureSourcePanel({
               <SourceSectionCard
                 key={section.id}
                 recordsLabel={t('projectControl.records')}
+                recordRefsLabel={t('projectControl.sourceRecordRefs')}
                 section={section}
               />
             ))}
@@ -92,12 +93,20 @@ export function FeatureSourcePanel({
 }
 
 function SourceSectionCard({
+  recordRefsLabel,
   recordsLabel,
   section,
 }: {
+  recordRefsLabel: string
   recordsLabel: string
   section: FeatureSourceSection
 }) {
+  const visibleRecordRefs = section.recordRefs.slice(0, 10)
+  const hiddenRecordRefCount = Math.max(
+    section.recordRefs.length - visibleRecordRefs.length,
+    0
+  )
+
   return (
     <Stack borderWidth="1px" borderRadius="sm" p={3} spacing={2}>
       <HStack justify="space-between" align="flex-start" gap={2}>
@@ -119,6 +128,30 @@ function SourceSectionCard({
       <Text fontSize="xs" color="field.muted">
         {section.recordRefs.length} {recordsLabel}
       </Text>
+      {section.recordRefs.length > 0 ? (
+        <Stack spacing={1}>
+          <Text fontSize="xs" color="field.muted">
+            {recordRefsLabel}
+          </Text>
+          <HStack wrap="wrap" gap={1}>
+            {visibleRecordRefs.map((ref, index) => (
+              <Badge
+                key={`${ref.kind}-${ref.id}-${index}`}
+                fontFamily="mono"
+                variant="outline"
+              >
+                {formatRecordRef(ref)}
+              </Badge>
+            ))}
+            {hiddenRecordRefCount > 0 ? (
+              <Badge variant="subtle">+{hiddenRecordRefCount}</Badge>
+            ) : null}
+          </HStack>
+        </Stack>
+      ) : null}
     </Stack>
   )
 }
+
+const formatRecordRef = (ref: FeatureSourceSection['recordRefs'][number]) =>
+  `${ref.kind}${ref.table ? ` ${ref.table}` : ''}: ${ref.id}`
