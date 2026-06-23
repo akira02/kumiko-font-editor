@@ -134,6 +134,52 @@ describe('OpenType FEA generation', () => {
     expect(generated.text).toContain("ignore sub less less' exclam hyphen;")
   })
 
+  it('serializes reverse chaining single substitution rules', () => {
+    const state: OpenTypeFeaturesState = {
+      ...createEmptyOpenTypeFeaturesState(),
+      features: [
+        {
+          id: 'feature_rvrn',
+          tag: 'rvrn',
+          isActive: true,
+          origin: 'manual',
+          entries: [
+            {
+              id: 'entry_rvrn_DFLT_dflt',
+              script: 'DFLT',
+              language: 'dflt',
+              lookupIds: ['lookup_reverse'],
+            },
+          ],
+        },
+      ],
+      lookups: [
+        {
+          id: 'lookup_reverse',
+          name: 'lookup_reverse',
+          table: 'GSUB',
+          lookupType: 'reverseChainingSingleSubst',
+          lookupFlag: {},
+          rules: [
+            {
+              id: 'rule_reverse',
+              kind: 'reverseChainingSingleSubstitution',
+              backtrack: [{ kind: 'glyph', glyph: 'x' }],
+              target: { kind: 'glyph', glyph: 'a' },
+              lookahead: [{ kind: 'glyph', glyph: 'z' }],
+              replacement: 'a.rev',
+              meta: { origin: 'manual' },
+            },
+          ],
+          editable: true,
+          origin: 'manual',
+        },
+      ],
+    }
+
+    expect(generateFea(state).text).toContain("rsub x a' z by a.rev;")
+  })
+
   it('serializes glyph class selectors with their FEA class names', () => {
     const state: OpenTypeFeaturesState = {
       ...createEmptyOpenTypeFeaturesState(),

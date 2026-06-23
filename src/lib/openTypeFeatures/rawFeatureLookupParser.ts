@@ -379,6 +379,7 @@ export const getLookupShape = (rules: Rule[]) => {
     alternateSubstitution: 'alternateSubst',
     ligatureSubstitution: 'ligatureSubst',
     contextualSubstitution: 'chainingContextSubst',
+    reverseChainingSingleSubstitution: 'reverseChainingSingleSubst',
     contextualPositioning: 'chainingContextPos',
     singlePositioning: 'singlePos',
     pairPositioning: 'pairPos',

@@ -9,6 +9,7 @@ import {
   parseContextSubstitutionFormat1,
   parseContextSubstitutionFormat3,
 } from 'src/lib/openTypeFeatures/gsubContextRuleParser'
+import { parseReverseChainingSingleSubstitutionFormat1 } from 'src/lib/openTypeFeatures/gsubReverseContextRuleParser'
 import type { LayoutLookupInventory } from 'src/lib/openTypeFeatures/layoutTableInventory'
 import type {
   AlternateSubstitutionRule,
@@ -509,6 +510,14 @@ const parseSupportedSubtable = (
       subtableIndex
     )
   }
+  if (lookup.lookupType === 8 && format === 1) {
+    return parseReverseChainingSingleSubstitutionFormat1(
+      subtableReader,
+      glyphOrder,
+      lookup,
+      subtableIndex
+    )
+  }
   return null
 }
 
@@ -584,16 +593,7 @@ export const parseGsubLookupRules = (
   glyphOrder: string[],
   lookupId: string
 ): GsubRuleParseResult => {
-  if (lookup.lookupType === 8) {
-    return {
-      rules: [],
-      diagnostics: [],
-      unsupportedReason:
-        'GSUB ReverseChainingSingleSubst is preserved as unsupported because the current IR has no reverse-chaining replacement rule shape yet.',
-    }
-  }
-
-  if (![1, 2, 3, 4, 5, 6, 7].includes(lookup.lookupType)) {
+  if (![1, 2, 3, 4, 5, 6, 7, 8].includes(lookup.lookupType)) {
     return {
       rules: [],
       diagnostics: [],

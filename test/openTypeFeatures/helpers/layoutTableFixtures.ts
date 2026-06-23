@@ -429,6 +429,26 @@ export const makeChainingContextSubstitutionFormat2Subtable = () =>
     ])
   })
 
+export const makeReverseChainingSingleSubstitutionSubtable = () =>
+  makeBytes(40, (view) => {
+    writeUint16(view, 0, 1)
+    writeUint16(view, 2, 18)
+
+    writeUint16(view, 4, 1)
+    writeUint16(view, 6, 26)
+
+    writeUint16(view, 8, 1)
+    writeUint16(view, 10, 34)
+
+    writeUint16(view, 12, 2)
+    writeUint16(view, 14, 5)
+    writeUint16(view, 16, 6)
+
+    writeCoverageFormat1(view, 18, [1, 2])
+    writeCoverageFormat1(view, 26, [3, 4])
+    writeCoverageFormat1(view, 34, [7])
+  })
+
 export const makeSinglePositioningSubtable = () =>
   makeBytes(14, (view) => {
     writeUint16(view, 0, 1)

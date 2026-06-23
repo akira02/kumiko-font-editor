@@ -20,6 +20,13 @@ export const getRuleGlyphReferences = (rule: Rule): string[] => {
       return [rule.target, ...rule.alternates]
     case 'ligatureSubstitution':
       return [...rule.components, rule.replacement]
+    case 'reverseChainingSingleSubstitution':
+      return [
+        ...rule.backtrack.flatMap(getSelectorGlyphs),
+        ...getSelectorGlyphs(rule.target),
+        ...rule.lookahead.flatMap(getSelectorGlyphs),
+        rule.replacement,
+      ]
     case 'pairPositioning':
       return [...getSelectorGlyphs(rule.left), ...getSelectorGlyphs(rule.right)]
     case 'singlePositioning':
@@ -58,6 +65,12 @@ export const getRuleClassReferences = (rule: Rule): string[] => {
       return [
         ...rule.backtrack.flatMap(getSelectorClassIds),
         ...rule.input.flatMap((input) => getSelectorClassIds(input.selector)),
+        ...rule.lookahead.flatMap(getSelectorClassIds),
+      ]
+    case 'reverseChainingSingleSubstitution':
+      return [
+        ...rule.backtrack.flatMap(getSelectorClassIds),
+        ...getSelectorClassIds(rule.target),
         ...rule.lookahead.flatMap(getSelectorClassIds),
       ]
     case 'markToBase':

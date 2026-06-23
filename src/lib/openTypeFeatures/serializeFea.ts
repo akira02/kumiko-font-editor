@@ -189,6 +189,29 @@ const serializeContextualSubstitution = (
   recordRuleSource(context, node.ruleId, lineStart, lineStart)
 }
 
+const serializeReverseChainingSingleSubstitution = (
+  node: Extract<FeaNode, { kind: 'ReverseChainingSingleSubstitution' }>,
+  context: SerializeContext,
+  indent: string
+) => {
+  if (node.ruleId) {
+    pushLine(context, `${indent}# kumiko-rule-id: ${node.ruleId}`)
+  }
+  const lineStart = context.lines.length + 1
+  const backtrack = node.backtrack.map((selector) =>
+    formatSelector(context, selector)
+  )
+  const target = `${formatSelector(context, node.target)}'`
+  const lookahead = node.lookahead.map((selector) =>
+    formatSelector(context, selector)
+  )
+  pushLine(
+    context,
+    `${indent}rsub ${[...backtrack, target, ...lookahead].join(' ')} by ${node.replacement};`
+  )
+  recordRuleSource(context, node.ruleId, lineStart, lineStart)
+}
+
 const serializeContextualPositioning = (
   node: Extract<FeaNode, { kind: 'ContextualPositioning' }>,
   context: SerializeContext,
@@ -399,6 +422,9 @@ function serializeNode(
       return
     case 'ContextualSubstitution':
       serializeContextualSubstitution(node, context, indent)
+      return
+    case 'ReverseChainingSingleSubstitution':
+      serializeReverseChainingSingleSubstitution(node, context, indent)
       return
     case 'ContextualPositioning':
       serializeContextualPositioning(node, context, indent)

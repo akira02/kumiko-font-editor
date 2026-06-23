@@ -118,6 +118,15 @@ const ruleToNode = (
         })),
         lookahead: rule.lookahead,
       }
+    case 'reverseChainingSingleSubstitution':
+      return {
+        kind: 'ReverseChainingSingleSubstitution',
+        ruleId: rule.id,
+        backtrack: rule.backtrack,
+        target: rule.target,
+        lookahead: rule.lookahead,
+        replacement: rule.replacement,
+      }
     case 'contextualPositioning':
       return {
         kind: 'ContextualPositioning',

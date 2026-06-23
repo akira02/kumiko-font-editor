@@ -12,6 +12,7 @@ import {
   makeLigatureSubstitutionSubtable,
   makeMinimalGsubTable,
   makeMultipleSubstitutionSubtable,
+  makeReverseChainingSingleSubstitutionSubtable,
   makeSfnt,
   makeSingleSubstitutionSubtable,
 } from './helpers/layoutTableFixtures'
@@ -563,6 +564,76 @@ describe('GSUB binary inventory', () => {
         {
           kind: 'glyphClass',
           id: 'class_gsub_0_0_input_1_2',
+          table: 'GSUB',
+        },
+      ])
+    )
+  })
+
+  it('extracts editable GSUB ReverseChainingSingleSubst rules', () => {
+    const state = extractBinaryFeatures(
+      makeSfnt([
+        {
+          tag: 'GSUB',
+          data: makeGsubTable(
+            'rvrn',
+            8,
+            makeReverseChainingSingleSubstitutionSubtable()
+          ),
+        },
+      ]),
+      null,
+      ['.notdef', 'a', 'b', 'x', 'y', 'a.rev', 'b.rev', 'z']
+    )
+
+    expect(state.unsupportedLookups).toEqual([])
+    expect(state.glyphClasses).toMatchObject([
+      {
+        id: 'class_gsub_0_0_backtrack_0_0',
+        name: '@GSUB_0_0_backtrack_0',
+        glyphs: ['x', 'y'],
+        origin: 'imported',
+      },
+    ])
+    expect(state.lookups).toMatchObject([
+      {
+        id: 'lookup_gsub_0',
+        lookupType: 'reverseChainingSingleSubst',
+        editable: true,
+        origin: 'imported',
+        rules: [
+          {
+            kind: 'reverseChainingSingleSubstitution',
+            backtrack: [
+              { kind: 'class', classId: 'class_gsub_0_0_backtrack_0_0' },
+            ],
+            target: { kind: 'glyph', glyph: 'a' },
+            lookahead: [{ kind: 'glyph', glyph: 'z' }],
+            replacement: 'a.rev',
+            meta: {
+              origin: 'imported',
+              provenance: {
+                table: 'GSUB',
+                lookupIndex: 0,
+                lookupType: 8,
+                subtableIndex: 0,
+                subtableFormat: 1,
+              },
+            },
+          },
+          {
+            kind: 'reverseChainingSingleSubstitution',
+            target: { kind: 'glyph', glyph: 'b' },
+            replacement: 'b.rev',
+          },
+        ],
+      },
+    ])
+    expect(state.sourceSections[0]?.recordRefs).toEqual(
+      expect.arrayContaining([
+        {
+          kind: 'glyphClass',
+          id: 'class_gsub_0_0_backtrack_0_0',
           table: 'GSUB',
         },
       ])

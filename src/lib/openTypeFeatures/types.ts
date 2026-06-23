@@ -182,6 +182,16 @@ export interface ContextualRule {
   meta: RuleMeta
 }
 
+export interface ReverseChainingSingleSubstitutionRule {
+  id: string
+  kind: 'reverseChainingSingleSubstitution'
+  backtrack: GlyphSelector[]
+  target: GlyphSelector
+  lookahead: GlyphSelector[]
+  replacement: string
+  meta: RuleMeta
+}
+
 export interface AnchorPoint {
   x: number
   y: number
@@ -228,6 +238,7 @@ export type Rule =
   | PairPositioningRule
   | SinglePositioningRule
   | ContextualRule
+  | ReverseChainingSingleSubstitutionRule
   | MarkToBaseRule
   | MarkToMarkRule
   | MarkToLigatureRule

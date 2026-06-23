@@ -94,6 +94,15 @@ export interface ContextualSubstitutionNode {
   lookahead: GlyphSelector[]
 }
 
+export interface ReverseChainingSingleSubstitutionNode {
+  kind: 'ReverseChainingSingleSubstitution'
+  ruleId?: string
+  backtrack: GlyphSelector[]
+  target: GlyphSelector
+  lookahead: GlyphSelector[]
+  replacement: string
+}
+
 export interface ContextualPositioningNode {
   kind: 'ContextualPositioning'
   ruleId?: string
@@ -151,6 +160,7 @@ export type FeaNode =
   | LanguageStatementNode
   | SubstitutionNode
   | ContextualSubstitutionNode
+  | ReverseChainingSingleSubstitutionNode
   | ContextualPositioningNode
   | PositioningNode
   | MarkToBaseNode
