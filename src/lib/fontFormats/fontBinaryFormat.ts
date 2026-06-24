@@ -460,6 +460,8 @@ export const exportGlyphListAsBinary = (input: {
   >
   glyphs: GlyphData[]
   format: BinaryFontExportFormat
+  familyName?: string
+  styleName?: string
 }) => {
   const glyphs = input.glyphs.map((glyph) => {
     const path = new opentype.Path()
@@ -489,8 +491,9 @@ export const exportGlyphListAsBinary = (input: {
   })
 
   const font = new opentype.Font({
-    familyName: input.fontData.fontInfo?.familyName || 'KumikoExport',
-    styleName: 'Regular',
+    familyName:
+      input.familyName || input.fontData.fontInfo?.familyName || 'KumikoExport',
+    styleName: input.styleName || 'Regular',
     unitsPerEm: input.fontData.unitsPerEm ?? 1000,
     ascender:
       input.fontData.lineMetricsHorizontalLayout?.ascender?.value ?? 800,

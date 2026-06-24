@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { isInterpolatedGlyphLocation } from 'src/font/designspaceLocation'
 import { interpolateGlyphLayer } from 'src/font/glyphInterpolation'
+import { bakeGlyphStaticInstance } from 'src/font/staticInstance'
 import type {
   FontAxes,
   FontData,
@@ -142,6 +143,56 @@ describe('interpolateGlyphLayer', () => {
     expect(result.layer?.metrics.width).toBeCloseTo(500)
     expect(result.layer?.paths[0].nodes[1].x).toBeCloseTo(100)
     expect(result.issues.map((issue) => issue.code)).toContain('missing-layer')
+  })
+})
+
+describe('bakeGlyphStaticInstance', () => {
+  it('flattens an export instance into a single active layer', () => {
+    const result = bakeGlyphStaticInstance({
+      fontData: { axes, sources },
+      glyph: glyph(),
+      instance: {
+        id: 'instance-medium',
+        name: 'Medium',
+        styleName: 'Medium',
+        location: { Weight: 50 },
+        export: true,
+      },
+    })
+
+    expect(result.errors).toEqual([])
+    expect(result.glyph.activeLayerId).toBe('public.default')
+    expect(result.glyph.layerOrder).toEqual(['public.default'])
+    expect(Object.keys(result.glyph.layers ?? {})).toEqual(['public.default'])
+    expect(result.glyph.layers?.['public.default'].metrics.width).toBeCloseTo(
+      600
+    )
+    expect(
+      result.glyph.layers?.['public.default'].paths[0].nodes[1].x
+    ).toBeCloseTo(150)
+  })
+
+  it('reports blocking errors when outlines cannot interpolate', () => {
+    const incompatibleBold = {
+      ...layer('Bold', 700, 200, 700),
+      paths: [],
+    }
+
+    const result = bakeGlyphStaticInstance({
+      fontData: { axes, sources },
+      glyph: glyph(incompatibleBold),
+      instance: {
+        id: 'instance-medium',
+        name: 'Medium',
+        styleName: 'Medium',
+        location: { Weight: 50 },
+        export: true,
+      },
+    })
+
+    expect(result.errors.some((error) => error.message.includes('paths'))).toBe(
+      true
+    )
   })
 })
 

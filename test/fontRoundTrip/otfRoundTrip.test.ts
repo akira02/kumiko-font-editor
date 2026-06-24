@@ -9,9 +9,12 @@ import {
   exportFontAsBinary,
   importBinaryFontFile,
 } from 'src/lib/fontFormats/fontBinaryFormat'
-import { exportCanonicalProjectAsBinary } from 'src/lib/fontFormats/canonicalBinaryExport'
+import {
+  exportCanonicalProjectAsBinary,
+  exportCanonicalProjectInstanceAsBinary,
+} from 'src/lib/fontFormats/canonicalBinaryExport'
 import { saveProjectDraft } from 'src/lib/project/projectRepository'
-import type { FontData, GlyphData } from 'src/store'
+import type { FontAxes, FontData, GlyphData, GlyphLayerData } from 'src/store'
 import { getGlyphLayer } from 'src/store/glyphLayer'
 import { getPrimaryGlyphUnicode } from 'src/lib/glyph/glyphUnicode'
 const layerOf = (g: GlyphData) => getGlyphLayer(g, null)!
@@ -62,6 +65,98 @@ const reimport = async (blob: Blob, name: string) => {
 
 const nodeCount = (glyph: GlyphData) =>
   layerOf(glyph).paths.reduce((sum, path) => sum + path.nodes.length, 0)
+
+const variableAxes: FontAxes = {
+  axes: [
+    {
+      name: 'Weight',
+      label: 'Weight',
+      tag: 'wght',
+      minValue: 0,
+      defaultValue: 0,
+      maxValue: 100,
+    },
+  ],
+  mappings: [],
+}
+
+const variableSources = {
+  Light: { id: 'Light', name: 'Light', location: { Weight: 0 } },
+  Bold: { id: 'Bold', name: 'Bold', location: { Weight: 100 } },
+}
+
+const variableLayer = (
+  id: 'Light' | 'Bold',
+  width: number,
+  right: number
+): GlyphLayerData => ({
+  id,
+  name: id,
+  type: 'master',
+  associatedMasterId: id,
+  paths: [
+    {
+      id: `${id}-path`,
+      closed: true,
+      nodes: [
+        { id: `${id}-1`, kind: 'oncurve', x: 0, y: 0, segmentType: 'line' },
+        {
+          id: `${id}-2`,
+          kind: 'oncurve',
+          x: right,
+          y: 0,
+          segmentType: 'line',
+        },
+        {
+          id: `${id}-3`,
+          kind: 'oncurve',
+          x: right,
+          y: 500,
+          segmentType: 'line',
+        },
+        { id: `${id}-4`, kind: 'oncurve', x: 0, y: 500, segmentType: 'line' },
+      ],
+    },
+  ],
+  componentRefs: [],
+  anchors: [],
+  guidelines: [],
+  metrics: { lsb: 0, rsb: width - right, width },
+})
+
+const variableGlyph = (id: string, unicodes: string[] = []): GlyphData => ({
+  id,
+  name: id,
+  unicodes,
+  activeLayerId: 'Light',
+  layerOrder: ['Light', 'Bold'],
+  layers: {
+    Light: variableLayer('Light', 500, 100),
+    Bold: variableLayer('Bold', 700, 200),
+  },
+})
+
+const variableFontData = (): FontData => ({
+  glyphs: {
+    '.notdef': variableGlyph('.notdef'),
+    A: variableGlyph('A', ['0041']),
+  },
+  glyphOrder: ['.notdef', 'A'],
+  fontInfo: { familyName: 'Variable Test', customData: {} },
+  axes: variableAxes,
+  sources: variableSources,
+  exportInstances: [
+    {
+      id: 'instance-medium',
+      name: 'Variable Test Medium',
+      familyName: 'Variable Test',
+      styleName: 'Medium',
+      location: { Weight: 50 },
+      export: true,
+    },
+  ],
+  unitsPerEm: 1000,
+})
 
 describe('OTF import → export round-trip', () => {
   let prepared: FontData
@@ -128,6 +223,35 @@ describe('OTF import → export round-trip', () => {
       Object.keys(imported.fontData.glyphs).length
     )
     expect(reimported.fontData.glyphOrder).toEqual(imported.fontData.glyphOrder)
+  })
+
+  it('exports a static instance from canonical variable records', async () => {
+    const canonicalProjectId = 'canonical-instance-export'
+    await saveProjectDraft({
+      id: canonicalProjectId,
+      title: 'Canonical Instance Export',
+      lastModified: 2,
+      createdAt: 1,
+      updatedAt: 2,
+      sourceName: 'Variable Test.designspace',
+      sourceType: 'local',
+      githubSource: null,
+      fontData: variableFontData(),
+      projectMetadata: null,
+      projectSourceData: null,
+      projectSourceFormat: 'designspace',
+      projectRoundTripFormat: null,
+      projectGlyphsPackage: null,
+    })
+
+    const blob = await exportCanonicalProjectInstanceAsBinary({
+      projectId: canonicalProjectId,
+      format: 'otf',
+      instanceId: 'instance-medium',
+    })
+    const reimported = await reimport(blob, 'canonical-instance.otf')
+
+    expect(layerOf(reimported.fontData.glyphs.A).metrics.width).toBe(600)
   })
 
   it('keeps control-character glyphs but drops their cmap mapping', () => {

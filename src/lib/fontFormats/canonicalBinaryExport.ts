@@ -12,6 +12,10 @@ import {
   kumikoGlyphRecordToGlyphData,
   kumikoRecordsToFontData,
 } from 'src/lib/project/kumikoFontDataAdapter'
+import {
+  bakeStaticInstanceGlyphs,
+  formatStaticInstanceBakeError,
+} from 'src/font/staticInstance'
 import type { GlyphData } from 'src/store'
 
 const BINARY_EXPORT_GLYPH_BATCH_SIZE = 256
@@ -88,5 +92,52 @@ export const exportCanonicalProjectAsBinary = async (input: {
     fontData: kumikoRecordsToFontData(project, [], { metadataOnly: true }),
     glyphs,
     format: input.format,
+  })
+}
+
+export const exportCanonicalProjectInstanceAsBinary = async (input: {
+  projectId: string
+  format: BinaryFontExportFormat
+  instanceId: string
+  batchSize?: number
+}) => {
+  const project = await loadKumikoProjectRecord(input.projectId)
+  if (!project) {
+    throw new Error('找不到 Kumiko 專案')
+  }
+
+  const instance = project.exportInstances?.find(
+    (item) => item.id === input.instanceId
+  )
+  if (!instance) {
+    throw new Error('找不到指定的 export instance')
+  }
+
+  const glyphIds = await getCanonicalBinaryExportGlyphIds(
+    input.projectId,
+    project.glyphOrder
+  )
+  const glyphs = await loadCanonicalGlyphs(
+    input.projectId,
+    glyphIds,
+    input.batchSize
+  )
+  const fontData = kumikoRecordsToFontData(project, [], { metadataOnly: true })
+  const baked = bakeStaticInstanceGlyphs({
+    fontData,
+    glyphs,
+    instance,
+  })
+
+  if (baked.errors.length > 0) {
+    throw new Error(formatStaticInstanceBakeError(instance, baked.errors))
+  }
+
+  return exportGlyphListAsBinary({
+    fontData,
+    glyphs: baked.glyphs,
+    format: input.format,
+    familyName: instance.familyName,
+    styleName: instance.styleName || instance.name,
   })
 }
