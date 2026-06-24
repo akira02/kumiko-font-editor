@@ -1,8 +1,15 @@
 import { interpolateGlyphLayer } from 'src/font/glyphInterpolation'
+import {
+  getActiveBracketLayerForSource,
+  getGlyphMasterLayerForSource,
+  locationsMatch,
+} from 'src/font/designspaceLocation'
 import { activeLayer } from 'src/store/glyphLayer'
 import type {
+  FontAxis,
   FontData,
   FontExportInstance,
+  FontSource,
   GlyphData,
   GlyphLayerData,
 } from 'src/store/types'
@@ -65,6 +72,34 @@ const interpolationMessages = (
   ...result.modelErrors.map((error) => error.message),
 ]
 
+const getSourceAtLocation = (
+  sources: Record<string, FontSource> | undefined,
+  axes: FontAxis[],
+  location: Record<string, number>
+) =>
+  Object.values(sources ?? {}).find((source) =>
+    locationsMatch(source.location, location, axes)
+  )
+
+const getExactSourceLayer = (input: {
+  axes: FontAxis[]
+  glyph: GlyphData
+  includeBracketLayers?: boolean
+  location: Record<string, number>
+  sources: Record<string, FontSource> | undefined
+}) => {
+  const source = getSourceAtLocation(input.sources, input.axes, input.location)
+  if (!source) {
+    return null
+  }
+
+  return (
+    (input.includeBracketLayers !== false
+      ? getActiveBracketLayerForSource(input.glyph, source.id, input.location)
+      : null) ?? getGlyphMasterLayerForSource(input.glyph, source.id)
+  )
+}
+
 export const bakeGlyphStaticInstance = (input: {
   fontData: Pick<FontData, 'axes' | 'sources'>
   glyph: GlyphData
@@ -80,11 +115,30 @@ export const bakeGlyphStaticInstance = (input: {
   const hasDesignspace =
     (input.fontData.axes?.axes.length ?? 0) > 0 &&
     Object.keys(input.fontData.sources ?? {}).length > 0
+  const axisList = input.fontData.axes?.axes ?? []
 
   if (!hasDesignspace) {
     const layer = cloneStaticLayer(activeLayer(input.glyph), layerId, layerName)
     return {
       glyph: bakeGlyphWithLayer(input.glyph, layer),
+      warnings: [],
+      errors: [],
+    }
+  }
+
+  const exactSourceLayer = getExactSourceLayer({
+    axes: axisList,
+    glyph: input.glyph,
+    includeBracketLayers: input.includeBracketLayers,
+    location: input.instance.location,
+    sources: input.fontData.sources,
+  })
+  if (exactSourceLayer) {
+    return {
+      glyph: bakeGlyphWithLayer(
+        input.glyph,
+        cloneStaticLayer(exactSourceLayer, layerId, layerName)
+      ),
       warnings: [],
       errors: [],
     }

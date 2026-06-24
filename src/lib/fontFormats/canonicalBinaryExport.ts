@@ -24,6 +24,7 @@ import {
 import {
   bakeStaticInstanceGlyphs,
   formatStaticInstanceBakeError,
+  type StaticInstanceBakeProblem,
 } from 'src/font/staticInstance'
 import {
   compileManagedFontFeatures,
@@ -176,6 +177,21 @@ interface VariableMasterSource {
   name: string
   location: Record<string, number>
 }
+
+const formatBakeProblemPreview = (errors: StaticInstanceBakeProblem[]) => {
+  const preview = errors
+    .slice(0, 5)
+    .map((error) => `${error.glyphName}: ${error.message}`)
+    .join('；')
+  const suffix = errors.length > 5 ? `；還有 ${errors.length - 5} 個 glyph` : ''
+  return `${errors.length} 個 glyph 無法建立 master。${preview}${suffix}`
+}
+
+const formatVariableMasterBakeError = (
+  source: Pick<VariableMasterSource, 'name'>,
+  errors: StaticInstanceBakeProblem[]
+) =>
+  `無法匯出 Variable OTF：source「${source.name}」${formatBakeProblemPreview(errors)}`
 
 interface BracketLayerSource {
   glyph: GlyphData
@@ -373,12 +389,7 @@ export const exportCanonicalProjectAsVariableOtf = async (input: {
         includeBracketLayers: false,
       })
       if (baked.errors.length > 0) {
-        throw new Error(
-          formatStaticInstanceBakeError(
-            { name: source.name, styleName: source.name },
-            baked.errors
-          )
-        )
+        throw new Error(formatVariableMasterBakeError(source, baked.errors))
       }
       const fileName = `master-${index + 1}.otf`
       const blob = await exportGlyphListAsBinary({

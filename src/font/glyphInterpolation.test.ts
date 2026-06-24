@@ -275,6 +275,37 @@ describe('bakeGlyphStaticInstance', () => {
       true
     )
   })
+
+  it('uses the exact source layer without requiring other masters to interpolate', () => {
+    const incompatibleBold = {
+      ...layer('Bold', 700, 200, 700),
+      guidelines: [
+        { id: 'bold-guide-1', x: 10, y: 20, angle: 0 },
+        { id: 'bold-guide-2', x: 20, y: 30, angle: 0 },
+      ],
+    }
+
+    const result = bakeGlyphStaticInstance({
+      fontData: { axes, sources },
+      glyph: glyph(incompatibleBold),
+      instance: {
+        id: 'instance-light',
+        name: 'Light',
+        styleName: 'Light',
+        location: { Weight: 0 },
+        export: true,
+      },
+    })
+
+    expect(result.errors).toEqual([])
+    expect(result.warnings).toEqual([])
+    expect(result.glyph.layers?.['public.default'].metrics.width).toBeCloseTo(
+      500
+    )
+    expect(
+      result.glyph.layers?.['public.default'].paths[0].nodes[1].x
+    ).toBeCloseTo(100)
+  })
 })
 
 describe('isInterpolatedGlyphLocation', () => {
