@@ -13,6 +13,13 @@ const PYODIDE_ASSET_FILES = [
   'python_stdlib.zip',
 ]
 
+const PYODIDE_CONTENT_TYPES: Record<string, string> = {
+  'pyodide.asm.js': 'application/javascript; charset=utf-8',
+  'pyodide.asm.wasm': 'application/wasm',
+  'pyodide-lock.json': 'application/json; charset=utf-8',
+  'python_stdlib.zip': 'application/zip',
+}
+
 const pyodidePackageDir = fileURLToPath(
   new URL('./node_modules/pyodide', import.meta.url)
 )
@@ -21,13 +28,21 @@ const pyodideAssetsPlugin = (): Plugin => ({
   name: 'kumiko-pyodide-assets',
   configureServer(server) {
     server.middlewares.use('/pyodide', (request, response, next) => {
-      const requestedFile = request.url?.replace(/^\/+/, '') ?? ''
+      const requestedPath = new URL(request.url ?? '', 'http://localhost')
+        .pathname
+      const requestedFile = requestedPath.replace(/^\/+/, '')
 
       if (!PYODIDE_ASSET_FILES.includes(requestedFile)) {
         next()
         return
       }
 
+      response.statusCode = 200
+      response.setHeader(
+        'Content-Type',
+        PYODIDE_CONTENT_TYPES[requestedFile] ?? 'application/octet-stream'
+      )
+      response.setHeader('Cache-Control', 'no-cache')
       response.end(readFileSync(join(pyodidePackageDir, requestedFile)))
     })
   },
