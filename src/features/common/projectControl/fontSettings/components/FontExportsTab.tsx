@@ -14,20 +14,29 @@ import { NumberField } from 'src/features/common/projectControl/fontSettings/com
 import {
   makeId,
   parseInteger,
+  parseLocation,
+  parseNumber,
+  stringifyJson,
   type ExportDraft,
 } from 'src/features/common/projectControl/fontSettings/utils/model'
+import type { FontAxis } from 'src/store'
 import { useTranslation } from 'react-i18next'
 
 interface FontExportsTabProps {
+  axes: FontAxis[]
   exports: ExportDraft[]
   onExportsChange: (exports: ExportDraft[]) => void
 }
 
 export function FontExportsTab({
+  axes,
   exports,
   onExportsChange,
 }: FontExportsTabProps) {
   const { t } = useTranslation()
+  const defaultLocation = Object.fromEntries(
+    axes.map((axis) => [axis.name, axis.defaultValue])
+  )
 
   const updateExport = (index: number, update: Partial<ExportDraft>) => {
     onExportsChange(
@@ -35,6 +44,13 @@ export function FontExportsTab({
         instanceIndex === index ? { ...instance, ...update } : instance
       )
     )
+  }
+
+  const updateLocation = (index: number, location: Record<string, number>) => {
+    updateExport(index, {
+      location,
+      locationText: stringifyJson(location),
+    })
   }
 
   return (
@@ -50,8 +66,8 @@ export function FontExportsTab({
                 id: makeId('instance'),
                 name: `Instance ${exports.length + 1}`,
                 styleName: 'Regular',
-                location: {},
-                locationText: '{}',
+                location: defaultLocation,
+                locationText: stringifyJson(defaultLocation),
                 export: true,
               },
             ])
@@ -74,24 +90,23 @@ export function FontExportsTab({
             </FormControl>
             <FormControl>
               <FormLabel fontSize="sm">
+                {t('projectControl.familyName')}
+              </FormLabel>
+              <Input
+                value={instance.familyName ?? ''}
+                onChange={(event) =>
+                  updateExport(index, { familyName: event.target.value })
+                }
+              />
+            </FormControl>
+            <FormControl>
+              <FormLabel fontSize="sm">
                 {t('projectControl.styleName')}
               </FormLabel>
               <Input
                 value={instance.styleName}
                 onChange={(event) =>
                   updateExport(index, { styleName: event.target.value })
-                }
-              />
-            </FormControl>
-            <FormControl>
-              <FormLabel fontSize="sm">
-                {t('projectControl.locationJson')}
-              </FormLabel>
-              <Input
-                fontFamily="mono"
-                value={instance.locationText}
-                onChange={(event) =>
-                  updateExport(index, { locationText: event.target.value })
                 }
               />
             </FormControl>
@@ -106,6 +121,46 @@ export function FontExportsTab({
                 }
               />
             </FormControl>
+          </SimpleGrid>
+          {axes.length > 0 ? (
+            <SimpleGrid columns={{ base: 1, lg: 4 }} spacing={3} mt={3}>
+              {axes.map((axis) => (
+                <NumberField
+                  key={axis.name}
+                  label={axis.label || axis.name}
+                  min={axis.minValue}
+                  max={axis.maxValue}
+                  value={instance.location[axis.name] ?? axis.defaultValue}
+                  onChange={(value) => {
+                    const parsed = parseNumber(value)
+                    updateLocation(index, {
+                      ...instance.location,
+                      [axis.name]: parsed ?? axis.defaultValue,
+                    })
+                  }}
+                />
+              ))}
+            </SimpleGrid>
+          ) : (
+            <SimpleGrid columns={{ base: 1, lg: 4 }} spacing={3} mt={3}>
+              <FormControl>
+                <FormLabel fontSize="sm">
+                  {t('projectControl.locationJson')}
+                </FormLabel>
+                <Input
+                  fontFamily="mono"
+                  value={instance.locationText}
+                  onChange={(event) => {
+                    updateExport(index, {
+                      locationText: event.target.value,
+                      location: parseLocation(event.target.value),
+                    })
+                  }}
+                />
+              </FormControl>
+            </SimpleGrid>
+          )}
+          <SimpleGrid columns={{ base: 1, lg: 4 }} spacing={3} mt={3}>
             <NumberField
               label={t('projectControl.weightClass')}
               min={1}

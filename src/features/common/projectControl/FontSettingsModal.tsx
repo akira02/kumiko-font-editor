@@ -217,6 +217,7 @@ export function FontSettingsModal({
               </TabPanel>
               <TabPanel p={0} h="100%" overflow="auto">
                 <FontExportsTab
+                  axes={axes}
                   exports={exports}
                   onExportsChange={setExports}
                 />
