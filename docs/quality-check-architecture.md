@@ -113,7 +113,15 @@ expectedFeature = currentPeerMedian + referenceResidual * confidence
 - `balance:centroidX`
 - `balance:centroidY`
 
-若某個字或 feature 沒有 reference residual，系統會直接退回固定尺或複雜度同儕尺。這個版本先把 scoring path 和資料介面接好；實際 Noto residual dataset 應該離線預先計算後載入，避免在編輯頁即時計算整套參考字體。
+若某個字或 feature 沒有 reference residual，系統會直接退回固定尺或複雜度同儕尺。
+
+目前預設資料是 `public/quality-reference/noto-sans-cjk-tc-regular-radar-residuals.json`，由 Noto Sans CJK TC Regular 離線產生。資料檔收錄約三萬個 Noto 漢字 sample，最後輸出 30,289 個逐字 residual entry，`defaultConfidence` 設為 `0.75`，讓參考字體只提供結構偏移，不會完全覆蓋目前字體自己的風格。重建指令是：
+
+```bash
+pnpm data:quality-reference [font-path-or-url] [output-json]
+```
+
+不提供參數時，script 會從 Noto CJK upstream 下載 `NotoSansCJKtc-Regular.otf`，並寫回預設 JSON 路徑。Worker 透過 `getDefaultRadarReferenceData()` 載入這份靜態 JSON；載入失敗或資料缺某個字時，品質分析照常進行，只是不使用 reference residual 校正。這維持了文件原本的界線：編輯頁不即時計算整套參考字體，runtime 只讀一份預先算好的相對值。
 
 ## 幾何怎麼取樣
 
@@ -218,8 +226,9 @@ bearing 的座標定義：
 Worker import graph 不能碰 store：
 
 - `resolvedGlyph.ts` 定義 `ResolvedGlyph` / `ResolvedFont`，並提供唯一使用 `getGlyphLayer` 的 store adapter：`resolveFontGlyphs`。它只在主執行緒使用。
-- 可進 worker 的純層包括 `polygonGeometry`、`glyphInk`、`hanClassification`、`structureMetrics`、`structureRuler`、`glyphSampling`、`qualityRadar`、`populationAnalysis`。
-- `src/workers/qualityAnalysisWorker.ts` 只 import `runPopulationAnalysis`。若 store 洩漏進 worker，build 後 chunk 會從約 9KB 膨脹到數百 KB，可當回歸檢測。
+- `populationAnalysis.ts` 只保留已解析字形的純分析；`populationAnalysisAdapter.ts` 才提供 `analyzeFontPopulation(fontData)` 這條主執行緒同步 adapter。Worker 不可 import adapter。
+- 可進 worker 的純層包括 `polygonGeometry`、`glyphInk`、`hanClassification`、`structureMetrics`、`structureRuler`、`glyphSampling`、`qualityRadar`、`populationAnalysis`，以及只用 `fetch` 載靜態資料的 `semanticStructure` / `radarReferenceData`。
+- `src/workers/qualityAnalysisWorker.ts` import `runPopulationAnalysis`、GlyphWiki enclosure loader 與 Noto residual loader。若 store 洩漏進 worker，build 後 chunk 會從十幾 KB 膨脹到數百 KB，可當回歸檢測。
 - `useQualityAnalysis.ts` 負責 worker hook；`isAnalyzing` 由「最後分析的 fontData 是否等於當前 fontData」衍生，不在 effect 裡同步 `setState`。
 
 新增母體分析特徵時，應加在 `glyphSampling` 的 sample 或 `qualityRadar.collectGlyphFeatures`，不要另開一條 flatten 流程。任何要進 worker 的程式碼只能 `import type` 自 `resolvedGlyph`，不能 import `resolveFontGlyphs`。

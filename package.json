@@ -20,6 +20,7 @@
     "data:glyphdata": "node scripts/build-glyphdata.mjs",
     "data:ids": "node scripts/build-ids-data.mjs",
     "data:glyphwiki": "node scripts/build-glyphwiki-data.mjs",
+    "data:quality-reference": "node scripts/build-quality-reference-data.mjs",
     "cf:preview": "pnpm build && npx wrangler pages dev dist",
     "cf:deploy": "pnpm build && npx wrangler pages deploy dist"
   },

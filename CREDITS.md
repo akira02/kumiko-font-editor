@@ -33,3 +33,10 @@ Licensed under the SIL Open Font License 1.1 (see `test/fixtures/otf/OFL.txt`).
 
 A minimal demonstration UFO used only as a fixture for the UFO round-trip test.
 Licensed under the SIL Open Font License 1.1 (see `test/fixtures/ufo/OFL.txt`).
+
+6. [Noto Sans CJK](https://github.com/notofonts/noto-cjk)
+
+`public/quality-reference/noto-sans-cjk-tc-regular-radar-residuals.json`
+contains geometric residual data derived from Noto Sans CJK TC Regular by
+`scripts/build-quality-reference-data.mjs`. The Noto Sans CJK fonts are
+licensed under the SIL Open Font License 1.1.

@@ -11,7 +11,7 @@ import {
 } from 'src/lib/qualityCheck/hanClassification'
 import { resolveFontGlyphs } from 'src/lib/qualityCheck/resolvedGlyph'
 import { buildGlyphGeometrySample } from 'src/lib/qualityCheck/glyphSampling'
-import { analyzeFontPopulation } from 'src/lib/qualityCheck/populationAnalysis'
+import { analyzeFontPopulation } from 'src/lib/qualityCheck/populationAnalysisAdapter'
 import type { FontData, GlyphData, PathData } from 'src/store/types'
 import { normalizeGlyphToLayers } from 'src/store'
 

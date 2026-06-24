@@ -1,4 +1,5 @@
 import { runPopulationAnalysis } from 'src/lib/qualityCheck/populationAnalysis'
+import { getDefaultRadarReferenceData } from 'src/lib/qualityCheck/radarReferenceData'
 import { getEnclosureCharacterSet } from 'src/lib/qualityCheck/semanticStructure'
 import type { ResolvedFont } from 'src/lib/qualityCheck/resolvedGlyph'
 
@@ -25,8 +26,15 @@ self.onmessage = async (event: MessageEvent<AnalyzeMessage>) => {
   const post = (self as DedicatedWorkerGlobalScope).postMessage.bind(self)
 
   try {
-    const enclosureChars = await getEnclosureCharacterSet()
-    const analysis = runPopulationAnalysis(resolvedFont, enclosureChars)
+    const [enclosureChars, referenceData] = await Promise.all([
+      getEnclosureCharacterSet(),
+      getDefaultRadarReferenceData(),
+    ])
+    const analysis = runPopulationAnalysis(
+      resolvedFont,
+      enclosureChars,
+      referenceData
+    )
     post({ type: 'analysis-success', payload: { requestId, analysis } })
   } catch (error) {
     post({

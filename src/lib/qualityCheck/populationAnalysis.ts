@@ -1,6 +1,4 @@
-import type { FontData } from 'src/store'
 import type { ResolvedFont } from 'src/lib/qualityCheck/resolvedGlyph'
-import { resolveFontGlyphs } from 'src/lib/qualityCheck/resolvedGlyph'
 import { buildFontGeometrySamples } from 'src/lib/qualityCheck/glyphSampling'
 import {
   buildStructureBaseline,
@@ -44,23 +42,4 @@ export const runPopulationAnalysis = (
       referenceData
     ),
   }
-}
-
-/**
- * Synchronously derive population analysis from live FontData. Useful for small
- * fonts, tests, and fallback paths where the worker is not involved.
- */
-export const analyzeFontPopulation = (
-  fontData: FontData | null | undefined,
-  semanticEnclosureChars?: ReadonlySet<string>,
-  referenceData?: RadarReferenceData | null
-): PopulationAnalysis => {
-  if (!fontData) {
-    return { baseline: null, ruler: null, radar: null }
-  }
-  return runPopulationAnalysis(
-    resolveFontGlyphs(fontData),
-    semanticEnclosureChars,
-    referenceData
-  )
 }

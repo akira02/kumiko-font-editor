@@ -9,7 +9,7 @@ import {
   computeRadarFromSamples,
   radarZScore,
 } from 'src/lib/qualityCheck/qualityRadar'
-import { analyzeFontPopulation } from 'src/lib/qualityCheck/populationAnalysis'
+import { analyzeFontPopulation } from 'src/lib/qualityCheck/populationAnalysisAdapter'
 import type { GlyphGeometrySample } from 'src/lib/qualityCheck/glyphSampling'
 import type { FontData, GlyphData, PathData } from 'src/store'
 import { normalizeGlyphToLayers } from 'src/store'
