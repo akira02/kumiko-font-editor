@@ -149,6 +149,16 @@ export const buildUiActions = (set: ImmerSet) => ({
       state.referenceFontChar = char
     }),
 
+  setReferenceFontColor: (color: string) =>
+    set((state) => {
+      state.referenceFontColor = color
+    }),
+
+  setReferenceFontOpacity: (opacity: number) =>
+    set((state) => {
+      state.referenceFontOpacity = Math.min(1, Math.max(0, opacity))
+    }),
+
   setReferenceFontResidualComputing: () =>
     set((state) => {
       state.referenceFontResidualEnabled = false

@@ -14,21 +14,113 @@ interface LoadedReferenceFont {
 
 let loaded: LoadedReferenceFont | null = null
 
+const languageCandidates = (locale?: string | null) => {
+  const normalized = locale?.replace(/_/g, '-')
+  const lower = normalized?.toLowerCase()
+  const candidates = new Set<string>()
+  if (normalized) {
+    candidates.add(normalized)
+  }
+  if (lower) {
+    candidates.add(lower)
+  }
+
+  const language = lower?.split('-')[0]
+  if (language === 'zh') {
+    if (
+      lower?.includes('hant') ||
+      lower?.includes('tw') ||
+      lower?.includes('hk') ||
+      lower?.includes('mo')
+    ) {
+      candidates.add('zh-Hant')
+      candidates.add('zh-TW')
+    } else {
+      candidates.add('zh-Hans')
+      candidates.add('zh-CN')
+    }
+    candidates.add('zh')
+  } else if (language) {
+    candidates.add(language)
+  }
+
+  candidates.add('en')
+  candidates.add('en-US')
+  candidates.add('en-GB')
+  return [...candidates]
+}
+
+const getLocalizedValue = (
+  localized: Record<string, string> | undefined,
+  locale?: string | null
+) => {
+  if (!localized) {
+    return undefined
+  }
+  const entries = Object.entries(localized)
+  const byLowerKey = new Map(
+    entries.map(([key, value]) => [key.toLowerCase(), value])
+  )
+  for (const candidate of languageCandidates(locale)) {
+    const value = byLowerKey.get(candidate.toLowerCase())
+    if (value) {
+      return value
+    }
+  }
+  return entries[0]?.[1]
+}
+
+const getLocalizedFontName = (font: opentype.Font, locale?: string | null) => {
+  const names = font.names as unknown as Record<
+    string,
+    Record<string, string> | Record<string, Record<string, string>> | undefined
+  >
+  for (const key of ['preferredFamily', 'fontFamily', 'fullName']) {
+    const directValue = getLocalizedValue(
+      names[key] as Record<string, string> | undefined,
+      locale
+    )
+    if (directValue) {
+      return directValue
+    }
+
+    for (const platform of ['unicode', 'windows', 'macintosh']) {
+      const platformNames = names[platform] as
+        | Record<string, Record<string, string> | undefined>
+        | undefined
+      const platformValue = getLocalizedValue(platformNames?.[key], locale)
+      if (platformValue) {
+        return platformValue
+      }
+    }
+
+    for (const platformNames of Object.values(names)) {
+      if (!platformNames || typeof platformNames !== 'object') {
+        continue
+      }
+      const nestedValue = getLocalizedValue(
+        (platformNames as Record<string, Record<string, string> | undefined>)[
+          key
+        ],
+        locale
+      )
+      if (nestedValue) {
+        return nestedValue
+      }
+    }
+  }
+  return undefined
+}
+
 // Parse font bytes into the holder and return a display name. `fallbackName`
 // is used when the font has no family name (e.g. derived from a file name).
 export function loadReferenceFontFromBytes(
   buffer: ArrayBuffer,
-  fallbackName?: string
+  fallbackName?: string,
+  locale?: string | null
 ): string {
   const font = opentype.parse(buffer)
-  const familyNames = font.names?.fontFamily as
-    | Record<string, string>
-    | undefined
-  const name =
-    familyNames?.en ??
-    (familyNames ? Object.values(familyNames)[0] : undefined) ??
-    fallbackName ??
-    'Reference'
+  const name = getLocalizedFontName(font, locale) ?? fallbackName ?? 'Reference'
   loaded = { name, font, unitsPerEm: font.unitsPerEm, fontBytes: buffer }
   return name
 }

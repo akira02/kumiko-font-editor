@@ -11,6 +11,15 @@ import {
   ModalFooter,
   ModalHeader,
   ModalOverlay,
+  Popover,
+  PopoverArrow,
+  PopoverBody,
+  PopoverContent,
+  PopoverTrigger,
+  Slider,
+  SliderFilledTrack,
+  SliderThumb,
+  SliderTrack,
   Spinner,
   Stack,
   Text,
@@ -39,13 +48,15 @@ export function ReferenceFontSettingsModal({
   isOpen,
   onClose,
 }: ReferenceFontSettingsModalProps) {
-  const { t } = useTranslation()
+  const { i18n, t } = useTranslation()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [error, setError] = useState<string | null>(null)
 
   const projectId = useStore((state) => state.projectId)
   const referenceFontName = useStore((state) => state.referenceFontName)
   const referenceFontChar = useStore((state) => state.referenceFontChar)
+  const referenceFontColor = useStore((state) => state.referenceFontColor)
+  const referenceFontOpacity = useStore((state) => state.referenceFontOpacity)
   const residualEnabled = useStore(
     (state) => state.referenceFontResidualEnabled
   )
@@ -59,6 +70,10 @@ export function ReferenceFontSettingsModal({
     (state) => state.setReferenceFontVisible
   )
   const setReferenceFontChar = useStore((state) => state.setReferenceFontChar)
+  const setReferenceFontColor = useStore((state) => state.setReferenceFontColor)
+  const setReferenceFontOpacity = useStore(
+    (state) => state.setReferenceFontOpacity
+  )
   const setReferenceFontResidualComputing = useStore(
     (state) => state.setReferenceFontResidualComputing
   )
@@ -88,7 +103,11 @@ export function ReferenceFontSettingsModal({
     try {
       const buffer = await file.arrayBuffer()
       const fallbackName = file.name.replace(/\.[^.]+$/, '')
-      const name = loadReferenceFontFromBytes(buffer, fallbackName)
+      const name = loadReferenceFontFromBytes(
+        buffer,
+        fallbackName,
+        i18n.resolvedLanguage ?? i18n.language
+      )
       setReferenceFontName(name)
       setReferenceFontVisible(true)
       setReferenceFontChar(null)
@@ -228,6 +247,98 @@ export function ReferenceFontSettingsModal({
                 }
                 placeholder={t('editor.referenceFontCharOverridePlaceholder')}
               />
+            </Box>
+
+            <Box>
+              <Text fontSize="xs" color="field.muted" mb={2}>
+                {t('editor.referenceFontAppearance')}
+              </Text>
+              <Stack spacing={2}>
+                <HStack justify="space-between" spacing={3}>
+                  <Text fontSize="sm" fontWeight="700">
+                    {t('editor.referenceFontColor')}
+                  </Text>
+                  <Popover placement="bottom-end">
+                    <PopoverTrigger>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        aria-label={t('editor.referenceFontColor')}
+                      >
+                        <HStack spacing={2}>
+                          <Box
+                            w="18px"
+                            h="18px"
+                            borderRadius="sm"
+                            borderWidth={1}
+                            borderColor="field.line"
+                            bg={referenceFontColor}
+                            opacity={referenceFontOpacity}
+                          />
+                          <Text fontFamily="mono" fontSize="xs">
+                            {Math.round(referenceFontOpacity * 100)}%
+                          </Text>
+                        </HStack>
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      bg="field.paper"
+                      borderColor="field.line"
+                      w="240px"
+                    >
+                      <PopoverArrow bg="field.paper" />
+                      <PopoverBody>
+                        <Stack spacing={3}>
+                          <HStack justify="space-between">
+                            <Text fontSize="sm" fontWeight="700">
+                              {t('editor.referenceFontColor')}
+                            </Text>
+                            <Input
+                              type="color"
+                              size="sm"
+                              w="52px"
+                              h="32px"
+                              p={1}
+                              value={referenceFontColor}
+                              onChange={(event) =>
+                                setReferenceFontColor(event.target.value)
+                              }
+                            />
+                          </HStack>
+                          <Box>
+                            <HStack justify="space-between" mb={1}>
+                              <Text fontSize="sm" fontWeight="700">
+                                {t('editor.referenceFontOpacity')}
+                              </Text>
+                              <Text
+                                fontFamily="mono"
+                                fontSize="xs"
+                                color="field.muted"
+                              >
+                                {Math.round(referenceFontOpacity * 100)}%
+                              </Text>
+                            </HStack>
+                            <Slider
+                              min={5}
+                              max={100}
+                              step={5}
+                              value={Math.round(referenceFontOpacity * 100)}
+                              onChange={(value) =>
+                                setReferenceFontOpacity(value / 100)
+                              }
+                            >
+                              <SliderTrack bg="blackAlpha.200">
+                                <SliderFilledTrack bg="field.yellow.400" />
+                              </SliderTrack>
+                              <SliderThumb />
+                            </Slider>
+                          </Box>
+                        </Stack>
+                      </PopoverBody>
+                    </PopoverContent>
+                  </Popover>
+                </HStack>
+              </Stack>
             </Box>
 
             <Box opacity={isComputingResidual ? 0.65 : 1}>

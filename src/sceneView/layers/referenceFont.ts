@@ -25,7 +25,8 @@ registerVisualizationLayerDefinition({
   ) => {
     if (!model.referencePath) return
     const context = canvasController.context
-    context.fillStyle = parameters.fillColor as string
+    context.fillStyle =
+      model.referenceFillColor ?? (parameters.fillColor as string)
     context.fill(model.referencePath)
   },
 })

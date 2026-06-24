@@ -437,6 +437,8 @@ export interface GlobalState {
   referenceFontName: string | null
   referenceFontVisible: boolean
   referenceFontChar: string | null
+  referenceFontColor: string
+  referenceFontOpacity: number
   referenceFontResidualEnabled: boolean
   referenceFontResidualStatus: ReferenceFontResidualStatus
   referenceFontResidualData: RadarReferenceData | null
@@ -536,6 +538,8 @@ export interface GlobalState {
   setReferenceFontName: (name: string | null) => void
   setReferenceFontVisible: (visible: boolean) => void
   setReferenceFontChar: (char: string | null) => void
+  setReferenceFontColor: (color: string) => void
+  setReferenceFontOpacity: (opacity: number) => void
   setReferenceFontResidualComputing: () => void
   setReferenceFontResidualReady: (
     data: RadarReferenceData,

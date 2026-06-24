@@ -1,5 +1,6 @@
 import { Box } from '@chakra-ui/react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   CanvasController,
   SceneView,
@@ -29,6 +30,7 @@ import { loadProjectGlyphGeometryClosure } from 'src/lib/project/projectReposito
 import type { GlyphData } from 'src/store'
 
 export function CanvasWorkspace() {
+  const { i18n } = useTranslation()
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const canvasControllerRef = useRef<CanvasController | null>(null)
   const sceneControllerRef = useRef<SceneController | null>(null)
@@ -88,6 +90,8 @@ export function CanvasWorkspace() {
   const referenceFontName = useStore((state) => state.referenceFontName)
   const referenceFontVisible = useStore((state) => state.referenceFontVisible)
   const referenceFontChar = useStore((state) => state.referenceFontChar)
+  const referenceFontColor = useStore((state) => state.referenceFontColor)
+  const referenceFontOpacity = useStore((state) => state.referenceFontOpacity)
   const projectId = useStore((state) => state.projectId)
   const hydrateGlyphGeometry = useStore((state) => state.hydrateGlyphGeometry)
   const setReferenceFontName = useStore((state) => state.setReferenceFontName)
@@ -382,6 +386,7 @@ export function CanvasWorkspace() {
 
   useReferenceFontRestoration({
     projectId,
+    referenceFontLocale: i18n.resolvedLanguage ?? i18n.language,
     clearReferenceFontResidual,
     setReferenceFontChar,
     setReferenceFontName,
@@ -443,7 +448,9 @@ export function CanvasWorkspace() {
     positionedGlyph,
     positionedGlyphs,
     referenceFontChar,
+    referenceFontColor,
     referenceFontName,
+    referenceFontOpacity,
     referenceFontVisible,
     sceneControllerRef,
     selectedLayerId,

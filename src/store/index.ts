@@ -137,6 +137,8 @@ const initialState = {
   referenceFontName: null,
   referenceFontVisible: false,
   referenceFontChar: null,
+  referenceFontColor: '#1f6feb',
+  referenceFontOpacity: 0.2,
   referenceFontResidualEnabled: false,
   referenceFontResidualStatus: 'idle' as const,
   referenceFontResidualData: null,

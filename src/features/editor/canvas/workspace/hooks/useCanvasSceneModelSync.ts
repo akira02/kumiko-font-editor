@@ -16,6 +16,18 @@ import {
   type PathData,
 } from 'src/store'
 
+const hexColorToRgba = (hexColor: string, opacity: number) => {
+  const match = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hexColor)
+  if (!match) {
+    return `rgba(31, 111, 235, ${Math.min(1, Math.max(0, opacity))})`
+  }
+  const red = Number.parseInt(match[1], 16)
+  const green = Number.parseInt(match[2], 16)
+  const blue = Number.parseInt(match[3], 16)
+  const alpha = Math.min(1, Math.max(0, opacity))
+  return `rgba(${red}, ${green}, ${blue}, ${alpha})`
+}
+
 const buildPath2DFromPaths = (paths: PathData[]) =>
   new Path2D(
     VarPackedPath.fromUnpackedContours(
@@ -61,7 +73,9 @@ interface CanvasSceneModelSyncOptions {
   positionedGlyph: PositionedGlyph | undefined
   positionedGlyphs: PositionedGlyph[]
   referenceFontChar: string | null
+  referenceFontColor: string
   referenceFontName: string | null
+  referenceFontOpacity: number
   referenceFontVisible: boolean
   sceneControllerRef: RefObject<SceneController | null>
   selectedLayerId: string | null
@@ -85,7 +99,9 @@ export function useCanvasSceneModelSync({
   positionedGlyph,
   positionedGlyphs,
   referenceFontChar,
+  referenceFontColor,
   referenceFontName,
+  referenceFontOpacity,
   referenceFontVisible,
   sceneControllerRef,
   selectedLayerId,
@@ -155,13 +171,19 @@ export function useCanvasSceneModelSync({
       referenceFontVisible && referenceFontName && char
         ? (buildReferenceCharPath(char, unitsPerEm, advanceWidth) ?? undefined)
         : undefined
+    sceneController.sceneModel.referenceFillColor = hexColorToRgba(
+      referenceFontColor,
+      referenceFontOpacity
+    )
     controller.requestUpdate()
   }, [
     activeEditorGlyphId,
     canvasControllerRef,
     fontData,
     referenceFontChar,
+    referenceFontColor,
     referenceFontName,
+    referenceFontOpacity,
     referenceFontVisible,
     sceneControllerRef,
     selectedLayerId,

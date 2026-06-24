@@ -8,7 +8,6 @@ import type {
   PositionedGlyph,
   SceneModel,
   StructureGuideModel,
-  StructureGuideSide,
 } from 'src/sceneView/SceneView'
 import type { CanvasController } from 'src/sceneView/CanvasController'
 
@@ -29,10 +28,6 @@ const sideGeometry = (
   bottom: { toBandStart: (value) => guide.bodyBottom + value, axis: 'y' },
 })
 
-const isOutsideBand = (side: StructureGuideSide) =>
-  side.band !== null &&
-  (side.bearing < side.band.p10 || side.bearing > side.band.p90)
-
 registerVisualizationLayerDefinition({
   identifier: 'main.structureGuide',
   name: 'Structure Guide',
@@ -40,20 +35,18 @@ registerVisualizationLayerDefinition({
   userSwitchable: false,
   defaultOn: true,
   zIndex: 90,
-  screenParameters: { modeWidth: 1.5, edgeWidth: 1.5, edgeDash: [6, 6] },
+  screenParameters: { modeWidth: 1.5 },
   colors: {
     framingFill: 'rgba(237, 100, 166, 0.14)',
     framingLine: 'rgba(237, 100, 166, 0.6)',
     branchingFill: 'rgba(66, 153, 225, 0.14)',
     branchingLine: 'rgba(66, 153, 225, 0.6)',
-    outsideColor: '#E53E3E',
   },
   colorsDarkMode: {
     framingFill: 'rgba(237, 100, 166, 0.18)',
     framingLine: 'rgba(246, 135, 179, 0.7)',
     branchingFill: 'rgba(66, 153, 225, 0.18)',
     branchingLine: 'rgba(99, 179, 237, 0.7)',
-    outsideColor: '#FC8181',
   },
   draw: (
     canvasController: CanvasController,
@@ -132,17 +125,6 @@ registerVisualizationLayerDefinition({
         parameters.modeWidth as number,
         null
       )
-
-      // 此邊落在 80% 區間外 → 以紅色虛線標示目前邊緣位置
-      if (isOutsideBand(side)) {
-        strokeAcross(
-          axis,
-          toBandStart(side.bearing),
-          parameters.outsideColor as string,
-          parameters.edgeWidth as number,
-          parameters.edgeDash as number[]
-        )
-      }
     }
   },
 })

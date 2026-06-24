@@ -72,6 +72,7 @@ export interface SceneModel {
   // Single reference-font character rendered behind the editing glyph
   // (glyph-local, font units). See lib/referenceFont.
   referencePath?: Path2D
+  referenceFillColor?: string
   // Non-active glyph layers shown faintly behind the editing layer.
   backdropPaths?: Path2D[]
   // When true, the active layer's outline fill is not drawn.
