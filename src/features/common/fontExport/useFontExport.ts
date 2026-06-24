@@ -26,6 +26,10 @@ import { flushPendingDraft } from 'src/lib/project/flushPendingDraft'
 import { markKumikoProjectExportClean } from 'src/lib/project/kumikoProjectPersistence'
 import { createProjectUiStateSnapshot } from 'src/lib/project/projectUiState'
 import { canUseCanonicalUfoZipExport } from 'src/features/common/fontExport/exportDraftPolicy'
+import {
+  createFontExportErrorReport,
+  type FontExportErrorReport,
+} from 'src/features/common/fontExport/exportErrorReport'
 import { useStore } from 'src/store'
 import type {
   FontExportFormat,
@@ -100,6 +104,8 @@ export function useFontExport() {
     total: number
     phase?: 'write' | 'zip'
   } | null>(null)
+  const [exportErrorReport, setExportErrorReport] =
+    useState<FontExportErrorReport | null>(null)
   const fontData = useStore((state) => state.fontData)
   const projectId = useStore((state) => state.projectId)
   const projectTitle = useStore((state) => state.projectTitle)
@@ -177,6 +183,7 @@ export function useFontExport() {
 
     try {
       setIsExporting(true)
+      setExportErrorReport(null)
       await flushPendingDraft({
         projectId,
         projectTitle: projectTitle || projectId,
@@ -406,10 +413,11 @@ export function useFontExport() {
         isClosable: true,
       })
     } catch (error) {
+      const report = createFontExportErrorReport(error, selectedFormats)
+      setExportErrorReport(report)
       toast({
         title: '匯出失敗',
-        description:
-          error instanceof Error ? error.message : '目前無法匯出字型。',
+        description: report.message,
         status: 'error',
         duration: 3200,
         isClosable: true,
@@ -428,6 +436,8 @@ export function useFontExport() {
     glyphsExportWarnings,
     exportInstances: fontData?.exportInstances ?? [],
     canExportVariableFont,
+    exportErrorReport,
+    closeExportErrorReport: () => setExportErrorReport(null),
     isExporting,
     loadingText,
     ufoExportProgress,

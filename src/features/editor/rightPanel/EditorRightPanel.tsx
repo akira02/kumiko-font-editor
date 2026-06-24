@@ -8,6 +8,7 @@ import {
   useDisclosure,
 } from '@chakra-ui/react'
 import { useState } from 'react'
+import { ExportErrorModal } from 'src/features/common/fontExport/ExportErrorModal'
 import { ExportFontModal } from 'src/features/common/fontExport/ExportFontModal'
 import { useFontExport } from 'src/features/common/fontExport/useFontExport'
 import { GitHubCommitModal } from 'src/features/common/glyphInspector/components/GitHubCommitModal'
@@ -163,6 +164,10 @@ export function EditorRightPanel() {
         onExport={(format, options) =>
           void fontExport.exportFont(format, options)
         }
+      />
+      <ExportErrorModal
+        report={fontExport.exportErrorReport}
+        onClose={fontExport.closeExportErrorReport}
       />
       {fontSettingsModal.isOpen ? (
         <FontSettingsModal

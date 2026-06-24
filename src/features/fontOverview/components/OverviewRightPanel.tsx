@@ -1,6 +1,7 @@
 import { Box, Stack, Text, useDisclosure } from '@chakra-ui/react'
 import { useState } from 'react'
 import { BatchTransformCard } from 'src/features/fontOverview/components/BatchTransformCard'
+import { ExportErrorModal } from 'src/features/common/fontExport/ExportErrorModal'
 import { ExportFontModal } from 'src/features/common/fontExport/ExportFontModal'
 import { useFontExport } from 'src/features/common/fontExport/useFontExport'
 import { GitHubCommitModal } from 'src/features/common/glyphInspector/components/GitHubCommitModal'
@@ -134,6 +135,10 @@ export function OverviewRightPanel({
         onExport={(format, options) =>
           void fontExport.exportFont(format, options)
         }
+      />
+      <ExportErrorModal
+        report={fontExport.exportErrorReport}
+        onClose={fontExport.closeExportErrorReport}
       />
       {fontSettingsModal.isOpen ? (
         <FontSettingsModal
