@@ -332,15 +332,11 @@ export const exportCanonicalProjectAsVariableOtf = async (input: {
     input.batchSize
   )
   const bracketLayerSources = getBracketLayerSources(glyphs)
-  if (
+  const shouldCompileFeaturesBeforeVariableBuild = Boolean(
     bracketLayerSources.length > 0 &&
     fontData.openTypeFeatures &&
     needsOpenTypeFeatureCompilationForBinaryExport(fontData.openTypeFeatures)
-  ) {
-    throw new Error(
-      'Variable OTF 的 bracket layers 需要保留 fontTools 產生的 FeatureVariations；目前不能同時重編 OpenType features。請先改用 preserve compiled tables 或暫時移除 feature edits。'
-    )
-  }
+  )
   const defaultLocation = Object.fromEntries(
     axes.map((axis) => [axis.name, axis.defaultValue])
   )
@@ -357,7 +353,9 @@ export const exportCanonicalProjectAsVariableOtf = async (input: {
   const familyName = fontData.fontInfo?.familyName || project.title || 'Kumiko'
   const masterFontData = {
     ...fontData,
-    openTypeFeatures: undefined,
+    openTypeFeatures: shouldCompileFeaturesBeforeVariableBuild
+      ? fontData.openTypeFeatures
+      : undefined,
   }
   const masters = await Promise.all(
     variableSources.map(async (source, index) => {
@@ -417,9 +415,11 @@ export const exportCanonicalProjectAsVariableOtf = async (input: {
       fontBuffer: master.fontBuffer,
     }))
   )
-  const compiledBuffer = await compileManagedFontFeatures(
-    variableBuffer,
-    fontData.openTypeFeatures
-  )
+  const compiledBuffer = shouldCompileFeaturesBeforeVariableBuild
+    ? variableBuffer
+    : await compileManagedFontFeatures(
+        variableBuffer,
+        fontData.openTypeFeatures
+      )
   return new Blob([compiledBuffer], { type: 'font/otf' })
 }

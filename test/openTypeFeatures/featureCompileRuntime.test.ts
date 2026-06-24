@@ -102,6 +102,12 @@ const buildMasterFont = (
       advanceWidth: 500 + weight,
       path: rectPath(50, 300 + weight, 700),
     }),
+    new opentype.Glyph({
+      name: 'B',
+      unicode: 0x42,
+      advanceWidth: 500 + weight,
+      path: rectPath(70, 260 + weight, 700),
+    }),
   ]
   if (options.includeBracketAlternate) {
     glyphs.push(
@@ -365,6 +371,82 @@ describe('fontTools FEA compile runtime', () => {
     expect(built.ok, built.message).toBe(true)
     const inspected = inspect(pyodide, '/tmp/bracket-out.otf')
     expect(inspected.tables).toContain('GSUB')
+    expect(inspected.features).toContain('rclt')
+    expect(inspected.gsubFeatureVariations).toBe(true)
+  })
+
+  it('keeps compiled master features when adding bracket FeatureVariations', () => {
+    pyodide.FS.writeFile(
+      '/tmp/bracket-feature-light-src.otf',
+      new Uint8Array(
+        buildMasterFont(0, 'Light', { includeBracketAlternate: true })
+      )
+    )
+    pyodide.FS.writeFile(
+      '/tmp/bracket-feature-bold-src.otf',
+      new Uint8Array(
+        buildMasterFont(100, 'Bold', { includeBracketAlternate: true })
+      )
+    )
+    pyodide.FS.writeFile('/tmp/bracket-feature.fea', FEATURE_TEXT)
+
+    for (const style of ['light', 'bold']) {
+      const result = pyodide.runPython(
+        `kumiko_compile_fea('/tmp/bracket-feature-${style}-src.otf', '/tmp/bracket-feature.fea', '/tmp/bracket-feature-${style}.otf', ["GSUB"])`
+      ) as {
+        toJs: (o?: { dict_converter?: typeof Object.fromEntries }) => unknown
+        destroy?: () => void
+      }
+      const compiled = result.toJs({ dict_converter: Object.fromEntries }) as {
+        ok: boolean
+        message: string
+      }
+      result.destroy?.()
+      expect(compiled.ok, compiled.message).toBe(true)
+    }
+
+    pyodide.FS.writeFile(
+      '/tmp/bracket-feature.designspace',
+      `<?xml version="1.0" encoding="UTF-8"?>
+<designspace format="4.1">
+  <axes>
+    <axis tag="wght" name="Weight" minimum="0" maximum="100" default="0"/>
+  </axes>
+  <sources>
+    <source filename="bracket-feature-light.otf" name="Light" stylename="Light">
+      <info copy="1"/>
+      <location><dimension name="Weight" xvalue="0"/></location>
+    </source>
+    <source filename="bracket-feature-bold.otf" name="Bold" stylename="Bold">
+      <location><dimension name="Weight" xvalue="100"/></location>
+    </source>
+  </sources>
+  <rules processing="last">
+    <rule name="A.bracket">
+      <conditionset>
+        <condition name="Weight" minimum="80" maximum="100"/>
+      </conditionset>
+      <sub name="A" with="A.bracket.bracket"/>
+    </rule>
+  </rules>
+</designspace>`
+    )
+
+    const result = pyodide.runPython(
+      `kumiko_build_variable_font('/tmp/bracket-feature.designspace', '/tmp/bracket-feature-out.otf')`
+    ) as {
+      toJs: (o?: { dict_converter?: typeof Object.fromEntries }) => unknown
+      destroy?: () => void
+    }
+    const built = result.toJs({ dict_converter: Object.fromEntries }) as {
+      ok: boolean
+      message: string
+    }
+    result.destroy?.()
+
+    expect(built.ok, built.message).toBe(true)
+    const inspected = inspect(pyodide, '/tmp/bracket-feature-out.otf')
+    expect(inspected.features).toContain('ss01')
     expect(inspected.features).toContain('rclt')
     expect(inspected.gsubFeatureVariations).toBe(true)
   })

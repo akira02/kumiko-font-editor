@@ -60,6 +60,7 @@ const exportOptions: Array<{
   format: FontExportFormat
   label: string
   description: string
+  group: 'source' | 'font'
   // When set, only show this option for the matching project source format.
   sourceFormat?: ProjectSourceFormat
   requiresVariableFont?: boolean
@@ -68,21 +69,25 @@ const exportOptions: Array<{
     format: 'zip',
     label: 'UFO (ZIP)',
     description: '可再匯入或交給其他字型工具編輯。',
+    group: 'source',
   },
   {
     format: 'glyphs2',
     label: 'Glyphs 2 (.glyphs)',
     description: '匯出 Glyphs 2 相容檔案，使用 paths/components 結構。',
+    group: 'source',
   },
   {
     format: 'glyphs3',
     label: 'Glyphs 3 (.glyphs)',
     description: '匯出 Glyphs 3 相容檔案，使用 shapes 與 tuple nodes。',
+    group: 'source',
   },
   {
     format: 'glyphspackage',
     label: 'Glyphs Package (ZIP)',
     description: '回存 .glyphspackage 內容，打包成 ZIP。',
+    group: 'source',
     sourceFormat: 'glyphspackage',
   },
   {
@@ -90,27 +95,49 @@ const exportOptions: Array<{
     label: 'Variable OTF',
     description:
       '使用 fontTools 建立含 fvar/CFF2 variation tables 的可變字型。',
+    group: 'font',
     requiresVariableFont: true,
   },
   {
     format: 'ttf',
     label: 'TTF',
     description: 'TrueType 字型檔。',
+    group: 'font',
   },
   {
     format: 'otf',
     label: 'OTF',
     description: 'OpenType 字型檔。',
+    group: 'font',
   },
   {
     format: 'woff',
     label: 'WOFF',
     description: '網頁字型格式。',
+    group: 'font',
   },
   {
     format: 'woff2',
     label: 'WOFF2',
     description: '壓縮率較高的網頁字型格式。',
+    group: 'font',
+  },
+]
+
+const exportOptionGroups: Array<{
+  id: 'source' | 'font'
+  label: string
+  description: string
+}> = [
+  {
+    id: 'source',
+    label: '工作檔',
+    description: '保留編輯結構，適合備份、同步或交給其他字型工具。',
+  },
+  {
+    id: 'font',
+    label: '字型檔',
+    description: '產生可安裝或可在網頁使用的字型輸出。',
   },
 ]
 
@@ -258,6 +285,12 @@ export function ExportFontModal({
       (!option.sourceFormat || option.sourceFormat === sourceFormat) &&
       (!option.requiresVariableFont || canExportVariableFont)
   )
+  const visibleOptionGroups = exportOptionGroups
+    .map((group) => ({
+      ...group,
+      options: visibleOptions.filter((option) => option.group === group.id),
+    }))
+    .filter((group) => group.options.length > 0)
   const exportableInstances = useMemo(
     () => exportInstances.filter((instance) => instance.export !== false),
     [exportInstances]
@@ -330,37 +363,62 @@ export function ExportFontModal({
                 onChange={setConfirmedDropUnsupported}
               />
             )}
-            {visibleOptions.map((option) => (
-              <Button
-                key={option.format}
-                h="auto"
-                minH="88px"
-                justifyContent="flex-start"
-                alignItems="flex-start"
-                whiteSpace="normal"
-                variant="unstyled"
-                p={4}
-                borderColor={
-                  selectedFormats.includes(option.format)
-                    ? 'field.accent'
-                    : undefined
-                }
-                isDisabled={!canExport || isExporting}
-                onClick={() => toggleFormat(option.format)}
-              >
-                <Stack spacing={1} align="flex-start" textAlign="left">
-                  <HStack spacing={2}>
-                    <Checkbox
-                      isChecked={selectedFormats.includes(option.format)}
-                      pointerEvents="none"
-                    />
-                    <Text fontWeight="semibold">{option.label}</Text>
-                  </HStack>
-                  <Text fontSize="sm" fontWeight="normal" color="gray.500">
-                    {option.description}
+            {visibleOptionGroups.map((group) => (
+              <Stack key={group.id} spacing={2}>
+                <Stack spacing={0}>
+                  <Text fontSize="sm" fontWeight="semibold">
+                    {group.label}
+                  </Text>
+                  <Text fontSize="xs" color="field.muted">
+                    {group.description}
                   </Text>
                 </Stack>
-              </Button>
+                <Stack spacing={1}>
+                  {group.options.map((option) => {
+                    const isSelected = selectedFormats.includes(option.format)
+                    return (
+                      <Button
+                        key={option.format}
+                        h="auto"
+                        minH="58px"
+                        justifyContent="flex-start"
+                        alignItems="flex-start"
+                        whiteSpace="normal"
+                        variant="unstyled"
+                        p={3}
+                        borderWidth="1px"
+                        borderRadius="md"
+                        borderColor={isSelected ? 'field.accent' : 'field.line'}
+                        bg={isSelected ? 'field.panelMuted' : 'transparent'}
+                        isDisabled={!canExport || isExporting}
+                        onClick={() => toggleFormat(option.format)}
+                      >
+                        <Stack
+                          spacing={0.5}
+                          align="flex-start"
+                          textAlign="left"
+                        >
+                          <HStack spacing={2}>
+                            <Checkbox
+                              isChecked={isSelected}
+                              pointerEvents="none"
+                            />
+                            <Text fontWeight="semibold">{option.label}</Text>
+                          </HStack>
+                          <Text
+                            pl={6}
+                            fontSize="xs"
+                            fontWeight="normal"
+                            color="field.muted"
+                          >
+                            {option.description}
+                          </Text>
+                        </Stack>
+                      </Button>
+                    )
+                  })}
+                </Stack>
+              </Stack>
             ))}
             {hasSelectedBinaryFormat && exportableInstances.length > 0 && (
               <>
