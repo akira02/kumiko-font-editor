@@ -33,6 +33,7 @@ import {
 import type { FontAxis, FontSource, GlyphData, GlyphLayerData } from 'src/store'
 
 const BINARY_EXPORT_GLYPH_BATCH_SIZE = 256
+const POST_SCRIPT_SAFE_NAME_MAX_LENGTH = 60
 
 const getCanonicalBinaryExportGlyphIds = async (
   projectId: string,
@@ -176,6 +177,64 @@ interface VariableMasterSource {
   id: string
   name: string
   location: Record<string, number>
+}
+
+const normalizePostScriptSafeNamePart = (value: string) =>
+  value
+    .normalize('NFKD')
+    .replace(/[^\x20-\x7E]/g, '')
+    .replace(/[^A-Za-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+
+const trimPostScriptSafeNamePart = (value: string) =>
+  value.slice(0, POST_SCRIPT_SAFE_NAME_MAX_LENGTH).replace(/-+$/g, '')
+
+const makePostScriptSafeNamePart = (value: string, fallback: string) => {
+  const fallbackName = normalizePostScriptSafeNamePart(fallback) || 'KumikoName'
+  return (
+    trimPostScriptSafeNamePart(normalizePostScriptSafeNamePart(value)) ||
+    trimPostScriptSafeNamePart(fallbackName)
+  )
+}
+
+const makeUniquePostScriptSafeNamePart = (
+  value: string,
+  fallback: string,
+  usedNames: Set<string>
+) => {
+  const base = makePostScriptSafeNamePart(value, fallback)
+  let candidate = base
+  let suffix = 2
+  while (usedNames.has(candidate)) {
+    const suffixText = `-${suffix}`
+    const baseWithRoom =
+      trimPostScriptSafeNamePart(
+        base.slice(0, POST_SCRIPT_SAFE_NAME_MAX_LENGTH - suffixText.length)
+      ) || makePostScriptSafeNamePart(fallback, 'KumikoName')
+    candidate = `${baseWithRoom}${suffixText}`
+    suffix += 1
+  }
+  usedNames.add(candidate)
+  return candidate
+}
+
+export const makeVariableBuildMasterNames = (
+  familyName: string,
+  sources: Array<{ name: string }>
+) => {
+  const safeFamilyName = makePostScriptSafeNamePart(
+    familyName,
+    'KumikoVariable'
+  )
+  const usedStyleNames = new Set<string>()
+  return sources.map((source, index) => ({
+    familyName: safeFamilyName,
+    styleName: makeUniquePostScriptSafeNamePart(
+      source.name,
+      `Master-${index + 1}`,
+      usedStyleNames
+    ),
+  }))
 }
 
 const formatBakeProblemPreview = (errors: StaticInstanceBakeProblem[]) => {
@@ -367,6 +426,10 @@ export const exportCanonicalProjectAsVariableOtf = async (input: {
   const bracketAlternateGlyphs = makeBracketAlternateGlyphs(bracketLayerSources)
   const bracketRules = makeBracketRules(bracketLayerSources)
   const familyName = fontData.fontInfo?.familyName || project.title || 'Kumiko'
+  const variableBuildMasterNames = makeVariableBuildMasterNames(
+    familyName,
+    variableSources
+  )
   const masterFontData = {
     ...fontData,
     openTypeFeatures: shouldCompileFeaturesBeforeVariableBuild
@@ -375,6 +438,7 @@ export const exportCanonicalProjectAsVariableOtf = async (input: {
   }
   const masters = await Promise.all(
     variableSources.map(async (source, index) => {
+      const buildNames = variableBuildMasterNames[index]
       const baked = bakeStaticInstanceGlyphs({
         fontData,
         glyphs,
@@ -396,17 +460,17 @@ export const exportCanonicalProjectAsVariableOtf = async (input: {
         fontData: masterFontData,
         glyphs: [...baked.glyphs, ...bracketAlternateGlyphs],
         format: 'otf',
-        familyName,
-        styleName: source.name,
+        familyName: buildNames.familyName,
+        styleName: buildNames.styleName,
       })
       return {
         fileName,
         fontBuffer: await blobToArrayBuffer(blob),
         source: {
           filename: fileName,
-          name: source.name,
-          styleName: source.name,
-          familyName,
+          name: buildNames.styleName,
+          styleName: buildNames.styleName,
+          familyName: buildNames.familyName,
           location: source.location,
         },
       }

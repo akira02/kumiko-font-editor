@@ -12,6 +12,7 @@ import {
 import {
   exportCanonicalProjectAsBinary,
   exportCanonicalProjectInstanceAsBinary,
+  makeVariableBuildMasterNames,
 } from 'src/lib/fontFormats/canonicalBinaryExport'
 import { saveProjectDraft } from 'src/lib/project/projectRepository'
 import type { FontAxes, FontData, GlyphData, GlyphLayerData } from 'src/store'
@@ -252,6 +253,26 @@ describe('OTF import → export round-trip', () => {
     const reimported = await reimport(blob, 'canonical-instance.otf')
 
     expect(layerOf(reimported.fontData.glyphs.A).metrics.width).toBe(600)
+  })
+
+  it('uses CFF-safe names for variable build masters', () => {
+    const names = makeVariableBuildMasterNames('MutatorSans', [
+      { name: 'LightCondensed · support.crossbar' },
+      { name: 'LightCondensed support.crossbar' },
+      { name: '字重' },
+    ])
+
+    expect(names).toEqual([
+      {
+        familyName: 'MutatorSans',
+        styleName: 'LightCondensed-support-crossbar',
+      },
+      {
+        familyName: 'MutatorSans',
+        styleName: 'LightCondensed-support-crossbar-2',
+      },
+      { familyName: 'MutatorSans', styleName: 'Master-3' },
+    ])
   })
 
   it('keeps control-character glyphs but drops their cmap mapping', () => {
