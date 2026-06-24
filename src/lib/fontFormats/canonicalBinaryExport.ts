@@ -30,7 +30,14 @@ import {
   compileManagedFontFeatures,
   needsOpenTypeFeatureCompilationForBinaryExport,
 } from 'src/lib/openTypeFeatures'
-import type { FontAxis, FontSource, GlyphData, GlyphLayerData } from 'src/store'
+import type {
+  FontAxes,
+  FontAxis,
+  FontExportInstance,
+  FontSource,
+  GlyphData,
+  GlyphLayerData,
+} from 'src/store'
 
 const BINARY_EXPORT_GLYPH_BATCH_SIZE = 256
 const POST_SCRIPT_SAFE_NAME_MAX_LENGTH = 60
@@ -235,6 +242,33 @@ export const makeVariableBuildMasterNames = (
       usedStyleNames
     ),
   }))
+}
+
+const isLocationValueWithinAxisRange = (
+  value: number | undefined,
+  axis: FontAxis
+) => {
+  const locationValue = value ?? axis.defaultValue
+  if (!Number.isFinite(locationValue)) {
+    return false
+  }
+  const min = Math.min(axis.minValue, axis.maxValue)
+  const max = Math.max(axis.minValue, axis.maxValue)
+  return locationValue >= min && locationValue <= max
+}
+
+export const getVariableBuildExportInstances = (
+  axes: FontAxes | undefined,
+  instances: FontExportInstance[] = []
+) => {
+  const axisEntries = axes?.axes ?? []
+  return instances.filter(
+    (instance) =>
+      instance.export !== false &&
+      axisEntries.every((axis) =>
+        isLocationValueWithinAxisRange(instance.location[axis.name], axis)
+      )
+  )
 }
 
 const formatBakeProblemPreview = (errors: StaticInstanceBakeProblem[]) => {
@@ -481,7 +515,7 @@ export const exportCanonicalProjectAsVariableOtf = async (input: {
     getVariableBuildAxes(fontData.axes),
     masters.map((master) => master.source),
     bracketRules,
-    fontData.exportInstances ?? []
+    getVariableBuildExportInstances(fontData.axes, fontData.exportInstances)
   )
   const variableBuffer = await buildVariableFontWithFontTools(
     designspaceText,

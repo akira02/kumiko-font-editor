@@ -12,6 +12,7 @@ import {
 import {
   exportCanonicalProjectAsBinary,
   exportCanonicalProjectInstanceAsBinary,
+  getVariableBuildExportInstances,
   makeVariableBuildMasterNames,
 } from 'src/lib/fontFormats/canonicalBinaryExport'
 import { saveProjectDraft } from 'src/lib/project/projectRepository'
@@ -273,6 +274,61 @@ describe('OTF import → export round-trip', () => {
       },
       { familyName: 'MutatorSans', styleName: 'Master-3' },
     ])
+  })
+
+  it('skips out-of-range named instances for variable font builds', () => {
+    const instances = getVariableBuildExportInstances(
+      {
+        axes: [
+          {
+            name: 'width',
+            label: 'Width',
+            tag: 'wdth',
+            minValue: 0,
+            defaultValue: 0,
+            maxValue: 1000,
+          },
+          {
+            name: 'weight',
+            label: 'Weight',
+            tag: 'wght',
+            minValue: 100,
+            defaultValue: 100,
+            maxValue: 900,
+            mapping: [
+              [100, 150],
+              [900, 850],
+            ],
+          },
+        ],
+        mappings: [],
+      },
+      [
+        {
+          id: 'normal',
+          name: 'MutatorSans Normal',
+          styleName: 'Normal',
+          location: { width: 1000, weight: 900 },
+          export: true,
+        },
+        {
+          id: 'extrapolate',
+          name: 'MutatorSans Extrapolate',
+          styleName: 'Extrapolate',
+          location: { width: 2000, weight: 900 },
+          export: true,
+        },
+        {
+          id: 'disabled',
+          name: 'Disabled',
+          styleName: 'Disabled',
+          location: { width: 500, weight: 100 },
+          export: false,
+        },
+      ]
+    )
+
+    expect(instances.map((instance) => instance.id)).toEqual(['normal'])
   })
 
   it('keeps control-character glyphs but drops their cmap mapping', () => {
