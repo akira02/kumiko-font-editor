@@ -501,6 +501,7 @@
     "crossAxisMapping": "Cross-axis mapping",
     "cubic": "Cubic",
     "customParameters": "自定參數",
+    "axisValues": "允許值",
     "default": "Default",
     "delete": "Delete",
     "diagnostics": "Diagnostics",

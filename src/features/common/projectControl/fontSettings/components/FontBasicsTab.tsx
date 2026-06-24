@@ -27,6 +27,21 @@ import {
 } from 'src/features/common/projectControl/fontSettings/utils/model'
 import { useTranslation } from 'react-i18next'
 
+const formatAxisValues = (values: number[] | undefined) =>
+  values?.join(', ') ?? ''
+
+const parseAxisValues = (value: string) => {
+  const values = [
+    ...new Set(
+      value
+        .split(',')
+        .map((entry) => Number(entry.trim()))
+        .filter(Number.isFinite)
+    ),
+  ].sort((left, right) => left - right)
+  return values.length > 0 ? values : undefined
+}
+
 interface FontBasicsTabProps {
   axes: FontAxis[]
   customParametersText: string
@@ -150,7 +165,7 @@ export function FontBasicsTab({
         <Stack spacing={3}>
           {axes.map((axis, index) => (
             <Box key={`${axis.name}-${index}`} borderWidth="1px" p={3}>
-              <SimpleGrid columns={{ base: 1, lg: 6 }} spacing={3}>
+              <SimpleGrid columns={{ base: 1, lg: 7 }} spacing={3}>
                 <FormControl>
                   <FormLabel fontSize="sm">
                     {t('projectControl.name')}
@@ -197,6 +212,20 @@ export function FontBasicsTab({
                     />
                   )
                 )}
+                <FormControl>
+                  <FormLabel fontSize="sm">
+                    {t('projectControl.axisValues')}
+                  </FormLabel>
+                  <Input
+                    fontFamily="mono"
+                    value={formatAxisValues(axis.values)}
+                    onChange={(event) =>
+                      updateAxis(index, {
+                        values: parseAxisValues(event.target.value),
+                      })
+                    }
+                  />
+                </FormControl>
               </SimpleGrid>
               <HStack mt={3} justify="space-between">
                 <Checkbox

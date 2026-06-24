@@ -9,10 +9,32 @@ export interface AxisSourceMarker {
 export const clampAxisValue = (axis: FontAxis, value: number) =>
   Math.min(axis.maxValue, Math.max(axis.minValue, value))
 
+export const getAxisDiscreteValues = (axis: FontAxis) =>
+  [
+    ...new Set(
+      (axis.values ?? [])
+        .filter(Number.isFinite)
+        .map((value) => clampAxisValue(axis, value))
+    ),
+  ].sort((left, right) => left - right)
+
+export const snapAxisDiscreteValue = (axis: FontAxis, value: number) => {
+  const clampedValue = clampAxisValue(axis, value)
+  const values = getAxisDiscreteValues(axis)
+  if (values.length === 0) {
+    return clampedValue
+  }
+  return values.reduce((nearest, current) =>
+    Math.abs(current - clampedValue) < Math.abs(nearest - clampedValue)
+      ? current
+      : nearest
+  )
+}
+
 export const getAxisValue = (
   axis: FontAxis,
   location: Record<string, number>
-) => clampAxisValue(axis, location[axis.name] ?? axis.defaultValue)
+) => snapAxisDiscreteValue(axis, location[axis.name] ?? axis.defaultValue)
 
 export const getAxisPercent = (axis: FontAxis, value: number) => {
   const range = axis.maxValue - axis.minValue
@@ -22,8 +44,16 @@ export const getAxisPercent = (axis: FontAxis, value: number) => {
   return ((clampAxisValue(axis, value) - axis.minValue) / range) * 100
 }
 
-export const getAxisStep = (axis: FontAxis) =>
-  Math.abs(axis.maxValue - axis.minValue) <= 1 ? 0.01 : 1
+export const getAxisStep = (axis: FontAxis) => {
+  const values = getAxisDiscreteValues(axis)
+  if (values.length > 1) {
+    return values.slice(1).reduce((step, value, index) => {
+      const delta = value - values[index]
+      return delta > 0 ? Math.min(step, delta) : step
+    }, Number.POSITIVE_INFINITY)
+  }
+  return Math.abs(axis.maxValue - axis.minValue) <= 1 ? 0.01 : 1
+}
 
 const trimFixed = (value: number, digits: number) =>
   value
@@ -48,6 +78,9 @@ export const getAxisSnapTolerance = (axis: FontAxis) => {
   const range = Math.abs(axis.maxValue - axis.minValue)
   if (range === 0) {
     return 0
+  }
+  if (getAxisDiscreteValues(axis).length > 0) {
+    return Math.max(1e-6, getAxisStep(axis) * 0.1)
   }
   return Math.max(getAxisStep(axis) * 2, range * 0.015)
 }
@@ -91,7 +124,7 @@ export const snapAxisValue = (
   value: number,
   markers: AxisSourceMarker[]
 ) => {
-  const clampedValue = clampAxisValue(axis, value)
+  const clampedValue = snapAxisDiscreteValue(axis, value)
   const tolerance = getAxisSnapTolerance(axis)
   let nearest: AxisSourceMarker | null = null
   let nearestDistance = Number.POSITIVE_INFINITY

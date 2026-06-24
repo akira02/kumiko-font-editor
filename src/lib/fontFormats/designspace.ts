@@ -31,6 +31,7 @@ export interface DesignspaceAxis {
   minimum: number
   default: number
   maximum: number
+  values?: number[]
   // avar 1 piecewise map, as [userValue, designValue] pairs.
   map?: Array<[number, number]>
 }
@@ -99,6 +100,31 @@ const parseLocation = (element: Element): Record<string, number> => {
   return location
 }
 
+const uniqueNumbers = (values: number[]) =>
+  [...new Set(values.filter(Number.isFinite))].sort(
+    (left, right) => left - right
+  )
+
+const parseAxisValues = (axis: Element): number[] => {
+  const valueElements = [
+    ...Array.from(axis.querySelectorAll('values > value')),
+    ...Array.from(axis.children).filter(
+      (child) => child.tagName.toLowerCase() === 'value'
+    ),
+  ]
+  return uniqueNumbers(
+    valueElements.map((valueElement) =>
+      toNumber(
+        valueElement.getAttribute('value') ??
+          valueElement.getAttribute('uservalue') ??
+          valueElement.getAttribute('xvalue') ??
+          valueElement.textContent,
+        Number.NaN
+      )
+    )
+  )
+}
+
 export const parseDesignspace = (
   text: string,
   context = 'designspace'
@@ -118,12 +144,14 @@ export const parseDesignspace = (
           toNumber(entry.getAttribute('output')),
         ] as [number, number]
     )
+    const values = parseAxisValues(axis)
     return {
       name: axis.getAttribute('name') ?? '',
       tag: axis.getAttribute('tag') ?? '',
       minimum: toNumber(axis.getAttribute('minimum')),
       default: toNumber(axis.getAttribute('default')),
       maximum: toNumber(axis.getAttribute('maximum')),
+      ...(values.length ? { values } : {}),
       ...(map.length ? { map } : {}),
     }
   })
@@ -213,6 +241,7 @@ export const designspaceToFontAxes = (designspace: Designspace): FontAxes => ({
     minValue: axis.minimum,
     defaultValue: axis.default,
     maxValue: axis.maximum,
+    ...(axis.values ? { values: axis.values } : {}),
     ...(axis.map ? { mapping: axis.map } : {}),
   })),
   mappings: [],
@@ -306,8 +335,20 @@ export const serializeDesignspace = (
             `      <map input="${input}" output="${output}"/>`
         )
         .join('\n')
+      const values = (axis.values ?? [])
+        .map((value) => `      <value value="${value}"/>`)
+        .join('\n')
       const open = `    <axis tag="${escapeXmlAttr(axis.tag)}" name="${escapeXmlAttr(axis.name)}" minimum="${axis.minValue}" maximum="${axis.maxValue}" default="${axis.defaultValue}">`
-      return maps ? `${open}\n${maps}\n    </axis>` : `${open}\n    </axis>`
+      return maps || values
+        ? [
+            open,
+            values ? `      <values>\n${values}\n      </values>` : '',
+            maps,
+            '    </axis>',
+          ]
+            .filter(Boolean)
+            .join('\n')
+        : `${open}\n    </axis>`
     })
     .join('\n')
 

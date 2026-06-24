@@ -178,6 +178,27 @@ describe('parseDesignspace', () => {
     })
   })
 
+  it('preserves discrete axis values', () => {
+    const designspace = parseDesignspace(`<?xml version="1.0" encoding="UTF-8"?>
+<designspace format="5.0">
+  <axes>
+    <axis name="Italic" tag="ital" minimum="0" default="0" maximum="1">
+      <values>
+        <value value="0"/>
+        <value value="1"/>
+      </values>
+    </axis>
+  </axes>
+  <sources/>
+</designspace>`)
+
+    expect(designspace.axes[0].values).toEqual([0, 1])
+    expect(designspaceToFontAxes(designspace).axes[0].values).toEqual([0, 1])
+
+    const xml = serializeDesignspace(designspaceToFontAxes(designspace), [])
+    expect(parseDesignspace(xml).axes[0].values).toEqual([0, 1])
+  })
+
   it('parses named instances into export instances', () => {
     const ds = parseDesignspace(`<?xml version="1.0" encoding="UTF-8"?>
 <designspace format="5.0">

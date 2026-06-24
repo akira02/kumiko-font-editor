@@ -26,6 +26,16 @@ const widthAxis: FontAxis = {
   maxValue: 200,
 }
 
+const italicAxis: FontAxis = {
+  name: 'Italic',
+  label: 'Italic',
+  tag: 'ital',
+  minValue: 0,
+  defaultValue: 0,
+  maxValue: 1,
+  values: [0, 1],
+}
+
 const sources: Record<string, FontSource> = {
   Light: {
     id: 'Light',
@@ -66,6 +76,11 @@ describe('designspace axis snapping', () => {
 
     expect(snapAxisValue(weightAxis, 392, markers)).toBe(400)
     expect(snapAxisValue(weightAxis, 370, markers)).toBe(370)
+  })
+
+  it('snaps discrete axes to their allowed values', () => {
+    expect(snapAxisValue(italicAxis, 0.49, [])).toBe(0)
+    expect(snapAxisValue(italicAxis, 0.51, [])).toBe(1)
   })
 
   it('snaps the full location when every axis is near a source node', () => {

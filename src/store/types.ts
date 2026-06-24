@@ -278,6 +278,7 @@ export interface FontAxis {
   defaultValue: number
   maxValue: number
   hidden?: boolean
+  values?: number[]
   mapping?: Array<[number, number]>
   customData?: Record<string, unknown>
 }
