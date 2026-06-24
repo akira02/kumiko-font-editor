@@ -8,6 +8,7 @@ import {
   Divider,
   FormControl,
   FormLabel,
+  Grid,
   HStack,
   Modal,
   ModalBody,
@@ -162,18 +163,28 @@ const isBinaryFormat = (format: FontExportFormat) => binaryFormats.has(format)
 const isFontOutputFormat = (format: FontExportFormat) =>
   fontOutputFormats.has(format)
 
-const exportPolicies: Array<{ value: ExportPolicy; label: string }> = [
+const exportPolicies: Array<{
+  value: ExportPolicy
+  label: string
+  description: string
+}> = [
   {
     value: 'rebuild-managed-layout-tables',
-    label: '重建 editable features',
+    label: '套用目前編輯',
+    description:
+      '用 Kumiko 目前的 OpenType feature 編輯重建輸出字型；匯入但無法表示的 lookup 可能不會保留。',
   },
   {
     value: 'preserve-compiled-layout-tables',
-    label: '保留已編譯 layout tables',
+    label: '沿用原始表',
+    description:
+      '保留匯入字型原本已編譯的 GSUB/GPOS/GDEF；目前在 Kumiko 裡的 feature 編輯不會輸出。',
   },
   {
     value: 'drop-unsupported-and-rebuild',
-    label: '丟棄不支援 lookup 並重建',
+    label: '捨棄不支援項目後套用',
+    description:
+      '先移除 Kumiko 無法編輯或無法表示的 imported lookups，再輸出目前可重建的 feature 編輯。',
   },
 ]
 
@@ -352,6 +363,9 @@ export function ExportFontModal({
     selectedFormats.includes('glyphs3') ||
     selectedFormats.includes('glyphspackage')
   const visibleGlyphsWarnings = showsGlyphs3Warnings ? glyphsWarnings : []
+  const selectedExportPolicy = exportPolicies.find(
+    (policy) => policy.value === exportPolicy
+  )
   const canSubmit =
     canExport &&
     selectedFormats.length > 0 &&
@@ -383,12 +397,12 @@ export function ExportFontModal({
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={closeModal} size="lg">
+    <Modal isOpen={isOpen} onClose={closeModal} size="3xl">
       <ModalOverlay />
-      <ModalContent>
+      <ModalContent maxH="86vh">
         <ModalHeader>{t('fontExport.exportFont')}</ModalHeader>
         <ModalCloseButton />
-        <ModalBody>
+        <ModalBody overflowY="auto">
           <Stack spacing={3}>
             <OpenTypeExportWarnings warnings={openTypeWarnings} />
             <GlyphsExportWarnings warnings={visibleGlyphsWarnings} />
@@ -398,133 +412,179 @@ export function ExportFontModal({
                 onChange={setConfirmedDropUnsupported}
               />
             )}
-            {visibleOptionGroups.map((group) => (
-              <Stack key={group.id} spacing={2}>
+            <Grid
+              gap={{ base: 4, md: 5 }}
+              templateColumns={{
+                base: '1fr',
+                md: 'minmax(0, 1.15fr) minmax(280px, 0.85fr)',
+              }}
+              alignItems="start"
+            >
+              <Stack spacing={3} minW={0}>
                 <Stack spacing={0}>
                   <Text fontSize="sm" fontWeight="semibold">
-                    {group.label}
+                    輸出格式
                   </Text>
                   <Text fontSize="xs" color="field.muted">
-                    {group.description}
+                    可同時選擇多種格式；多個輸出會打包成 ZIP。
                   </Text>
                 </Stack>
-                <Stack spacing={1}>
-                  {group.options.map((option) => {
-                    const isSelected = selectedFormats.includes(option.format)
-                    return (
-                      <Button
-                        key={option.format}
-                        h="auto"
-                        minH="58px"
-                        justifyContent="flex-start"
-                        alignItems="flex-start"
-                        whiteSpace="normal"
-                        variant="unstyled"
-                        p={3}
-                        borderWidth="1px"
-                        borderRadius="md"
-                        borderColor={isSelected ? 'field.accent' : 'field.line'}
-                        bg={isSelected ? 'field.panelMuted' : 'transparent'}
-                        isDisabled={!canExport || isExporting}
-                        onClick={() => toggleFormat(option.format)}
-                      >
-                        <Stack
-                          spacing={0.5}
-                          align="flex-start"
-                          textAlign="left"
-                        >
-                          <HStack spacing={2}>
-                            <Checkbox
-                              isChecked={isSelected}
-                              pointerEvents="none"
-                            />
-                            <Text fontWeight="semibold">{option.label}</Text>
-                          </HStack>
-                          <Text
-                            pl={6}
-                            fontSize="xs"
-                            fontWeight="normal"
-                            color="field.muted"
+                {visibleOptionGroups.map((group) => (
+                  <Stack key={group.id} spacing={2}>
+                    <Stack spacing={0}>
+                      <Text fontSize="sm" fontWeight="semibold">
+                        {group.label}
+                      </Text>
+                      <Text fontSize="xs" color="field.muted">
+                        {group.description}
+                      </Text>
+                    </Stack>
+                    <Stack spacing={1}>
+                      {group.options.map((option) => {
+                        const isSelected = selectedFormats.includes(
+                          option.format
+                        )
+                        return (
+                          <Button
+                            key={option.format}
+                            h="auto"
+                            minH="58px"
+                            justifyContent="flex-start"
+                            alignItems="flex-start"
+                            whiteSpace="normal"
+                            variant="unstyled"
+                            p={3}
+                            borderWidth="1px"
+                            borderRadius="md"
+                            borderColor={
+                              isSelected ? 'field.accent' : 'field.line'
+                            }
+                            bg={isSelected ? 'field.panelMuted' : 'transparent'}
+                            isDisabled={!canExport || isExporting}
+                            onClick={() => toggleFormat(option.format)}
                           >
-                            {option.description}
-                          </Text>
-                        </Stack>
-                      </Button>
-                    )
-                  })}
-                </Stack>
-              </Stack>
-            ))}
-            {hasSelectedFontOutputFormat && exportPolicy ? (
-              <>
-                <Divider />
-                <FormControl>
-                  <FormLabel fontSize="sm">OpenType features</FormLabel>
-                  <Select
-                    size="sm"
-                    value={exportPolicy}
-                    isDisabled={
-                      !canExport || isExporting || !onExportPolicyChange
-                    }
-                    onChange={(event) =>
-                      onExportPolicyChange?.(event.target.value as ExportPolicy)
-                    }
-                  >
-                    {exportPolicies.map((policy) => (
-                      <option key={policy.value} value={policy.value}>
-                        {policy.label}
-                      </option>
-                    ))}
-                  </Select>
-                  <Text mt={1.5} fontSize="xs" color="field.muted">
-                    此設定會套用到目前專案的字型檔匯出；工作檔匯出不受影響。
-                  </Text>
-                </FormControl>
-              </>
-            ) : null}
-            {hasSelectedBinaryFormat && exportableInstances.length > 0 && (
-              <>
-                <Divider />
-                <Stack spacing={3}>
-                  <Text fontWeight="semibold">Binary 靜態輸出</Text>
-                  <Checkbox
-                    isChecked={includeDefaultBinary}
-                    isDisabled={!canExport || isExporting}
-                    onChange={(event) =>
-                      setIncludeDefaultBinary(event.target.checked)
-                    }
-                  >
-                    <Text as="span" fontSize="sm">
-                      目前字型
-                    </Text>
-                  </Checkbox>
-                  <Stack spacing={2}>
-                    {exportableInstances.map((instance) => (
-                      <Checkbox
-                        key={instance.id}
-                        isChecked={selectedInstanceIds.includes(instance.id)}
-                        isDisabled={!canExport || isExporting}
-                        onChange={() => toggleInstance(instance.id)}
-                      >
-                        <Stack spacing={0}>
-                          <Text as="span" fontSize="sm">
-                            {instance.name || instance.styleName}
-                          </Text>
-                          <Text
-                            as="span"
-                            fontSize="xs"
-                            color="field.muted"
-                            fontFamily="mono"
-                          >
-                            {JSON.stringify(instance.location)}
-                          </Text>
-                        </Stack>
-                      </Checkbox>
-                    ))}
+                            <Stack
+                              spacing={0.5}
+                              align="flex-start"
+                              textAlign="left"
+                            >
+                              <HStack spacing={2}>
+                                <Checkbox
+                                  isChecked={isSelected}
+                                  pointerEvents="none"
+                                />
+                                <Text fontWeight="semibold">
+                                  {option.label}
+                                </Text>
+                              </HStack>
+                              <Text
+                                pl={6}
+                                fontSize="xs"
+                                fontWeight="normal"
+                                color="field.muted"
+                              >
+                                {option.description}
+                              </Text>
+                            </Stack>
+                          </Button>
+                        )
+                      })}
+                    </Stack>
                   </Stack>
+                ))}
+              </Stack>
+
+              <Stack spacing={4} minW={0}>
+                <Stack spacing={0}>
+                  <Text fontSize="sm" fontWeight="semibold">
+                    匯出設定
+                  </Text>
+                  <Text fontSize="xs" color="field.muted">
+                    這些設定會套用到字型檔輸出；工作檔不受影響。
+                  </Text>
                 </Stack>
-              </>
-            )}
+
+                {hasSelectedFontOutputFormat && exportPolicy ? (
+                  <FormControl>
+                    <FormLabel fontSize="sm">OpenType features</FormLabel>
+                    <Select
+                      size="sm"
+                      value={exportPolicy}
+                      isDisabled={
+                        !canExport || isExporting || !onExportPolicyChange
+                      }
+                      onChange={(event) =>
+                        onExportPolicyChange?.(
+                          event.target.value as ExportPolicy
+                        )
+                      }
+                    >
+                      {exportPolicies.map((policy) => (
+                        <option key={policy.value} value={policy.value}>
+                          {policy.label}
+                        </option>
+                      ))}
+                    </Select>
+                    <Text mt={1.5} fontSize="xs" color="field.muted">
+                      {selectedExportPolicy?.description ??
+                        '選擇字型檔匯出時，決定 OpenType features 要如何寫進輸出字型。'}
+                    </Text>
+                  </FormControl>
+                ) : (
+                  <Text fontSize="sm" color="field.muted">
+                    選擇字型檔後，可設定 OpenType features 的輸出方式。
+                  </Text>
+                )}
+
+                {hasSelectedBinaryFormat && exportableInstances.length > 0 ? (
+                  <>
+                    <Divider />
+                    <Stack spacing={3}>
+                      <Text fontSize="sm" fontWeight="semibold">
+                        靜態 instance
+                      </Text>
+                      <Checkbox
+                        isChecked={includeDefaultBinary}
+                        isDisabled={!canExport || isExporting}
+                        onChange={(event) =>
+                          setIncludeDefaultBinary(event.target.checked)
+                        }
+                      >
+                        <Text as="span" fontSize="sm">
+                          目前字型
+                        </Text>
+                      </Checkbox>
+                      <Stack spacing={2}>
+                        {exportableInstances.map((instance) => (
+                          <Checkbox
+                            key={instance.id}
+                            isChecked={selectedInstanceIds.includes(
+                              instance.id
+                            )}
+                            isDisabled={!canExport || isExporting}
+                            onChange={() => toggleInstance(instance.id)}
+                          >
+                            <Stack spacing={0}>
+                              <Text as="span" fontSize="sm">
+                                {instance.name || instance.styleName}
+                              </Text>
+                              <Text
+                                as="span"
+                                fontSize="xs"
+                                color="field.muted"
+                                fontFamily="mono"
+                              >
+                                {JSON.stringify(instance.location)}
+                              </Text>
+                            </Stack>
+                          </Checkbox>
+                        ))}
+                      </Stack>
+                    </Stack>
+                  </>
+                ) : null}
+              </Stack>
+            </Grid>
           </Stack>
         </ModalBody>
         <ModalFooter>
