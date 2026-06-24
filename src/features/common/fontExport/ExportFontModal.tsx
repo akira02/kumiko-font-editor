@@ -30,6 +30,7 @@ import type {
 import { requiresDropUnsupportedConfirmation } from 'src/lib/openTypeFeatures/exportPolicy'
 import type { ProjectSourceFormat } from 'src/lib/project/projectFormats'
 import type { FontExportInstance } from 'src/store'
+import type { TFunction } from 'i18next'
 import { useTranslation } from 'react-i18next'
 
 export type FontExportFormat =
@@ -252,38 +253,58 @@ function OpenTypeExportWarnings({
 }: {
   warnings: OpenTypeExportWarning[]
 }) {
+  const { t } = useTranslation()
+
   if (warnings.length === 0) {
     return null
   }
 
   return (
     <Stack spacing={2}>
-      {warnings.map((warning) => (
-        <Alert
-          key={warning.id}
-          status={getAlertStatus(warning.severity)}
-          variant="subtle"
-          alignItems="flex-start"
-          borderRadius="md"
-        >
-          <AlertIcon mt={1} />
-          <Stack spacing={0}>
-            <AlertTitle fontSize="sm">{warning.title}</AlertTitle>
-            <AlertDescription fontSize="sm">{warning.message}</AlertDescription>
-            {warning.details && warning.details.length > 0 && (
-              <Stack as="ul" spacing={1} mt={2} pl={4}>
-                {warning.details.map((detail) => (
-                  <Text key={detail} as="li" fontSize="sm">
-                    {detail}
-                  </Text>
-                ))}
-              </Stack>
-            )}
-          </Stack>
-        </Alert>
-      ))}
+      {warnings.map((warning) => {
+        const translatedWarning = translateExportWarning(warning, t)
+
+        return (
+          <Alert
+            key={warning.id}
+            status={getAlertStatus(warning.severity)}
+            variant="subtle"
+            alignItems="flex-start"
+            borderRadius="md"
+          >
+            <AlertIcon mt={1} />
+            <Stack spacing={0}>
+              <AlertTitle fontSize="sm">{translatedWarning.title}</AlertTitle>
+              <AlertDescription fontSize="sm">
+                {translatedWarning.message}
+              </AlertDescription>
+              {warning.details && warning.details.length > 0 && (
+                <Stack as="ul" spacing={1} mt={2} pl={4}>
+                  {warning.details.map((detail) => (
+                    <Text key={detail} as="li" fontSize="sm">
+                      {detail}
+                    </Text>
+                  ))}
+                </Stack>
+              )}
+            </Stack>
+          </Alert>
+        )
+      })}
     </Stack>
   )
+}
+
+function translateExportWarning(warning: OpenTypeExportWarning, t: TFunction) {
+  const keyPrefix = `projectControl.exportWarning.${warning.code}`
+
+  return {
+    title: t(`${keyPrefix}.title`, { defaultValue: warning.title }),
+    message: t(`${keyPrefix}.message`, {
+      count: warning.details?.length ?? 0,
+      defaultValue: warning.message,
+    }),
+  }
 }
 
 function DropUnsupportedConfirmation({
@@ -336,6 +357,12 @@ export function ExportFontModal({
       options: visibleOptions.filter((option) => option.group === group.id),
     }))
     .filter((group) => group.options.length > 0)
+  const sourceOptionGroup = visibleOptionGroups.find(
+    (group) => group.id === 'source'
+  )
+  const fontOptionGroup = visibleOptionGroups.find(
+    (group) => group.id === 'font'
+  )
   const exportableInstances = useMemo(
     () => exportInstances.filter((instance) => instance.export !== false),
     [exportInstances]
@@ -352,6 +379,8 @@ export function ExportFontModal({
     requiresDropUnsupportedConfirmation(openTypeWarnings)
   const hasSelectedBinaryFormat = selectedFormats.some(isBinaryFormat)
   const hasSelectedFontOutputFormat = selectedFormats.some(isFontOutputFormat)
+  const needsVisibleDropUnsupportedConfirmation =
+    hasSelectedFontOutputFormat && needsDropUnsupportedConfirmation
   const selectedInstanceIds = exportableInstances
     .map((instance) => instance.id)
     .filter((instanceId) => !excludedInstanceIds.includes(instanceId))
@@ -371,7 +400,7 @@ export function ExportFontModal({
     selectedFormats.length > 0 &&
     !isExporting &&
     hasBinaryTarget &&
-    (!needsDropUnsupportedConfirmation || confirmedDropUnsupported)
+    (!needsVisibleDropUnsupportedConfirmation || confirmedDropUnsupported)
 
   const closeModal = () => {
     setConfirmedDropUnsupported(false)
@@ -396,6 +425,65 @@ export function ExportFontModal({
     )
   }
 
+  const renderOptionGroup = (
+    group: (typeof visibleOptionGroups)[number] | undefined
+  ) => {
+    if (!group) {
+      return null
+    }
+
+    return (
+      <Stack spacing={3}>
+        <Stack spacing={0}>
+          <Text fontSize="sm" fontWeight="semibold">
+            {group.label}
+          </Text>
+          <Text fontSize="xs" color="field.muted">
+            {group.description}
+          </Text>
+        </Stack>
+        <Stack spacing={1}>
+          {group.options.map((option) => {
+            const isSelected = selectedFormats.includes(option.format)
+            return (
+              <Button
+                key={option.format}
+                h="auto"
+                minH="58px"
+                justifyContent="flex-start"
+                alignItems="flex-start"
+                whiteSpace="normal"
+                variant="unstyled"
+                p={3}
+                borderWidth="1px"
+                borderRadius="md"
+                borderColor={isSelected ? 'field.accent' : 'field.line'}
+                bg={isSelected ? 'field.panelMuted' : 'transparent'}
+                isDisabled={!canExport || isExporting}
+                onClick={() => toggleFormat(option.format)}
+              >
+                <Stack spacing={0.5} align="flex-start" textAlign="left">
+                  <HStack spacing={2}>
+                    <Checkbox isChecked={isSelected} pointerEvents="none" />
+                    <Text fontWeight="semibold">{option.label}</Text>
+                  </HStack>
+                  <Text
+                    pl={6}
+                    fontSize="xs"
+                    fontWeight="normal"
+                    color="field.muted"
+                  >
+                    {option.description}
+                  </Text>
+                </Stack>
+              </Button>
+            )
+          })}
+        </Stack>
+      </Stack>
+    )
+  }
+
   return (
     <Modal isOpen={isOpen} onClose={closeModal} size="3xl">
       <ModalOverlay />
@@ -404,14 +492,6 @@ export function ExportFontModal({
         <ModalCloseButton />
         <ModalBody overflowY="auto">
           <Stack spacing={3}>
-            <OpenTypeExportWarnings warnings={openTypeWarnings} />
-            <GlyphsExportWarnings warnings={visibleGlyphsWarnings} />
-            {needsDropUnsupportedConfirmation && (
-              <DropUnsupportedConfirmation
-                isChecked={confirmedDropUnsupported}
-                onChange={setConfirmedDropUnsupported}
-              />
-            )}
             <Grid
               gap={{ base: 4, md: 5 }}
               templateColumns={{
@@ -421,120 +501,59 @@ export function ExportFontModal({
               alignItems="start"
             >
               <Stack spacing={3} minW={0}>
-                <Stack spacing={0}>
-                  <Text fontSize="sm" fontWeight="semibold">
-                    輸出格式
-                  </Text>
-                  <Text fontSize="xs" color="field.muted">
-                    可同時選擇多種格式；多個輸出會打包成 ZIP。
-                  </Text>
-                </Stack>
-                {visibleOptionGroups.map((group) => (
-                  <Stack key={group.id} spacing={2}>
-                    <Stack spacing={0}>
-                      <Text fontSize="sm" fontWeight="semibold">
-                        {group.label}
-                      </Text>
-                      <Text fontSize="xs" color="field.muted">
-                        {group.description}
-                      </Text>
-                    </Stack>
-                    <Stack spacing={1}>
-                      {group.options.map((option) => {
-                        const isSelected = selectedFormats.includes(
-                          option.format
-                        )
-                        return (
-                          <Button
-                            key={option.format}
-                            h="auto"
-                            minH="58px"
-                            justifyContent="flex-start"
-                            alignItems="flex-start"
-                            whiteSpace="normal"
-                            variant="unstyled"
-                            p={3}
-                            borderWidth="1px"
-                            borderRadius="md"
-                            borderColor={
-                              isSelected ? 'field.accent' : 'field.line'
-                            }
-                            bg={isSelected ? 'field.panelMuted' : 'transparent'}
-                            isDisabled={!canExport || isExporting}
-                            onClick={() => toggleFormat(option.format)}
-                          >
-                            <Stack
-                              spacing={0.5}
-                              align="flex-start"
-                              textAlign="left"
-                            >
-                              <HStack spacing={2}>
-                                <Checkbox
-                                  isChecked={isSelected}
-                                  pointerEvents="none"
-                                />
-                                <Text fontWeight="semibold">
-                                  {option.label}
-                                </Text>
-                              </HStack>
-                              <Text
-                                pl={6}
-                                fontSize="xs"
-                                fontWeight="normal"
-                                color="field.muted"
-                              >
-                                {option.description}
-                              </Text>
-                            </Stack>
-                          </Button>
-                        )
-                      })}
-                    </Stack>
-                  </Stack>
-                ))}
+                {renderOptionGroup(sourceOptionGroup)}
+                <GlyphsExportWarnings warnings={visibleGlyphsWarnings} />
               </Stack>
 
-              <Stack spacing={4} minW={0}>
-                <Stack spacing={0}>
-                  <Text fontSize="sm" fontWeight="semibold">
-                    匯出設定
-                  </Text>
-                  <Text fontSize="xs" color="field.muted">
-                    這些設定會套用到字型檔輸出；工作檔不受影響。
-                  </Text>
-                </Stack>
+              <Stack spacing={3} minW={0}>
+                {renderOptionGroup(fontOptionGroup)}
 
                 {hasSelectedFontOutputFormat && exportPolicy ? (
-                  <FormControl>
-                    <FormLabel fontSize="sm">OpenType features</FormLabel>
-                    <Select
-                      size="sm"
-                      value={exportPolicy}
-                      isDisabled={
-                        !canExport || isExporting || !onExportPolicyChange
-                      }
-                      onChange={(event) =>
-                        onExportPolicyChange?.(
-                          event.target.value as ExportPolicy
-                        )
-                      }
-                    >
-                      {exportPolicies.map((policy) => (
-                        <option key={policy.value} value={policy.value}>
-                          {policy.label}
-                        </option>
-                      ))}
-                    </Select>
-                    <Text mt={1.5} fontSize="xs" color="field.muted">
-                      {selectedExportPolicy?.description ??
-                        '選擇字型檔匯出時，決定 OpenType features 要如何寫進輸出字型。'}
-                    </Text>
-                  </FormControl>
-                ) : (
+                  <>
+                    <Divider />
+                    <Stack spacing={3}>
+                      <FormControl>
+                        <FormLabel fontSize="sm">
+                          OpenType features 輸出方式
+                        </FormLabel>
+                        <Select
+                          size="sm"
+                          value={exportPolicy}
+                          isDisabled={
+                            !canExport || isExporting || !onExportPolicyChange
+                          }
+                          onChange={(event) =>
+                            onExportPolicyChange?.(
+                              event.target.value as ExportPolicy
+                            )
+                          }
+                        >
+                          {exportPolicies.map((policy) => (
+                            <option key={policy.value} value={policy.value}>
+                              {policy.label}
+                            </option>
+                          ))}
+                        </Select>
+                        <Text mt={1.5} fontSize="xs" color="field.muted">
+                          {selectedExportPolicy?.description ??
+                            '選擇字型檔匯出時，決定 OpenType features 要如何寫進輸出字型。'}
+                        </Text>
+                      </FormControl>
+                      <OpenTypeExportWarnings warnings={openTypeWarnings} />
+                      {needsVisibleDropUnsupportedConfirmation && (
+                        <DropUnsupportedConfirmation
+                          isChecked={confirmedDropUnsupported}
+                          onChange={setConfirmedDropUnsupported}
+                        />
+                      )}
+                    </Stack>
+                  </>
+                ) : !hasSelectedFontOutputFormat ? (
                   <Text fontSize="sm" color="field.muted">
-                    選擇字型檔後，可設定 OpenType features 的輸出方式。
+                    選擇字型檔後，可設定 OpenType features 的輸出方式與靜態
+                    instance。
                   </Text>
-                )}
+                ) : null}
 
                 {hasSelectedBinaryFormat && exportableInstances.length > 0 ? (
                   <>

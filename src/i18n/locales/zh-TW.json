@@ -574,8 +574,8 @@
         "title": "Feature edits 不會被匯出"
       },
       "rebuild-replaces-tables": {
-        "message": "OpenType layout tables 會從 Kumiko feature model 重建，既有 compiled layout data 可能會被取代。",
-        "title": "Layout tables 可能被重建"
+        "message": "OpenType 排版表會從 Kumiko 的 feature model 重建，既有已編譯的排版資料可能會被取代。",
+        "title": "OpenType 排版表可能被重建"
       },
       "unsupported-lookups": {
         "message": "部分匯入的 OpenType lookups 目前不可編輯或無法表示。Rebuild layout tables 可能會移除它們。",
