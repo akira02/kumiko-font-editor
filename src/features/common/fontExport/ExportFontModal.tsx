@@ -8,7 +8,6 @@ import {
   Divider,
   FormControl,
   FormLabel,
-  Grid,
   HStack,
   Modal,
   ModalBody,
@@ -19,9 +18,13 @@ import {
   ModalOverlay,
   Select,
   Stack,
+  TabPanel,
+  TabPanels,
+  Tabs,
   Text,
 } from '@chakra-ui/react'
 import { useMemo, useState } from 'react'
+import { SlidingTabList } from 'src/features/common/SlidingTabList'
 import type { GlyphsExportWarning } from 'src/lib/fontFormats/glyphsExport'
 import type {
   ExportPolicy,
@@ -357,12 +360,6 @@ export function ExportFontModal({
       options: visibleOptions.filter((option) => option.group === group.id),
     }))
     .filter((group) => group.options.length > 0)
-  const sourceOptionGroup = visibleOptionGroups.find(
-    (group) => group.id === 'source'
-  )
-  const fontOptionGroup = visibleOptionGroups.find(
-    (group) => group.id === 'font'
-  )
   const exportableInstances = useMemo(
     () => exportInstances.filter((instance) => instance.export !== false),
     [exportInstances]
@@ -375,6 +372,7 @@ export function ExportFontModal({
   const [excludedInstanceIds, setExcludedInstanceIds] = useState<string[]>([])
   const [confirmedDropUnsupported, setConfirmedDropUnsupported] =
     useState(false)
+  const [activeExportTabIndex, setActiveExportTabIndex] = useState(0)
   const needsDropUnsupportedConfirmation =
     requiresDropUnsupportedConfirmation(openTypeWarnings)
   const hasSelectedBinaryFormat = selectedFormats.some(isBinaryFormat)
@@ -395,6 +393,15 @@ export function ExportFontModal({
   const selectedExportPolicy = exportPolicies.find(
     (policy) => policy.value === exportPolicy
   )
+  const exportTabLabels = visibleOptionGroups.map((group) => {
+    const selectedFormatCount = group.options.filter((option) =>
+      selectedFormats.includes(option.format)
+    ).length
+
+    return selectedFormatCount > 0
+      ? `${group.label} (${selectedFormatCount})`
+      : group.label
+  })
   const canSubmit =
     canExport &&
     selectedFormats.length > 0 &&
@@ -406,6 +413,7 @@ export function ExportFontModal({
     setConfirmedDropUnsupported(false)
     setIncludeDefaultBinary(true)
     setExcludedInstanceIds([])
+    setActiveExportTabIndex(0)
     onClose()
   }
 
@@ -484,147 +492,164 @@ export function ExportFontModal({
     )
   }
 
+  const renderFontOutputSettings = () => (
+    <>
+      {hasSelectedFontOutputFormat && exportPolicy ? (
+        <>
+          <Divider />
+          <Stack spacing={3}>
+            <FormControl>
+              <FormLabel fontSize="sm">OpenType features 輸出方式</FormLabel>
+              <Select
+                size="sm"
+                value={exportPolicy}
+                isDisabled={!canExport || isExporting || !onExportPolicyChange}
+                onChange={(event) =>
+                  onExportPolicyChange?.(event.target.value as ExportPolicy)
+                }
+              >
+                {exportPolicies.map((policy) => (
+                  <option key={policy.value} value={policy.value}>
+                    {policy.label}
+                  </option>
+                ))}
+              </Select>
+              <Text mt={1.5} fontSize="xs" color="field.muted">
+                {selectedExportPolicy?.description ??
+                  '選擇字型檔匯出時，決定 OpenType features 要如何寫進輸出字型。'}
+              </Text>
+            </FormControl>
+            <OpenTypeExportWarnings warnings={openTypeWarnings} />
+            {needsVisibleDropUnsupportedConfirmation && (
+              <DropUnsupportedConfirmation
+                isChecked={confirmedDropUnsupported}
+                onChange={setConfirmedDropUnsupported}
+              />
+            )}
+          </Stack>
+        </>
+      ) : !hasSelectedFontOutputFormat ? (
+        <Text fontSize="sm" color="field.muted">
+          選擇字型檔後，可設定 OpenType features 的輸出方式與靜態 instance。
+        </Text>
+      ) : null}
+
+      {hasSelectedBinaryFormat && exportableInstances.length > 0 ? (
+        <>
+          <Divider />
+          <Stack spacing={3}>
+            <Text fontSize="sm" fontWeight="semibold">
+              靜態 instance
+            </Text>
+            <Checkbox
+              isChecked={includeDefaultBinary}
+              isDisabled={!canExport || isExporting}
+              onChange={(event) =>
+                setIncludeDefaultBinary(event.target.checked)
+              }
+            >
+              <Text as="span" fontSize="sm">
+                目前字型
+              </Text>
+            </Checkbox>
+            <Stack spacing={2}>
+              {exportableInstances.map((instance) => (
+                <Checkbox
+                  key={instance.id}
+                  isChecked={selectedInstanceIds.includes(instance.id)}
+                  isDisabled={!canExport || isExporting}
+                  onChange={() => toggleInstance(instance.id)}
+                >
+                  <Stack spacing={0}>
+                    <Text as="span" fontSize="sm">
+                      {instance.name || instance.styleName}
+                    </Text>
+                    <Text
+                      as="span"
+                      fontSize="xs"
+                      color="field.muted"
+                      fontFamily="mono"
+                    >
+                      {JSON.stringify(instance.location)}
+                    </Text>
+                  </Stack>
+                </Checkbox>
+              ))}
+            </Stack>
+          </Stack>
+        </>
+      ) : null}
+    </>
+  )
+
+  const renderGroupPanel = (group: (typeof visibleOptionGroups)[number]) => (
+    <Stack spacing={3}>
+      {renderOptionGroup(group)}
+      {group.id === 'source' ? (
+        <GlyphsExportWarnings warnings={visibleGlyphsWarnings} />
+      ) : (
+        renderFontOutputSettings()
+      )}
+    </Stack>
+  )
+
   return (
     <Modal isOpen={isOpen} onClose={closeModal} size="3xl">
       <ModalOverlay />
-      <ModalContent maxH="86vh">
-        <ModalHeader>{t('fontExport.exportFont')}</ModalHeader>
-        <ModalCloseButton />
-        <ModalBody overflowY="auto">
-          <Stack spacing={3}>
-            <Grid
-              gap={{ base: 4, md: 5 }}
-              templateColumns={{
-                base: '1fr',
-                md: 'minmax(0, 1.15fr) minmax(280px, 0.85fr)',
-              }}
-              alignItems="start"
+      <ModalContent maxH="86vh" overflow="hidden">
+        <Tabs
+          variant="unstyled"
+          size="sm"
+          display="flex"
+          flexDirection="column"
+          flex={1}
+          maxH="inherit"
+          minH={0}
+          index={activeExportTabIndex}
+          onChange={setActiveExportTabIndex}
+        >
+          <ModalHeader>{t('fontExport.exportFont')}</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody overflowY="auto" flex={1} minH={0}>
+            <Stack spacing={4}>
+              <SlidingTabList
+                activeIndex={activeExportTabIndex}
+                labels={exportTabLabels}
+                layoutGroupId="font-export-modal-tabs"
+              />
+              <TabPanels>
+                {visibleOptionGroups.map((group) => (
+                  <TabPanel key={group.id} p={0}>
+                    {renderGroupPanel(group)}
+                  </TabPanel>
+                ))}
+              </TabPanels>
+            </Stack>
+          </ModalBody>
+          <ModalFooter>
+            <Button
+              variant="ghost"
+              onClick={closeModal}
+              isDisabled={isExporting}
             >
-              <Stack spacing={3} minW={0}>
-                {renderOptionGroup(sourceOptionGroup)}
-                <GlyphsExportWarnings warnings={visibleGlyphsWarnings} />
-              </Stack>
-
-              <Stack spacing={3} minW={0}>
-                {renderOptionGroup(fontOptionGroup)}
-
-                {hasSelectedFontOutputFormat && exportPolicy ? (
-                  <>
-                    <Divider />
-                    <Stack spacing={3}>
-                      <FormControl>
-                        <FormLabel fontSize="sm">
-                          OpenType features 輸出方式
-                        </FormLabel>
-                        <Select
-                          size="sm"
-                          value={exportPolicy}
-                          isDisabled={
-                            !canExport || isExporting || !onExportPolicyChange
-                          }
-                          onChange={(event) =>
-                            onExportPolicyChange?.(
-                              event.target.value as ExportPolicy
-                            )
-                          }
-                        >
-                          {exportPolicies.map((policy) => (
-                            <option key={policy.value} value={policy.value}>
-                              {policy.label}
-                            </option>
-                          ))}
-                        </Select>
-                        <Text mt={1.5} fontSize="xs" color="field.muted">
-                          {selectedExportPolicy?.description ??
-                            '選擇字型檔匯出時，決定 OpenType features 要如何寫進輸出字型。'}
-                        </Text>
-                      </FormControl>
-                      <OpenTypeExportWarnings warnings={openTypeWarnings} />
-                      {needsVisibleDropUnsupportedConfirmation && (
-                        <DropUnsupportedConfirmation
-                          isChecked={confirmedDropUnsupported}
-                          onChange={setConfirmedDropUnsupported}
-                        />
-                      )}
-                    </Stack>
-                  </>
-                ) : !hasSelectedFontOutputFormat ? (
-                  <Text fontSize="sm" color="field.muted">
-                    選擇字型檔後，可設定 OpenType features 的輸出方式與靜態
-                    instance。
-                  </Text>
-                ) : null}
-
-                {hasSelectedBinaryFormat && exportableInstances.length > 0 ? (
-                  <>
-                    <Divider />
-                    <Stack spacing={3}>
-                      <Text fontSize="sm" fontWeight="semibold">
-                        靜態 instance
-                      </Text>
-                      <Checkbox
-                        isChecked={includeDefaultBinary}
-                        isDisabled={!canExport || isExporting}
-                        onChange={(event) =>
-                          setIncludeDefaultBinary(event.target.checked)
-                        }
-                      >
-                        <Text as="span" fontSize="sm">
-                          目前字型
-                        </Text>
-                      </Checkbox>
-                      <Stack spacing={2}>
-                        {exportableInstances.map((instance) => (
-                          <Checkbox
-                            key={instance.id}
-                            isChecked={selectedInstanceIds.includes(
-                              instance.id
-                            )}
-                            isDisabled={!canExport || isExporting}
-                            onChange={() => toggleInstance(instance.id)}
-                          >
-                            <Stack spacing={0}>
-                              <Text as="span" fontSize="sm">
-                                {instance.name || instance.styleName}
-                              </Text>
-                              <Text
-                                as="span"
-                                fontSize="xs"
-                                color="field.muted"
-                                fontFamily="mono"
-                              >
-                                {JSON.stringify(instance.location)}
-                              </Text>
-                            </Stack>
-                          </Checkbox>
-                        ))}
-                      </Stack>
-                    </Stack>
-                  </>
-                ) : null}
-              </Stack>
-            </Grid>
-          </Stack>
-        </ModalBody>
-        <ModalFooter>
-          <Button variant="ghost" onClick={closeModal} isDisabled={isExporting}>
-            {t('fontExport.close')}
-          </Button>
-          <Button
-            ml={3}
-            isDisabled={!canSubmit}
-            isLoading={isExporting}
-            loadingText={loadingText}
-            onClick={() =>
-              onExport(selectedFormats, {
-                includeDefaultBinary,
-                instanceIds: selectedInstanceIds,
-              })
-            }
-          >
-            {t('fontExport.export')}
-          </Button>
-        </ModalFooter>
+              {t('fontExport.close')}
+            </Button>
+            <Button
+              ml={3}
+              isDisabled={!canSubmit}
+              isLoading={isExporting}
+              loadingText={loadingText}
+              onClick={() =>
+                onExport(selectedFormats, {
+                  includeDefaultBinary,
+                  instanceIds: selectedInstanceIds,
+                })
+              }
+            >
+              {t('fontExport.export')}
+            </Button>
+          </ModalFooter>
+        </Tabs>
       </ModalContent>
     </Modal>
   )
