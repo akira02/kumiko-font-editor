@@ -3,17 +3,20 @@ import {
   Button,
   HStack,
   IconButton,
+  Portal,
   Tag,
   Text,
   Tooltip,
   VStack,
 } from '@chakra-ui/react'
 import { NavArrowDown, NavArrowRight, Plus, Settings } from 'iconoir-react'
-import { useState } from 'react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { OverviewCustomFilterModal } from 'src/features/fontOverview/components/OverviewCustomFilterModal'
 import {
   customOverviewFilterNodeIdToFilterId,
+  type OverviewCustomFilterRule,
+  type OverviewCustomFilterRuleGroup,
   type GlyphOverviewTreeNode,
 } from 'src/lib/glyph/glyphOverview'
 import { useStore } from 'src/store'
@@ -39,6 +42,38 @@ const OVERVIEW_NODE_LABEL_KEYS: Record<string, string> = {
   'category:Mark': 'fontOverview.filterLabels.categoryMark',
   'category:Other': 'fontOverview.filterLabels.categoryOther',
   'category:Unencoded': 'fontOverview.filterLabels.categoryUnencoded',
+}
+
+interface CustomFilterContextMenuState {
+  filterId: string
+  label: string
+  x: number
+  y: number
+}
+
+const createCustomFilterRuleId = () =>
+  globalThis.crypto?.randomUUID?.() ??
+  `rule-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+
+const isCustomFilterRuleGroup = (
+  rule: OverviewCustomFilterRule
+): rule is OverviewCustomFilterRuleGroup => rule.type === 'group'
+
+const cloneCustomFilterRule = (
+  rule: OverviewCustomFilterRule
+): OverviewCustomFilterRule => {
+  if (isCustomFilterRuleGroup(rule)) {
+    return {
+      id: createCustomFilterRuleId(),
+      mode: rule.mode,
+      rules: rule.rules.map(cloneCustomFilterRule),
+      type: 'group',
+    }
+  }
+  return {
+    ...rule,
+    id: createCustomFilterRuleId(),
+  }
 }
 
 const getNextExpandedIds = (expandedIds: string[], nodeId: string): string[] =>
@@ -87,6 +122,7 @@ function OverviewTreeRow({
   node,
   onCreateCustomFilter,
   onEditCustomFilter,
+  onOpenCustomFilterContextMenu,
   onSectionSelect,
   onToggle,
   translateNodeLabel,
@@ -99,6 +135,11 @@ function OverviewTreeRow({
   node: GlyphOverviewTreeNode
   onCreateCustomFilter: () => void
   onEditCustomFilter: (filterId: string) => void
+  onOpenCustomFilterContextMenu: (
+    filterId: string,
+    label: string,
+    event: React.MouseEvent
+  ) => void
   onSectionSelect: (sectionId: string) => void
   onToggle: (sectionId: string) => void
   translateNodeLabel: (node: GlyphOverviewTreeNode) => string
@@ -108,7 +149,16 @@ function OverviewTreeRow({
   const customFilterId = customOverviewFilterNodeIdToFilterId(node.id)
 
   return (
-    <HStack spacing={0} pl={depth * 2.5}>
+    <HStack
+      spacing={0}
+      pl={depth * 2.5}
+      onContextMenu={(event) => {
+        if (!customFilterId) {
+          return
+        }
+        onOpenCustomFilterContextMenu(customFilterId, label, event)
+      }}
+    >
       {hasChildren ? (
         <ExpandToggle
           isExpanded={isExpanded}
@@ -143,7 +193,7 @@ function OverviewTreeRow({
             minW="28px"
             w="28px"
             h="32px"
-            ml={1}
+            ml={0.25}
             size="sm"
             variant="ghost"
             onClick={(event) => {
@@ -183,6 +233,7 @@ function OverviewTreeBranch({
   node,
   onCreateCustomFilter,
   onEditCustomFilter,
+  onOpenCustomFilterContextMenu,
   selectedSectionId,
   onSectionSelect,
   onToggle,
@@ -195,6 +246,11 @@ function OverviewTreeBranch({
   node: GlyphOverviewTreeNode
   onCreateCustomFilter: () => void
   onEditCustomFilter: (filterId: string) => void
+  onOpenCustomFilterContextMenu: (
+    filterId: string,
+    label: string,
+    event: React.MouseEvent
+  ) => void
   selectedSectionId: string
   onSectionSelect: (sectionId: string) => void
   onToggle: (sectionId: string) => void
@@ -213,6 +269,7 @@ function OverviewTreeBranch({
         node={node}
         onCreateCustomFilter={onCreateCustomFilter}
         onEditCustomFilter={onEditCustomFilter}
+        onOpenCustomFilterContextMenu={onOpenCustomFilterContextMenu}
         onSectionSelect={onSectionSelect}
         onToggle={onToggle}
         translateNodeLabel={translateNodeLabel}
@@ -228,12 +285,105 @@ function OverviewTreeBranch({
             node={child}
             onCreateCustomFilter={onCreateCustomFilter}
             onEditCustomFilter={onEditCustomFilter}
+            onOpenCustomFilterContextMenu={onOpenCustomFilterContextMenu}
             selectedSectionId={selectedSectionId}
             onSectionSelect={onSectionSelect}
             onToggle={onToggle}
             translateNodeLabel={translateNodeLabel}
           />
         ))}
+    </Box>
+  )
+}
+
+function CustomFilterContextMenu({
+  position,
+  onClose,
+  onDelete,
+  onDuplicate,
+  onEdit,
+}: {
+  position: { x: number; y: number }
+  onClose: () => void
+  onDelete: () => void
+  onDuplicate: () => void
+  onEdit: () => void
+}) {
+  const { t } = useTranslation()
+
+  useEffect(() => {
+    const handlePointerDown = () => onClose()
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose()
+      }
+    }
+
+    window.addEventListener('pointerdown', handlePointerDown)
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      window.removeEventListener('pointerdown', handlePointerDown)
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [onClose])
+
+  return (
+    <Portal>
+      <Box
+        bg="white"
+        border="1px solid"
+        borderColor="gray.200"
+        borderRadius="6px"
+        boxShadow="0 12px 32px rgba(15, 23, 42, 0.18)"
+        left={`${position.x}px`}
+        minW="168px"
+        overflow="hidden"
+        position="fixed"
+        py="4px"
+        top={`${position.y}px`}
+        zIndex="popover"
+        onContextMenu={(event) => event.preventDefault()}
+        onPointerDown={(event) => event.stopPropagation()}
+      >
+        <ContextMenuButton onClick={onEdit}>
+          {t('fontOverview.customFilter.contextEdit')}
+        </ContextMenuButton>
+        <ContextMenuButton onClick={onDuplicate}>
+          {t('fontOverview.customFilter.contextDuplicate')}
+        </ContextMenuButton>
+        <Box h="1px" my="4px" bg="gray.100" />
+        <ContextMenuButton tone="danger" onClick={onDelete}>
+          {t('fontOverview.customFilter.contextDelete')}
+        </ContextMenuButton>
+      </Box>
+    </Portal>
+  )
+}
+
+function ContextMenuButton({
+  children,
+  onClick,
+  tone = 'default',
+}: {
+  children: ReactNode
+  onClick: () => void
+  tone?: 'default' | 'danger'
+}) {
+  return (
+    <Box
+      as="button"
+      color={tone === 'danger' ? 'red.600' : 'gray.800'}
+      display="block"
+      fontSize="13px"
+      px="12px"
+      py="8px"
+      textAlign="left"
+      type="button"
+      w="100%"
+      _hover={{ bg: tone === 'danger' ? 'red.50' : 'gray.50' }}
+      onClick={onClick}
+    >
+      {children}
     </Box>
   )
 }
@@ -249,6 +399,8 @@ export function OverviewTreeNav({
     string | null
   >(null)
   const [isCreatingCustomFilter, setIsCreatingCustomFilter] = useState(false)
+  const [contextMenu, setContextMenu] =
+    useState<CustomFilterContextMenuState | null>(null)
   const overviewCustomFilters = useStore((state) => state.overviewCustomFilters)
   const addOverviewCustomFilter = useStore(
     (state) => state.addOverviewCustomFilter
@@ -269,18 +421,69 @@ export function OverviewTreeNav({
   const handleToggle = (nodeId: string) => {
     setExpandedIds((current) => getNextExpandedIds(current, nodeId))
   }
-  const handleOpenCreateCustomFilter = () => {
+  const handleOpenCreateCustomFilter = useCallback(() => {
     setEditingCustomFilterId(null)
     setIsCreatingCustomFilter(true)
-  }
-  const handleOpenEditCustomFilter = (filterId: string) => {
+  }, [])
+  const handleOpenEditCustomFilter = useCallback((filterId: string) => {
     setIsCreatingCustomFilter(false)
     setEditingCustomFilterId(filterId)
-  }
-  const handleCloseCustomFilterModal = () => {
+  }, [])
+  const handleOpenCustomFilterContextMenu = useCallback(
+    (filterId: string, label: string, event: React.MouseEvent) => {
+      event.preventDefault()
+      event.stopPropagation()
+      setContextMenu({
+        filterId,
+        label,
+        x: event.clientX,
+        y: event.clientY,
+      })
+    },
+    []
+  )
+  const handleCloseCustomFilterModal = useCallback(() => {
     setIsCreatingCustomFilter(false)
     setEditingCustomFilterId(null)
-  }
+  }, [])
+  const handleCloseContextMenu = useCallback(() => {
+    setContextMenu(null)
+  }, [])
+  const handleDuplicateCustomFilter = useCallback(
+    (filterId: string, label: string) => {
+      const filter = overviewCustomFilters.find(
+        (currentFilter) => currentFilter.id === filterId
+      )
+      if (!filter) {
+        setContextMenu(null)
+        return
+      }
+
+      addOverviewCustomFilter({
+        mode: filter.mode,
+        name: t('fontOverview.customFilter.copyName', { name: label }),
+        rules: filter.rules.map(cloneCustomFilterRule),
+        sort: filter.sort ?? 'codePoint',
+        source: 'user',
+      })
+      setContextMenu(null)
+    },
+    [addOverviewCustomFilter, overviewCustomFilters, t]
+  )
+  const handleDeleteCustomFilterFromContextMenu = useCallback(
+    (filterId: string) => {
+      deleteOverviewCustomFilter(filterId)
+      setContextMenu(null)
+    },
+    [deleteOverviewCustomFilter]
+  )
+  const handleEditCustomFilterFromContextMenu = useCallback(
+    (filterId: string) => {
+      handleOpenEditCustomFilter(filterId)
+      setContextMenu(null)
+    },
+    [handleOpenEditCustomFilter]
+  )
   const createCustomFilterLabel = t('fontOverview.customFilter.createTitle')
   const editCustomFilterLabel = t('fontOverview.customFilter.editTitle')
   const translateNodeLabel = (node: GlyphOverviewTreeNode) => {
@@ -304,6 +507,7 @@ export function OverviewTreeNav({
             node={node}
             onCreateCustomFilter={handleOpenCreateCustomFilter}
             onEditCustomFilter={handleOpenEditCustomFilter}
+            onOpenCustomFilterContextMenu={handleOpenCustomFilterContextMenu}
             selectedSectionId={selectedSectionId}
             onSectionSelect={onSectionSelect}
             onToggle={handleToggle}
@@ -319,6 +523,21 @@ export function OverviewTreeNav({
         onDeleteFilter={deleteOverviewCustomFilter}
         onUpdateFilter={updateOverviewCustomFilter}
       />
+      {contextMenu ? (
+        <CustomFilterContextMenu
+          position={{ x: contextMenu.x, y: contextMenu.y }}
+          onClose={handleCloseContextMenu}
+          onDelete={() =>
+            handleDeleteCustomFilterFromContextMenu(contextMenu.filterId)
+          }
+          onDuplicate={() =>
+            handleDuplicateCustomFilter(contextMenu.filterId, contextMenu.label)
+          }
+          onEdit={() =>
+            handleEditCustomFilterFromContextMenu(contextMenu.filterId)
+          }
+        />
+      ) : null}
     </>
   )
 }

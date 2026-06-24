@@ -1,6 +1,10 @@
 import { isEmptyGlyphToEdit } from 'src/lib/glyph/glyphBlankness'
 import { getGlyphComponentGlyphIds } from 'src/lib/glyph/glyphGeometryState'
 import {
+  GLYPHS_LABEL_COLOR_KEYS,
+  nearestGlyphsLabelColorIndex,
+} from 'src/lib/color/kumikoColor'
+import {
   getGlyphUnicodes,
   getPrimaryGlyphUnicode,
 } from 'src/lib/glyph/glyphUnicode'
@@ -42,7 +46,7 @@ export interface OverviewSearchModel {
   regex?: boolean
 }
 
-export type OverviewCustomFilterMode = 'all' | 'any'
+export type OverviewCustomFilterMode = 'all' | 'any' | 'none'
 export type OverviewCustomFilterSource = 'seeded' | 'glyphs' | 'user'
 export type OverviewCustomFilterSort = 'codePoint' | 'recentEdit'
 
@@ -50,8 +54,13 @@ export type OverviewCustomFilterRuleField =
   | 'glyphName'
   | 'unicode'
   | 'note'
+  | 'pathCount'
+  | 'componentCount'
+  | 'tags'
+  | 'script'
   | 'category'
   | 'subCategory'
+  | 'case'
   | 'component'
   | 'export'
   | 'empty'
@@ -60,8 +69,15 @@ export type OverviewCustomFilterRuleField =
   | 'hasComponents'
   | 'hasAnchors'
   | 'hasHints'
+  | 'hasCorners'
+  | 'hasSpecialLayers'
+  | 'hasCustomGlyphInfo'
+  | 'isAutoAligned'
   | 'hasMetricsKeys'
   | 'hasColorLabel'
+  | 'colorLabel'
+  | 'hasLayerColorLabel'
+  | 'layerColorLabel'
 
 export type OverviewCustomFilterRuleOperator =
   | 'contains'
@@ -70,13 +86,29 @@ export type OverviewCustomFilterRuleOperator =
   | 'isNot'
   | 'exists'
   | 'missing'
+  | 'greaterThan'
+  | 'lessThan'
+  | 'atLeast'
+  | 'atMost'
 
-export interface OverviewCustomFilterRule {
+export interface OverviewCustomFilterRuleCondition {
+  type?: 'condition'
   field: OverviewCustomFilterRuleField
   id: string
   operator: OverviewCustomFilterRuleOperator
   value: string
 }
+
+export interface OverviewCustomFilterRuleGroup {
+  id: string
+  mode: OverviewCustomFilterMode
+  rules: OverviewCustomFilterRule[]
+  type: 'group'
+}
+
+export type OverviewCustomFilterRule =
+  | OverviewCustomFilterRuleCondition
+  | OverviewCustomFilterRuleGroup
 
 export interface OverviewCustomFilter {
   id: string
@@ -436,8 +468,13 @@ const CUSTOM_FILTER_FIELDS = new Set<OverviewCustomFilterRuleField>([
   'glyphName',
   'unicode',
   'note',
+  'pathCount',
+  'componentCount',
+  'tags',
+  'script',
   'category',
   'subCategory',
+  'case',
   'component',
   'export',
   'empty',
@@ -446,8 +483,15 @@ const CUSTOM_FILTER_FIELDS = new Set<OverviewCustomFilterRuleField>([
   'hasComponents',
   'hasAnchors',
   'hasHints',
+  'hasCorners',
+  'hasSpecialLayers',
+  'hasCustomGlyphInfo',
+  'isAutoAligned',
   'hasMetricsKeys',
   'hasColorLabel',
+  'colorLabel',
+  'hasLayerColorLabel',
+  'layerColorLabel',
 ])
 
 const CUSTOM_FILTER_OPERATORS = new Set<OverviewCustomFilterRuleOperator>([
@@ -457,6 +501,10 @@ const CUSTOM_FILTER_OPERATORS = new Set<OverviewCustomFilterRuleOperator>([
   'isNot',
   'exists',
   'missing',
+  'greaterThan',
+  'lessThan',
+  'atLeast',
+  'atMost',
 ])
 
 const CUSTOM_FILTER_SOURCES = new Set<OverviewCustomFilterSource>([
@@ -475,7 +523,8 @@ const toCustomFilterString = (value: unknown) =>
 
 const isCustomFilterMode = (
   value: unknown
-): value is OverviewCustomFilterMode => value === 'all' || value === 'any'
+): value is OverviewCustomFilterMode =>
+  value === 'all' || value === 'any' || value === 'none'
 
 const isCustomFilterField = (
   value: unknown
@@ -501,6 +550,52 @@ const isCustomFilterSort = (
   typeof value === 'string' &&
   CUSTOM_FILTER_SORTS.has(value as OverviewCustomFilterSort)
 
+const normalizeOverviewCustomFilterRule = (
+  rawRule: unknown
+): OverviewCustomFilterRule | null => {
+  const rule = rawRule as Partial<OverviewCustomFilterRule>
+  const ruleId = toCustomFilterString(rule.id)
+  if (!ruleId) {
+    return null
+  }
+
+  if (rule.type === 'group') {
+    const rawGroup = rawRule as Partial<OverviewCustomFilterRuleGroup>
+    const rules = Array.isArray(rawGroup.rules)
+      ? rawGroup.rules
+          .map(normalizeOverviewCustomFilterRule)
+          .filter((childRule): childRule is OverviewCustomFilterRule =>
+            Boolean(childRule)
+          )
+      : []
+
+    return {
+      id: ruleId,
+      mode: isCustomFilterMode(rawGroup.mode) ? rawGroup.mode : 'all',
+      rules,
+      type: 'group',
+    }
+  }
+
+  const rawCondition = rawRule as Partial<OverviewCustomFilterRuleCondition>
+  if (
+    !isCustomFilterField(rawCondition.field) ||
+    !isCustomFilterOperator(rawCondition.operator)
+  ) {
+    return null
+  }
+
+  return {
+    ...(rawCondition.type === 'condition'
+      ? { type: 'condition' as const }
+      : {}),
+    field: rawCondition.field,
+    id: ruleId,
+    operator: rawCondition.operator,
+    value: toCustomFilterString(rawCondition.value),
+  }
+}
+
 export const normalizeOverviewCustomFilters = (
   filters: unknown
 ): OverviewCustomFilter[] => {
@@ -519,24 +614,7 @@ export const normalizeOverviewCustomFilters = (
 
       const rules = Array.isArray(record.rules)
         ? record.rules
-            .map((rawRule) => {
-              const rule = rawRule as Partial<OverviewCustomFilterRule>
-              const ruleId = toCustomFilterString(rule.id)
-              if (
-                !ruleId ||
-                !isCustomFilterField(rule.field) ||
-                !isCustomFilterOperator(rule.operator)
-              ) {
-                return null
-              }
-
-              return {
-                field: rule.field,
-                id: ruleId,
-                operator: rule.operator,
-                value: toCustomFilterString(rule.value),
-              }
-            })
+            .map(normalizeOverviewCustomFilterRule)
             .filter((rule): rule is OverviewCustomFilterRule => Boolean(rule))
         : []
 
@@ -669,6 +747,123 @@ const hasMetricsKeys = (glyph: GlyphData) =>
 const getLayer = (glyph: GlyphData) => activeLayer(glyph)
 
 const booleanString = (value: boolean) => (value ? 'true' : 'false')
+
+const asRecord = (value: unknown): Record<string, unknown> =>
+  value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {}
+
+const hasRecordEntries = (value: unknown) =>
+  Object.keys(asRecord(value)).length > 0
+
+const getSourceFields = (value: unknown): Record<string, unknown> =>
+  asRecord(asRecord(asRecord(value).glyphs).fields)
+
+const sourceFieldStrings = (
+  glyph: GlyphData,
+  fieldNames: string[]
+): string[] => {
+  const customData = asRecord(glyph.customData)
+  const sourceFields = getSourceFields(glyph.sourceData)
+
+  return fieldNames.flatMap((fieldName) =>
+    valueToStrings(customData[fieldName] ?? sourceFields[fieldName])
+  )
+}
+
+const valueToStrings = (value: unknown): string[] => {
+  if (typeof value === 'string') {
+    return value
+      .split(/[\n,]+/u)
+      .map((item) => item.trim())
+      .filter(Boolean)
+  }
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return [String(value)]
+  }
+  if (Array.isArray(value)) {
+    return value.flatMap(valueToStrings)
+  }
+  return []
+}
+
+const colorToStrings = (color: GlyphData['color']) => {
+  if (!color) {
+    return ['none', 'not set']
+  }
+
+  const colorIndex = nearestGlyphsLabelColorIndex(color)
+  const colorKey =
+    colorIndex === null ? null : GLYPHS_LABEL_COLOR_KEYS[colorIndex]
+  const rgba = color.map((channel) =>
+    Number.isInteger(channel)
+      ? String(channel)
+      : String(Number(channel.toFixed(3)))
+  )
+  const [r, g, b, a] = color
+  const hex =
+    r !== undefined &&
+    g !== undefined &&
+    b !== undefined &&
+    [r, g, b].every((channel) => channel >= 0 && channel <= 1)
+      ? `#${[r, g, b]
+          .map((channel) =>
+            Math.round(channel * 255)
+              .toString(16)
+              .padStart(2, '0')
+          )
+          .join('')}`
+      : null
+
+  return compact([
+    colorKey,
+    colorIndex === null ? null : String(colorIndex),
+    rgba.join(','),
+    `rgba(${rgba.join(', ')})`,
+    hex,
+    a === 0 ? 'not set' : null,
+  ])
+}
+
+const getGlyphCase = (glyph: GlyphData) => {
+  const explicitCase = sourceFieldStrings(glyph, ['case'])[0]
+  if (explicitCase) {
+    return explicitCase
+  }
+
+  const glyphName = glyph.name || glyph.id
+  if (/(^|[._-])s(?:mall)?c(?:ap)?s?($|[._-])/iu.test(glyphName)) {
+    return 'smallCap'
+  }
+
+  const character = getGlyphDisplayCharacter(glyph)
+  if (matchesUnicodeProperty(character, /\p{Uppercase_Letter}/u)) {
+    return 'uppercase'
+  }
+  if (matchesUnicodeProperty(character, /\p{Lowercase_Letter}/u)) {
+    return 'lowercase'
+  }
+  return 'none'
+}
+
+const hasSpecialLayers = (glyph: GlyphData) =>
+  Object.values(glyph.layers ?? {}).some(
+    (layer) => layer.type === 'brace' || layer.type === 'bracket'
+  )
+
+const hasCustomGlyphInfo = (glyph: GlyphData) =>
+  hasRecordEntries(glyph.customData) ||
+  hasRecordEntries(getSourceFields(glyph.sourceData))
+
+const hasAutoAlignedComponent = (glyph: GlyphData) =>
+  getLayer(glyph).componentRefs.some(
+    (component) => component.autoAlign !== false
+  )
+
+const hasCornerComponent = (glyph: GlyphData) =>
+  getGlyphComponentGlyphIds(glyph).some((componentId) =>
+    /(^|[._-])corner($|[._-])/iu.test(componentId)
+  )
 
 const createSeedRule = (
   field: OverviewCustomFilterRuleField,
@@ -829,6 +1024,7 @@ const getOverviewCustomFilterRuleValues = (
   glyphEditTimes: GlyphEditTimes
 ) => {
   const { category, subCategory } = getGlyphCategoryPath(glyph)
+  const layer = getLayer(glyph)
 
   switch (field) {
     case 'glyphName':
@@ -844,10 +1040,23 @@ const getOverviewCustomFilterRuleValues = (
       )
     case 'note':
       return compact([glyph.note])
+    case 'pathCount':
+      return [String(layer.paths.length)]
+    case 'componentCount':
+      return [String(layer.componentRefs.length)]
+    case 'tags':
+      return sourceFieldStrings(glyph, ['tags', 'tag'])
+    case 'script':
+      return compact([
+        ...sourceFieldStrings(glyph, ['script']),
+        getGlyphScriptLabel(glyph),
+      ])
     case 'category':
       return [category]
     case 'subCategory':
       return compact([subCategory])
+    case 'case':
+      return [getGlyphCase(glyph)]
     case 'component':
       return getGlyphComponentGlyphIds(glyph)
     case 'export':
@@ -864,16 +1073,40 @@ const getOverviewCustomFilterRuleValues = (
       return [booleanString(getLayer(glyph).anchors.length > 0)]
     case 'hasHints':
       return [booleanString((getLayer(glyph).hints ?? []).length > 0)]
+    case 'hasCorners':
+      return [booleanString(hasCornerComponent(glyph))]
+    case 'hasSpecialLayers':
+      return [booleanString(hasSpecialLayers(glyph))]
+    case 'hasCustomGlyphInfo':
+      return [booleanString(hasCustomGlyphInfo(glyph))]
+    case 'isAutoAligned':
+      return [booleanString(hasAutoAlignedComponent(glyph))]
     case 'hasMetricsKeys':
       return [booleanString(hasMetricsKeys(glyph))]
     case 'hasColorLabel':
       return [booleanString(Boolean(glyph.color))]
+    case 'colorLabel':
+      return colorToStrings(glyph.color)
+    case 'hasLayerColorLabel':
+      return [booleanString(Boolean(layer.color))]
+    case 'layerColorLabel':
+      return colorToStrings(layer.color)
   }
+}
+
+const CUSTOM_FILTER_NUMERIC_FIELDS = new Set<OverviewCustomFilterRuleField>([
+  'pathCount',
+  'componentCount',
+])
+
+const parseComparableNumber = (value: string) => {
+  const number = Number(value.trim())
+  return Number.isFinite(number) ? number : null
 }
 
 const matchesOverviewCustomFilterRule = (
   glyph: GlyphData,
-  rule: OverviewCustomFilterRule,
+  rule: OverviewCustomFilterRuleCondition,
   glyphEditTimes: GlyphEditTimes
 ) => {
   const values = getOverviewCustomFilterRuleValues(
@@ -887,6 +1120,55 @@ const matchesOverviewCustomFilterRule = (
   const normalizedValue = normalizeSearchText(rule.value, false)
   const hasValue = values.some((value) => value.trim().length > 0)
   const hasComparableValue = normalizedValue.trim().length > 0
+
+  if (CUSTOM_FILTER_NUMERIC_FIELDS.has(rule.field)) {
+    const comparableValue = parseComparableNumber(rule.value)
+    const comparableValues = values.flatMap((value) => {
+      const number = parseComparableNumber(value)
+      return number === null ? [] : [number]
+    })
+    const hasComparableNumbers = comparableValues.length > 0
+
+    switch (rule.operator) {
+      case 'exists':
+        return hasComparableNumbers
+      case 'missing':
+        return !hasComparableNumbers
+      case 'is':
+        return (
+          comparableValue !== null &&
+          comparableValues.some((value) => value === comparableValue)
+        )
+      case 'isNot':
+        return (
+          comparableValue !== null &&
+          comparableValues.every((value) => value !== comparableValue)
+        )
+      case 'greaterThan':
+        return (
+          comparableValue !== null &&
+          comparableValues.some((value) => value > comparableValue)
+        )
+      case 'lessThan':
+        return (
+          comparableValue !== null &&
+          comparableValues.some((value) => value < comparableValue)
+        )
+      case 'atLeast':
+        return (
+          comparableValue !== null &&
+          comparableValues.some((value) => value >= comparableValue)
+        )
+      case 'atMost':
+        return (
+          comparableValue !== null &&
+          comparableValues.some((value) => value <= comparableValue)
+        )
+      case 'contains':
+      case 'doesNotContain':
+        return false
+    }
+  }
 
   switch (rule.operator) {
     case 'exists':
@@ -913,6 +1195,45 @@ const matchesOverviewCustomFilterRule = (
         hasComparableValue &&
         normalizedValues.every((value) => value !== normalizedValue)
       )
+    case 'greaterThan':
+    case 'lessThan':
+    case 'atLeast':
+    case 'atMost':
+      return false
+  }
+}
+
+const isCustomFilterRuleGroup = (
+  rule: OverviewCustomFilterRule
+): rule is OverviewCustomFilterRuleGroup => rule.type === 'group'
+
+const matchesOverviewCustomFilterRuleNode = (
+  glyph: GlyphData,
+  rule: OverviewCustomFilterRule,
+  glyphEditTimes: GlyphEditTimes
+): boolean => {
+  if (!isCustomFilterRuleGroup(rule)) {
+    return matchesOverviewCustomFilterRule(glyph, rule, glyphEditTimes)
+  }
+
+  if (!rule.rules.length) {
+    return false
+  }
+
+  switch (rule.mode) {
+    case 'any':
+      return rule.rules.some((childRule) =>
+        matchesOverviewCustomFilterRuleNode(glyph, childRule, glyphEditTimes)
+      )
+    case 'none':
+      return rule.rules.every(
+        (childRule) =>
+          !matchesOverviewCustomFilterRuleNode(glyph, childRule, glyphEditTimes)
+      )
+    case 'all':
+      return rule.rules.every((childRule) =>
+        matchesOverviewCustomFilterRuleNode(glyph, childRule, glyphEditTimes)
+      )
   }
 }
 
@@ -926,13 +1247,21 @@ export const matchesOverviewCustomFilter = (
     return false
   }
 
-  return filter.mode === 'any'
-    ? rules.some((rule) =>
-        matchesOverviewCustomFilterRule(glyph, rule, glyphEditTimes)
+  switch (filter.mode) {
+    case 'any':
+      return rules.some((rule) =>
+        matchesOverviewCustomFilterRuleNode(glyph, rule, glyphEditTimes)
       )
-    : rules.every((rule) =>
-        matchesOverviewCustomFilterRule(glyph, rule, glyphEditTimes)
+    case 'none':
+      return rules.every(
+        (rule) =>
+          !matchesOverviewCustomFilterRuleNode(glyph, rule, glyphEditTimes)
       )
+    case 'all':
+      return rules.every((rule) =>
+        matchesOverviewCustomFilterRuleNode(glyph, rule, glyphEditTimes)
+      )
+  }
 }
 
 export const getGlyphOverviewTree = (

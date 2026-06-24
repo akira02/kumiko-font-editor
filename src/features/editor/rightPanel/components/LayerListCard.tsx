@@ -16,8 +16,16 @@ import {
   useDisclosure,
 } from '@chakra-ui/react'
 import { EyeClosed, EyeSolid, Settings } from 'iconoir-react'
-import { useState, type KeyboardEvent, type MouseEvent } from 'react'
+import {
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent,
+} from 'react'
 import { useTranslation } from 'react-i18next'
+import {
+  LayerColorContextMenu,
+  LayerColorDot,
+} from 'src/features/editor/rightPanel/components/LayerListCard/LayerColorControls'
 import { ReferenceFontSettingsModal } from 'src/features/editor/rightPanel/components/ReferenceFontSettingsModal'
 import { useStore, type GlyphLayerData } from 'src/store'
 
@@ -26,6 +34,12 @@ interface LayerListCardProps {
   layers: GlyphLayerData[]
   activeLayerId: string | null
   onSelectLayer: (layerId: string) => void
+}
+
+interface LayerColorMenuState {
+  layerId: string
+  x: number
+  y: number
 }
 
 function EyeToggle({
@@ -73,6 +87,8 @@ export function LayerListCard({
   const referenceFontSettings = useDisclosure()
   const [renamingLayerId, setRenamingLayerId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
+  const [layerColorMenu, setLayerColorMenu] =
+    useState<LayerColorMenuState | null>(null)
   const createBackupLayer = useStore((state) => state.createBackupLayer)
   const sources = useStore((state) => state.fontData?.sources)
   const createGlyphMasterLayer = useStore(
@@ -83,6 +99,7 @@ export function LayerListCard({
   const deleteBackupLayer = useStore((state) => state.deleteBackupLayer)
   const renameBackupLayer = useStore((state) => state.renameBackupLayer)
   const promoteBackupToMaster = useStore((state) => state.promoteBackupToMaster)
+  const setLayerColor = useStore((state) => state.setLayerColor)
   const visibleBackdropLayerIds = useStore(
     (state) => state.visibleBackdropLayerIds
   )
@@ -96,6 +113,8 @@ export function LayerListCard({
   const setReferenceFontVisible = useStore(
     (state) => state.setReferenceFontVisible
   )
+  const layerColorMenuLayer =
+    layers.find((layer) => layer.id === layerColorMenu?.layerId) ?? null
   const submitRename = (layer: GlyphLayerData) => {
     const name = renameValue.trim() || layer.name
     setRenamingLayerId(null)
@@ -142,6 +161,15 @@ export function LayerListCard({
               borderColor={rowBorderColor}
               cursor="default"
               onClick={() => onSelectLayer(layer.id)}
+              onContextMenu={(event) => {
+                event.preventDefault()
+                event.stopPropagation()
+                setLayerColorMenu({
+                  layerId: layer.id,
+                  x: event.clientX,
+                  y: event.clientY,
+                })
+              }}
             >
               <EyeToggle
                 visible={visible}
@@ -151,6 +179,7 @@ export function LayerListCard({
                     : toggleBackdropLayer(layer.id)
                 }
               />
+              <LayerColorDot color={layer.color} />
 
               {isMaster ? (
                 <Box
@@ -174,7 +203,9 @@ export function LayerListCard({
                       onClick={(event) => event.stopPropagation()}
                       onChange={(event) => setRenameValue(event.target.value)}
                       onBlur={() => submitRename(layer)}
-                      onKeyDown={(event: KeyboardEvent<HTMLInputElement>) => {
+                      onKeyDown={(
+                        event: ReactKeyboardEvent<HTMLInputElement>
+                      ) => {
                         if (event.key === 'Enter') {
                           event.currentTarget.blur()
                         }
@@ -320,6 +351,16 @@ export function LayerListCard({
         isOpen={referenceFontSettings.isOpen}
         onClose={referenceFontSettings.onClose}
       />
+      {layerColorMenu && layerColorMenuLayer ? (
+        <LayerColorContextMenu
+          layer={layerColorMenuLayer}
+          position={{ x: layerColorMenu.x, y: layerColorMenu.y }}
+          onClose={() => setLayerColorMenu(null)}
+          onSelect={(color) =>
+            setLayerColor(glyphId, layerColorMenuLayer.id, color)
+          }
+        />
+      ) : null}
     </Box>
   )
 }

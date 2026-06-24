@@ -245,6 +245,23 @@ export const buildGlyphActions = (set: ImmerSet) => ({
       syncFilteredGlyphList(state)
     }),
 
+  setLayerColor: (
+    glyphId: string,
+    layerId: string,
+    color: KumikoColor | null
+  ) =>
+    set((state) => {
+      const glyph = state.fontData?.glyphs[glyphId]
+      const layer = glyph?.layers?.[layerId]
+      if (!glyph || !layer || areKumikoColorsEqual(layer.color, color)) {
+        return
+      }
+
+      layer.color = color
+      markGlyphDirty(state, glyphId)
+      syncFilteredGlyphList(state)
+    }),
+
   addGlyphs: (
     glyphs: Array<{
       id: string
