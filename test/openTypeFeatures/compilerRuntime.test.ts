@@ -72,6 +72,31 @@ describe('OpenType compiler diagnostics', () => {
       },
     ])
   })
+
+  it('does not treat Python traceback frames as FEA diagnostics', () => {
+    const rawCompilerOutput = [
+      'Traceback (most recent call last):',
+      '  File "<exec>", line 17, in kumiko_compile_fea',
+      '  File "/lib/python3.13/site-packages/fontTools/feaLib/builder.py", line 90, in addOpenTypeFeaturesFromString',
+      "UnicodeDecodeError: 'ascii' codec can't decode byte 0xb7 in position 25: ordinal not in range(128)",
+    ].join('\n')
+
+    expect(parseCompilerErrorLocations(rawCompilerOutput)).toEqual([])
+    expect(
+      mapCompilerErrorsToDiagnostics({
+        fallbackMessage:
+          "'ascii' codec can't decode byte 0xb7 in position 25: ordinal not in range(128)",
+        rawCompilerOutput,
+      })
+    ).toMatchObject([
+      {
+        message:
+          "'ascii' codec can't decode byte 0xb7 in position 25: ordinal not in range(128)",
+        severity: 'error',
+        target: { kind: 'global' },
+      },
+    ])
+  })
 })
 
 describe('OpenType compiler runtime scaffold', () => {

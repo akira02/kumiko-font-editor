@@ -81,12 +81,19 @@ const firstNonEmptyLine = (text: string) =>
     .map((line) => line.trim())
     .find(Boolean)
 
+const isPythonTracebackFrame = (line: string) =>
+  /^File\s+["'][^"']+["'],\s+line\s+\d+/i.test(line.trim())
+
 export const parseCompilerErrorLocations = (
   rawCompilerOutput: string
 ): CompilerErrorLocation[] => {
   const locations: CompilerErrorLocation[] = []
 
   rawCompilerOutput.split(/\r?\n/).forEach((line) => {
+    if (isPythonTracebackFrame(line)) {
+      return
+    }
+
     for (const pattern of FONTTOOLS_LOCATION_PATTERNS) {
       const match = pattern.exec(line)
       if (!match) {
@@ -121,7 +128,9 @@ export const mapCompilerErrorsToDiagnostics = ({
     return [
       makeDiagnostic(
         'error',
-        firstNonEmptyLine(rawCompilerOutput ?? '') ?? fallbackMessage,
+        fallbackMessage ||
+          firstNonEmptyLine(rawCompilerOutput ?? '') ||
+          'OpenType feature compiler failed.',
         { kind: 'global' },
         ['compiler', 'global']
       ),
