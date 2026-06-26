@@ -1,7 +1,15 @@
-import { Box, Grid, IconButton, Input, Stack, Text } from '@chakra-ui/react'
+import {
+  Box,
+  Grid,
+  HStack,
+  IconButton,
+  Input,
+  Stack,
+  Text,
+} from '@chakra-ui/react'
 import { Tooltip } from '@/components/ui/tooltip'
 import { Lock, ScaleFrameEnlarge, ScaleFrameReduce } from 'iconoir-react'
-import type { MouseEvent, ReactElement } from 'react'
+import type { MouseEvent, ReactElement, ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
 export type SkewAxis = 'x' | 'y'
@@ -19,6 +27,8 @@ interface TransformActionRowProps {
   onStep: (delta: number) => void
   onLeft: () => void
   onRight: () => void
+  // Optional control rendered on the right of the label row (e.g. a toggle).
+  headerRight?: ReactNode
 }
 
 interface ScaleActionGroupProps {
@@ -62,12 +72,22 @@ export function TransformActionRow({
   onStep,
   onLeft,
   onRight,
+  headerRight,
 }: TransformActionRowProps) {
   return (
     <Box>
-      <Text fontSize="xs" color="field.muted" mb={1} fontFamily="mono">
-        {label}
-      </Text>
+      {headerRight ? (
+        <HStack justify="space-between" mb={1}>
+          <Text fontSize="xs" color="field.muted" fontFamily="mono">
+            {label}
+          </Text>
+          {headerRight}
+        </HStack>
+      ) : (
+        <Text fontSize="xs" color="field.muted" mb={1} fontFamily="mono">
+          {label}
+        </Text>
+      )}
       <Grid templateColumns="32px 88px 32px" gap={1} justifyContent="center">
         <Tooltip content={leftLabel}>
           <IconButton

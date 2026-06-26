@@ -2,11 +2,16 @@
  * Path-level store actions: create, modify, delete paths and nodes,
  * connect/reconnect open paths, convert segments.
  */
+import { current } from 'immer'
 import type { StateCreator } from 'zustand'
 import {
   buildBooleanOperationPaths,
   type PathBooleanOperation,
 } from 'src/lib/pathBooleanOperations'
+import {
+  offsetGlyphPaths,
+  type OutlineOffsetOptions,
+} from 'src/lib/outlineOffset'
 import type { GlobalState, PathData, PathNode } from 'src/store/types'
 import {
   findPath,
@@ -15,12 +20,14 @@ import {
   isPathEndpointNode,
   lerp,
   orientOpenPathNodesForConnection,
+  recomputeGlyphSidebearings,
 } from 'src/store/glyphGeometry'
 import { ensureLoadedActiveLayer } from 'src/store/glyphLayer'
 import {
   pairNearestEndpoints,
   performReconnect,
 } from 'src/store/reconnectNodes'
+import { syncFilteredGlyphList } from 'src/store/glyphSearch'
 import { markGlyphDirty } from 'src/store/dirtyState'
 
 type ImmerSet = Parameters<
@@ -429,6 +436,77 @@ export const buildPathActions = (set: ImmerSet) => ({
 
     return nextSelection
   },
+
+  // Embolden/thin the whole glyph outline by offsetting every contour along its
+  // outward normal. Positive distance grows ink, negative shrinks it. Without
+  // cleanup, node ids are preserved (interpolation-safe); with cleanup, contours
+  // are rebuilt to resolve overlaps so selection is dropped.
+  applyOutlineOffset: (
+    glyphId: string,
+    distance: number,
+    options: OutlineOffsetOptions = {}
+  ) =>
+    set((state) => {
+      const glyph = state.fontData?.glyphs[glyphId]
+      const layer = glyph ? ensureLoadedActiveLayer(glyph) : undefined
+      if (!glyph || !layer || !Number.isFinite(distance) || distance === 0) {
+        return
+      }
+
+      const before = current(layer.paths)
+      const { paths, rebuilt } = offsetGlyphPaths(before, distance, options)
+      if (paths === before) {
+        return
+      }
+
+      layer.paths = paths
+      // Only a rebuild changes node ids, which would invalidate the selection.
+      if (rebuilt) {
+        state.selectedNodeIds = []
+        state.selectedSegment = null
+      }
+      recomputeGlyphSidebearings(layer)
+      markGlyphDirty(state, glyphId)
+    }),
+
+  applyBatchOutlineOffset: (
+    glyphIds: string[],
+    distance: number,
+    options: OutlineOffsetOptions = {}
+  ) =>
+    set((state) => {
+      if (!Number.isFinite(distance) || distance === 0) {
+        return
+      }
+
+      let didOffset = false
+      for (const glyphId of glyphIds) {
+        const glyph = state.fontData?.glyphs[glyphId]
+        const layer = glyph ? ensureLoadedActiveLayer(glyph) : undefined
+        if (!glyph || !layer) {
+          continue
+        }
+
+        const before = current(layer.paths)
+        const { paths } = offsetGlyphPaths(before, distance, options)
+        if (paths === before) {
+          continue
+        }
+
+        layer.paths = paths
+        recomputeGlyphSidebearings(layer)
+        markGlyphDirty(state, glyphId)
+        didOffset = true
+      }
+
+      if (!didOffset) {
+        return
+      }
+      state.selectedNodeIds = []
+      state.selectedSegment = null
+      // Refresh the overview grid so transformed shapes re-render.
+      syncFilteredGlyphList(state)
+    }),
 
   convertLineSegmentToCurve: (
     glyphId: string,

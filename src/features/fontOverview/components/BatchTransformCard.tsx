@@ -19,6 +19,7 @@ import {
 } from 'src/features/common/transform/components/TransformActionControls'
 import {
   MirrorControls,
+  OffsetControls,
   OriginPicker,
 } from 'src/features/common/transform/components/TransformPanelSections'
 import {
@@ -56,12 +57,17 @@ export function BatchTransformCard({
   const applyBatchNodePositions = useStore(
     (state) => state.applyBatchNodePositions
   )
+  const applyBatchOutlineOffset = useStore(
+    (state) => state.applyBatchOutlineOffset
+  )
 
   const [origin, setOrigin] = useState<TransformOrigin>({
     x: 'center',
     y: 'middle',
   })
   const [isScaleLocked, setIsScaleLocked] = useState(true)
+  const [offsetDraft, setOffsetDraft] = useState('10')
+  const [cleanupOverlaps, setCleanupOverlaps] = useState(true)
   const [actionDrafts, setActionDrafts] = useState<
     Record<TransformActionField, string>
   >({
@@ -148,6 +154,16 @@ export function BatchTransformCard({
         origin
       )
     )
+  }
+
+  const applyOffset = (direction: 1 | -1) => {
+    const amount = Number.parseFloat(offsetDraft)
+    if (isDisabled || !Number.isFinite(amount) || amount === 0) {
+      return
+    }
+    applyBatchOutlineOffset(selectedGlyphIds, amount * direction, {
+      cleanup: cleanupOverlaps,
+    })
   }
 
   const setActionDraft = (field: TransformActionField, value: string) => {
@@ -261,6 +277,21 @@ export function BatchTransformCard({
             onStep={(delta) => stepActionDraft('skewY', delta)}
             onLeft={() => applySkewStep('y', -1)}
             onRight={() => applySkewStep('y', 1)}
+          />
+
+          <OffsetControls
+            value={offsetDraft}
+            cleanup={cleanupOverlaps}
+            isDisabled={isDisabled}
+            onChange={setOffsetDraft}
+            onStep={(delta) =>
+              setOffsetDraft((current) =>
+                String(parseTransformNumber(current || '0') + delta)
+              )
+            }
+            onThin={() => applyOffset(-1)}
+            onEmbolden={() => applyOffset(1)}
+            onCleanupToggle={() => setCleanupOverlaps((current) => !current)}
           />
 
           <Box>

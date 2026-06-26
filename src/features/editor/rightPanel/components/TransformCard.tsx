@@ -18,7 +18,11 @@ import {
   TransformActionRow,
   type SkewAxis,
 } from 'src/features/common/transform/components/TransformActionControls'
-import { MirrorControls } from 'src/features/common/transform/components/TransformPanelSections'
+import {
+  MirrorControls,
+  OffsetControls,
+} from 'src/features/common/transform/components/TransformPanelSections'
+import { hasOffsetableContour } from 'src/lib/outlineOffset'
 import {
   AlignControls,
   PathOpsControls,
@@ -47,6 +51,11 @@ interface TransformCardProps {
   selectedNodeIds: string[]
   onMoveSelection: (updates: NodePositionUpdate[]) => void
   onPathOperation: (operation: PathBooleanOperation, pathIds: string[]) => void
+  onOutlineOffset: (
+    distance: number,
+    cleanup: boolean,
+    pathIds: string[] | null
+  ) => void
 }
 
 type TransformActionField = 'rotate' | 'scaleX' | 'scaleY' | 'skewX' | 'skewY'
@@ -57,6 +66,7 @@ export function TransformCard({
   selectedNodeIds,
   onMoveSelection,
   onPathOperation,
+  onOutlineOffset,
 }: TransformCardProps) {
   const { t } = useTranslation()
 
@@ -64,6 +74,10 @@ export function TransformCard({
     () =>
       getSelectedNodes(glyph ? activeLayer(glyph).paths : [], selectedNodeIds),
     [glyph, selectedNodeIds]
+  )
+  const canOffset = useMemo(
+    () => (glyph ? hasOffsetableContour(activeLayer(glyph).paths) : false),
+    [glyph]
   )
   const bounds = useMemo(
     () => getSelectionBounds(selectedNodes),
@@ -87,6 +101,8 @@ export function TransformCard({
     y: 'middle',
   })
   const [isScaleLocked, setIsScaleLocked] = useState(true)
+  const [offsetDraft, setOffsetDraft] = useState('10')
+  const [cleanupOverlaps, setCleanupOverlaps] = useState(true)
   const [actionDrafts, setActionDrafts] = useState<
     Record<TransformActionField, string>
   >({
@@ -213,6 +229,29 @@ export function TransformCard({
         axis === 'y' ? amount * direction : 0,
         origin
       )
+    )
+  }
+
+  const applyOffset = (direction: 1 | -1) => {
+    const amount = Number.parseFloat(offsetDraft)
+    if (!Number.isFinite(amount) || amount === 0) {
+      return
+    }
+    // With a selection, offset only the selected contours; otherwise the whole
+    // glyph. Offset needs full-contour context, so it works per path, not per
+    // node.
+    const selectedPathIds = Array.from(
+      new Set(
+        selectedNodeIds.flatMap((selectionKey) => {
+          const [pathId] = selectionKey.split(':')
+          return pathId ? [pathId] : []
+        })
+      )
+    )
+    onOutlineOffset(
+      amount * direction,
+      cleanupOverlaps,
+      selectedPathIds.length > 0 ? selectedPathIds : null
     )
   }
 
@@ -345,6 +384,21 @@ export function TransformCard({
             onStep={(delta) => stepActionDraft('skewY', delta)}
             onLeft={() => applySkewStep('y', -1)}
             onRight={() => applySkewStep('y', 1)}
+          />
+
+          <OffsetControls
+            value={offsetDraft}
+            cleanup={cleanupOverlaps}
+            isDisabled={!canOffset}
+            onChange={setOffsetDraft}
+            onStep={(delta) =>
+              setOffsetDraft((current) =>
+                String(parseTransformNumber(current || '0') + delta)
+              )
+            }
+            onThin={() => applyOffset(-1)}
+            onEmbolden={() => applyOffset(1)}
+            onCleanupToggle={() => setCleanupOverlaps((current) => !current)}
           />
 
           <Box>

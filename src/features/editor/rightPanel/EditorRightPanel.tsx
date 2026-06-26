@@ -136,6 +136,7 @@ export function EditorRightPanel() {
                     selectedNodeIds={panel.selectedNodeIds}
                     onMoveSelection={panel.handleMoveSelection}
                     onPathOperation={panel.handlePathOperation}
+                    onOutlineOffset={panel.handleOutlineOffset}
                   />
                 </Stack>
               </Tabs.Content>

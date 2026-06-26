@@ -1,6 +1,8 @@
-import { Box, Button, Grid, Stack, Text } from '@chakra-ui/react'
+import { Box, Button, Grid, HStack, Stack, Text } from '@chakra-ui/react'
 import { Tooltip } from '@/components/ui/tooltip'
-import { Flip } from 'iconoir-react'
+import { Switch } from '@/components/ui/switch'
+import { Flip, Minus, Plus } from 'iconoir-react'
+import { TransformActionRow } from 'src/features/common/transform/components/TransformActionControls'
 import type { TransformOrigin } from 'src/features/common/transform/utils/transformGeometry'
 import { useTranslation } from 'react-i18next'
 
@@ -13,6 +15,17 @@ interface OriginPickerProps {
 interface MirrorControlsProps {
   isDisabled: boolean
   onMirror: (axis: 'x' | 'y') => void
+}
+
+interface OffsetControlsProps {
+  value: string
+  cleanup: boolean
+  isDisabled: boolean
+  onChange: (value: string) => void
+  onStep: (delta: number) => void
+  onThin: () => void
+  onEmbolden: () => void
+  onCleanupToggle: () => void
 }
 
 export function OriginPicker({
@@ -100,5 +113,51 @@ export function MirrorControls({ isDisabled, onMirror }: MirrorControlsProps) {
         </Tooltip>
       </Grid>
     </Stack>
+  )
+}
+
+export function OffsetControls({
+  value,
+  cleanup,
+  isDisabled,
+  onChange,
+  onStep,
+  onThin,
+  onEmbolden,
+  onCleanupToggle,
+}: OffsetControlsProps) {
+  const { t } = useTranslation()
+
+  return (
+    <TransformActionRow
+      label={t('editor.offset')}
+      value={value}
+      unit="u"
+      isDisabled={isDisabled}
+      leftLabel={t('editor.thin')}
+      rightLabel={t('editor.embolden')}
+      leftIcon={<Minus width={16} height={16} />}
+      rightIcon={<Plus width={16} height={16} />}
+      onChange={onChange}
+      onStep={onStep}
+      onLeft={onThin}
+      onRight={onEmbolden}
+      headerRight={
+        <Tooltip content={t('editor.cleanupOverlapsHint')}>
+          <HStack gap={1}>
+            <Text fontSize="10px" color="field.muted" fontFamily="mono">
+              {t('editor.cleanupOverlaps')}
+            </Text>
+            <Switch
+              size="sm"
+              checked={cleanup}
+              disabled={isDisabled}
+              onCheckedChange={onCleanupToggle}
+              aria-label={t('editor.cleanupOverlaps')}
+            />
+          </HStack>
+        </Tooltip>
+      }
+    />
   )
 }

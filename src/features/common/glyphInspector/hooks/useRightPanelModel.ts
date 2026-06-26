@@ -59,6 +59,7 @@ export function useRightPanelModel() {
   const applyPathBooleanOperation = useStore(
     (state) => state.applyPathBooleanOperation
   )
+  const applyOutlineOffset = useStore((state) => state.applyOutlineOffset)
   const convertLineSegmentToCurve = useStore(
     (state) => state.convertLineSegmentToCurve
   )
@@ -281,6 +282,18 @@ export function useRightPanelModel() {
     applyPathBooleanOperation(glyph.id, pathIds, operation)
   }
 
+  const handleOutlineOffset = (
+    distance: number,
+    cleanup: boolean,
+    pathIds: string[] | null
+  ) => {
+    if (isInterpolatedPreview || !glyph || distance === 0) {
+      return
+    }
+
+    applyOutlineOffset(glyph.id, distance, { cleanup, pathIds })
+  }
+
   const handleDeleteGlyph = async () => {
     if (!glyph) {
       return
@@ -351,6 +364,7 @@ export function useRightPanelModel() {
     handleMetricsChange,
     handleMoveSelection,
     handleNodeTypeChange,
+    handleOutlineOffset,
     handlePathOperation,
     setSelectedLayerId,
     setWorkspaceView,

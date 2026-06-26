@@ -67,7 +67,7 @@ const applyPaperOperation = (
   return source.divide(target, options)
 }
 
-const pathToPaperPath = (scope: paper.PaperScope, path: PathData) => {
+export const pathToPaperPath = (scope: paper.PaperScope, path: PathData) => {
   const nodes = rotateToFirstOnCurve(path.nodes)
   const onCurveIndices = nodes
     .map((node, index) => (isOnCurve(node) ? index : -1))
@@ -135,7 +135,7 @@ const rotateToFirstOnCurve = (nodes: PathNode[]) => {
   ]
 }
 
-const collectPaperPaths = (item: paper.Item): paper.Path[] => {
+export const collectPaperPaths = (item: paper.Item): paper.Path[] => {
   if (item instanceof paper.Path) {
     return item.segments.length > 1 ? [item] : []
   }
@@ -143,7 +143,7 @@ const collectPaperPaths = (item: paper.Item): paper.Path[] => {
   return item.children?.flatMap((child) => collectPaperPaths(child)) ?? []
 }
 
-const paperPathToPathData = (
+export const paperPathToPathData = (
   path: paper.Path,
   idSeed: string
 ): PathData | null => {

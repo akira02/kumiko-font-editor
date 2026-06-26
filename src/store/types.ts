@@ -4,6 +4,7 @@ import type {
 } from 'src/lib/project/projectFormats'
 import type { KumikoProjectUiState } from 'src/lib/project/projectTypes'
 import type { PathBooleanOperation } from 'src/lib/pathBooleanOperations'
+import type { OutlineOffsetOptions } from 'src/lib/outlineOffset'
 import type { GlyphEditTimes } from 'src/lib/glyph/glyphEditTimes'
 import type { RadarReferenceData } from 'src/lib/qualityCheck/qualityRadar'
 import type {
@@ -627,6 +628,16 @@ export interface GlobalState {
     pathIds: string[],
     operation: PathBooleanOperation
   ) => string[]
+  applyOutlineOffset: (
+    glyphId: string,
+    distance: number,
+    options?: OutlineOffsetOptions
+  ) => void
+  applyBatchOutlineOffset: (
+    glyphIds: string[],
+    distance: number,
+    options?: OutlineOffsetOptions
+  ) => void
   convertLineSegmentToCurve: (
     glyphId: string,
     pathId: string,
